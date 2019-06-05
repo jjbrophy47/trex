@@ -108,14 +108,14 @@ def _parse_lgb_model(model, leaves_per_tree=False):
     return result
 
 
-def _similarity(x_feature, X_feature, X_train=None, k=5):
+def _similarity(x_feature, X_feature, X_train=None):
     """Finds which instances are most similar to x_feature."""
 
     if x_feature.ndim == 2:
         x_feature = x_feature[0]
 
     sim = np.matmul(X_feature, x_feature)
-    sim_ndx = np.argsort(sim)[::-1][:k]
+    sim_ndx = np.argsort(sim)[::-1]
 
     # display most similar train instances
     if X_train is not None:
@@ -127,11 +127,11 @@ def _similarity(x_feature, X_feature, X_train=None, k=5):
     return sim, sim_ndx
 
 
-def _euclidean(x, X, k=5):
+def _euclidean(x, X):
     """Computes the euclidean distance of x to each instance in X."""
 
     dist = np.linalg.norm(x - X, axis=1)
-    dist_ndx = np.argsort(dist)[:k]
+    dist_ndx = np.argsort(dist)
     return dist, dist_ndx
 
 
@@ -188,7 +188,7 @@ def main(args):
     y = data['target']
     label = data['target_names']
 
-    print('label names: {}'.format(label))
+    print('\nlabel names: {}'.format(label))
 
     # split dataset
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=args.rs, stratify=y)
@@ -196,7 +196,10 @@ def main(args):
     # train model
     model = clone(clf).fit(X_train, y_train)
     y_hat = model.predict(X_test)
-    print('test set acc: {:4f}'.format(accuracy_score(y_test, y_hat)))
+    tree_missed = np.where(y_hat != y_test)[0]
+
+    print('test set acc ({}): {:4f}'.format(args.model, accuracy_score(y_test, y_hat)))
+    print('missed test instances ({}): {}'.format(len(tree_missed), tree_missed))
 
     # extract feature representations
     if args.encoding == 'path':
@@ -211,32 +214,38 @@ def main(args):
     else:
         exit('encoding {} not implemented!'.format(args.encoding))
 
-    # test train or test instance similarity to train instances
-    ndx = 2
-    x = X_test[ndx]
-    x_feature = test_feature[ndx].reshape(1, -1)
-
-    print('\nTest [{}]'.format(ndx))
-    print(X_test[ndx])
-
-    sim, sim_ndx = _similarity(x_feature, train_feature, X_train=X_train, k=args.topk)
-    dist, _ = _euclidean(x, X_train)
-    # _plot_sim_dist(ndx, sim, dist, sim_ndx)
-
     # train an SVM on the feature representations
     svm = SVC(kernel=lambda x, y: np.dot(x, y.T), random_state=args.rs).fit(train_feature, y_train)
     y_hat_svm = svm.predict(test_feature)
-    print('\ntest set acc (svm): {:4f}'.format(accuracy_score(y_test, y_hat_svm)))
+    svm_missed = np.where(y_hat_svm != y_test)[0]
 
-    num_same_preds = np.count_nonzero(np.where(y_hat == y_hat_svm))
-    print('svm same predictions: {} / {}'.format(num_same_preds, len(y_hat)))
+    print('\ntest set acc (svm): {:4f}'.format(accuracy_score(y_test, y_hat_svm)))
+    print('missed test instances ({}): {}'.format(len(svm_missed), svm_missed))
+
+    num_same_preds = np.where(y_hat == y_hat_svm)[0]
+    print('svm-{} fidelity (same predictions): {} / {}'.format(args.model, len(num_same_preds), len(y_hat)))
+
+    missed_test_indices = np.where(y_hat != y_hat_svm)[0]
+    print('differed test instances (indices): {}'.format(missed_test_indices))
+    print(y_hat[64], y_hat[106])
+    print(y_hat_svm[64], y_hat_svm[106])
 
     print('support vectors (train indicies):')
     print(svm.support_)
 
-    # explain a test instance prediction
+    # similarity between the test instance and the train instances
+    ndx = 2
+    x = X_test[ndx]
+    x_feature = test_feature[ndx].reshape(1, -1)
+
+    sim, sim_ndx = _similarity(x_feature, train_feature)
+    dist, _ = _euclidean(x, X_train)
+    if args.plot_similarity:
+        _plot_sim_dist(ndx, sim, dist, sim_ndx)
+
+    # explain a test instance prediction using the trained svm
     prediction, influence = _svm_prediction(svm, x_feature, train_feature, y_train)
-    prediction_label = svm.predict(x_feature)
+    prediction_label = svm.predict(x_feature)[0]
     decision_pred = svm.decision_function(x_feature)[0]
     assert np.isclose(prediction, decision_pred), 'svm.decision_function does not match _svm_prediction!'
 
@@ -252,20 +261,23 @@ def main(args):
     pos_inf_list = sorted(zip(pos_inf_sv_ndx, pos_inf), key=lambda tup: tup[1], reverse=True)
 
     # show most influential train instances
-    # TODO: add label
-    print('\nTest [{}], distance to separator: {:.3f}, prediction: {}'.format(ndx, prediction, prediction_label))
+    test_str = '\nTest [{}], distance to separator: {:.3f}, prediction: {}, actual: {}'
+    train_str = '\nTrain [{}], impact: {:.3f}, similarity: {:.3f}, weight: {:.3f}, label: {}'
+
+    print(test_str.format(ndx, prediction, prediction_label, y_test[ndx]))
     print(X_test[ndx])
 
-    print('\nExcitatory Train Instances')
-    for ndx, inf in pos_inf_list[:args.topk]:
-        # TODO: add similarity and label
-        print('\nTrain [{}], impact: {:.3f}'.format(ndx, inf))
-        print(X_train[ndx])
+    print('\nPositive Train Instances')
+    for train_ndx, inf in pos_inf_list[:args.topk]:
+        train_coef = svm.dual_coef_[0][np.where(svm.support_ == train_ndx)[0][0]]
+        print(train_str.format(train_ndx, inf, sim[train_ndx], train_coef, y_train[train_ndx]))
+        print(X_train[train_ndx])
 
-    print('\nInhibitory Train Instances')
-    for ndx, inf in neg_inf_list[:args.topk]:
-        print('\nTrain [{}], impact: {:.3f}'.format(ndx, inf))
-        print(X_train[ndx])
+    print('\nNegative Train Instances')
+    for train_ndx, inf in neg_inf_list[:args.topk]:
+        train_coef = svm.dual_coef_[0][np.where(svm.support_ == train_ndx)[0][0]]
+        print(train_str.format(train_ndx, inf, sim[train_ndx], train_coef, y_train[train_ndx]))
+        print(X_train[train_ndx])
 
 
 if __name__ == '__main__':
@@ -277,6 +289,7 @@ if __name__ == '__main__':
     parser.add_argument('--n_estimators', metavar='N', type=int, default=20, help='number of trees in random forest.')
     parser.add_argument('--rs', metavar='RANDOM_STATE', type=int, default=69, help='for reproducibility.')
     parser.add_argument('--topk', metavar='NUM', type=int, default=5, help='Num of similar instances to display.')
+    parser.add_argument('--plot_similarity', default=False, action='store_true', help='plot train similarities.')
     args = parser.parse_args()
     print(args)
 
