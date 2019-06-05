@@ -167,74 +167,7 @@ def _svm_prediction(svm, x_feature, train_feature, y_train):
     return prediction, weighted_prod
 
 
-def main(args):
-    clf = None
-
-    # create model
-    if args.model == 'lgb':
-        clf = lgb.LGBMClassifier(random_state=args.rs, n_estimators=args.n_estimators)
-    elif args.model == 'rf':
-        clf = RandomForestClassifier(random_state=args.rs, n_estimators=args.n_estimators)
-
-    # load dataset
-    if args.dataset == 'iris':
-        data = load_iris()
-    elif args.dataset == 'breast':
-        data = load_breast_cancer()
-    elif args.dataset == 'wine':
-        data = load_wine()
-
-    X = data['data']
-    y = data['target']
-    label = data['target_names']
-
-    print('\nlabel names: {}'.format(label))
-
-    # split dataset
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=args.rs, stratify=y)
-
-    # train model
-    model = clone(clf).fit(X_train, y_train)
-    y_hat = model.predict(X_test)
-    tree_missed = np.where(y_hat != y_test)[0]
-
-    print('test set acc ({}): {:4f}'.format(args.model, accuracy_score(y_test, y_hat)))
-    print('missed test instances ({}): {}'.format(len(tree_missed), tree_missed))
-
-    # extract feature representations
-    if args.encoding == 'path':
-        train_feature, train_enc = tree_path_encoding(model, X_train)
-        test_feature, _ = tree_path_encoding(model, X_test, one_hot_enc=train_enc)
-
-    elif args.encoding == 'output':
-        exit('tree output encodings under construction...')
-        train_feature = tree_output_encoding(model, X_train)
-        test_feature = tree_output_encoding(model, X_test)
-
-    else:
-        exit('encoding {} not implemented!'.format(args.encoding))
-
-    # train an SVM on the feature representations
-    svm = SVC(kernel=lambda x, y: np.dot(x, y.T), random_state=args.rs).fit(train_feature, y_train)
-    y_hat_svm = svm.predict(test_feature)
-    svm_missed = np.where(y_hat_svm != y_test)[0]
-
-    print('\ntest set acc (svm): {:4f}'.format(accuracy_score(y_test, y_hat_svm)))
-    print('missed test instances ({}): {}'.format(len(svm_missed), svm_missed))
-
-    num_same_preds = np.where(y_hat == y_hat_svm)[0]
-    print('svm-{} fidelity (same predictions): {} / {}'.format(args.model, len(num_same_preds), len(y_hat)))
-
-    missed_test_indices = np.where(y_hat != y_hat_svm)[0]
-    print('differed test instances (indices): {}'.format(missed_test_indices))
-    print(y_hat[64], y_hat[106])
-    print(y_hat_svm[64], y_hat_svm[106])
-
-    print('support vectors (train indicies):')
-    print(svm.support_)
-
-    # similarity between the test instance and the train instances
-    ndx = 2
+def explain(ndx, svm, X_train, y_train, X_test, y_test, train_feature, test_feature):
     x = X_test[ndx]
     x_feature = test_feature[ndx].reshape(1, -1)
 
@@ -261,23 +194,108 @@ def main(args):
     pos_inf_list = sorted(zip(pos_inf_sv_ndx, pos_inf), key=lambda tup: tup[1], reverse=True)
 
     # show most influential train instances
-    test_str = '\nTest [{}], distance to separator: {:.3f}, prediction: {}, actual: {}'
-    train_str = '\nTrain [{}], impact: {:.3f}, similarity: {:.3f}, weight: {:.3f}, label: {}'
+    test_str = '\n\nTest [{}], distance to separator: {:.3f}, prediction: {}, actual: {}'
+    train_str = 'Train [{}], impact: {:.3f}, similarity: {:.3f}, weight: {:.3f}, label: {}'
 
     print(test_str.format(ndx, prediction, prediction_label, y_test[ndx]))
-    print(X_test[ndx])
+    # print(X_test[ndx])
 
     print('\nPositive Train Instances')
     for train_ndx, inf in pos_inf_list[:args.topk]:
         train_coef = svm.dual_coef_[0][np.where(svm.support_ == train_ndx)[0][0]]
         print(train_str.format(train_ndx, inf, sim[train_ndx], train_coef, y_train[train_ndx]))
-        print(X_train[train_ndx])
+        # print(X_train[train_ndx])
 
     print('\nNegative Train Instances')
     for train_ndx, inf in neg_inf_list[:args.topk]:
         train_coef = svm.dual_coef_[0][np.where(svm.support_ == train_ndx)[0][0]]
         print(train_str.format(train_ndx, inf, sim[train_ndx], train_coef, y_train[train_ndx]))
-        print(X_train[train_ndx])
+        # print(X_train[train_ndx])
+
+
+def main(args):
+    clf = None
+
+    # create model
+    if args.model == 'lgb':
+        clf = lgb.LGBMClassifier(random_state=args.rs, n_estimators=args.n_estimators)
+    elif args.model == 'rf':
+        clf = RandomForestClassifier(random_state=args.rs, n_estimators=args.n_estimators)
+
+    # load dataset
+    if args.dataset == 'iris':
+        data = load_iris()
+    elif args.dataset == 'breast':
+        data = load_breast_cancer()
+    elif args.dataset == 'wine':
+        data = load_wine()
+
+    X = data['data']
+    y = data['target']
+    label = data['target_names']
+
+    print('label names: {}'.format(label))
+
+    # split dataset
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=args.rs, stratify=y)
+
+    # train model
+    model = clone(clf).fit(X_train, y_train)
+    y_hat_train = model.predict(X_train)
+    y_hat_test = model.predict(X_test)
+    tree_missed_train = np.where(y_hat_train != y_train)[0]
+    tree_missed_test = np.where(y_hat_test != y_test)[0]
+
+    print('\nTree Ensemble ({})'.format(args.model))
+    print('train set acc ({}): {:4f}'.format(args.model, accuracy_score(y_train, y_hat_train)))
+    print('test set acc ({}): {:4f}'.format(args.model, accuracy_score(y_test, y_hat_test)))
+    print('missed train instances ({}): {}'.format(len(tree_missed_train), tree_missed_train))
+    print('missed test instances ({}): {}'.format(len(tree_missed_test), tree_missed_test))
+
+    # extract feature representations
+    if args.encoding == 'path':
+        train_feature, train_enc = tree_path_encoding(model, X_train)
+        test_feature, _ = tree_path_encoding(model, X_test, one_hot_enc=train_enc)
+
+    elif args.encoding == 'output':
+        exit('tree output encodings under construction...')
+        train_feature = tree_output_encoding(model, X_train)
+        test_feature = tree_output_encoding(model, X_test)
+
+    else:
+        exit('encoding {} not implemented!'.format(args.encoding))
+
+    # train an SVM on the feature representations
+    svm = SVC(kernel=lambda x, y: np.dot(x, y.T), random_state=args.rs, C=0.1).fit(train_feature, y_train)
+    y_hat_svm_train = svm.predict(train_feature)
+    y_hat_svm_test = svm.predict(test_feature)
+    svm_missed_train = np.where(y_hat_svm_train != y_train)[0]
+    svm_missed_test = np.where(y_hat_svm_test != y_test)[0]
+
+    print('\nSVM')
+    print('train set acc (svm): {:4f}'.format(accuracy_score(y_train, y_hat_svm_train)))
+    print('test set acc (svm): {:4f}'.format(accuracy_score(y_test, y_hat_svm_test)))
+    print('missed train instances ({}): {}'.format(len(svm_missed_train), svm_missed_train))
+    print('missed test instances ({}): {}'.format(len(svm_missed_test), svm_missed_test))
+
+    print('\nFidelity')
+    same_train_preds = np.where(y_hat_train == y_hat_svm_train)[0]
+    same_test_preds = np.where(y_hat_test == y_hat_svm_test)[0]
+    print('svm-{} train fidelity: {} / {}'.format(args.model, len(same_train_preds), len(y_hat_train)))
+    print('svm-{} test fidelity: {} / {}'.format(args.model, len(same_test_preds), len(y_hat_test)))
+
+    diff_train = np.where(y_hat_train != y_hat_svm_train)[0]
+    diff_test = np.where(y_hat_test != y_hat_svm_test)[0]
+    print('differed train instances (indices): {}'.format(diff_train))
+    print('differed test instances (indices): {}'.format(diff_test))
+
+    print('\nExplanation')
+    print('\nsupport vectors (train indices):')
+    print(svm.support_)
+
+    # similarity between the test instance and the train instances
+    for ndx in tree_missed_test:
+        explain(ndx, svm, X_train, y_train, X_test, y_test, train_feature, test_feature)
 
 
 if __name__ == '__main__':
