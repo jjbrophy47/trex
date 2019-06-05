@@ -252,11 +252,13 @@ def main(args):
     pos_inf_list = sorted(zip(pos_inf_sv_ndx, pos_inf), key=lambda tup: tup[1], reverse=True)
 
     # show most influential train instances
+    # TODO: add label
     print('\nTest [{}], distance to separator: {:.3f}, prediction: {}'.format(ndx, prediction, prediction_label))
     print(X_test[ndx])
 
     print('\nExcitatory Train Instances')
     for ndx, inf in pos_inf_list[:args.topk]:
+        # TODO: add similarity and label
         print('\nTrain [{}], impact: {:.3f}'.format(ndx, inf))
         print(X_train[ndx])
 
