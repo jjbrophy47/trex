@@ -2,7 +2,6 @@
 Sample explanation for tree ensembles with SEXEE.
 """
 import argparse
-import numpy as np
 import lightgbm as lgb
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.datasets import load_iris, load_breast_cancer, load_wine
@@ -10,38 +9,39 @@ from sklearn.model_selection import train_test_split
 from sexee.explainer import TreeExplainer
 
 
-def show_most_impactful_train_instances(impact):
-
-    neg_inf_ndx = np.where(influence < 0)[0]
-    neg_inf = influence[neg_inf_ndx]
-    neg_inf_sv_ndx = self.svm_.support_[neg_inf_ndx]
-    neg_inf_list = sorted(zip(neg_inf_sv_ndx, neg_inf), key=lambda tup: tup[1])
-
-    pos_inf_ndx = np.where(influence > 0)[0]
-    pos_inf = influence[pos_inf_ndx]
-    pos_inf_sv_ndx = self.svm_.support_[pos_inf_ndx]
-    pos_inf_list = sorted(zip(pos_inf_sv_ndx, pos_inf), key=lambda tup: tup[1], reverse=True)
+def show_test_instance(test_ndx, svm_pred, pred_label, y_test=None, label=None):
 
     # show test instance
-    if y is not None and ndx is not None:
+    if y_test is not None and label is not None:
         test_str = '\n\nTest [{}], distance to separator: {:.3f}, prediction: {}, actual: {}'
-        print(test_str.format(ndx, prediction, prediction_label, y_train[ndx]))
+        print(test_str.format(test_ndx, svm_pred, label[pred_label], label[y_test[test_ndx]]))
+
+    elif y_test is not None:
+        test_str = '\n\nTest [{}], distance to separator: {:.3f}, prediction: {}, actual: {}'
+        print(test_str.format(test_ndx, svm_pred, pred_label, y_test[test_ndx]))
+
     else:
         test_str = '\n\nTest [{}], distance to separator: {:.3f}, prediction: {}'
-        print(test_str.format(ndx, prediction, prediction_label))
+        print(test_str.format(test_ndx, svm_pred, pred_label))
+
+
+def show_train_instances(impact_list, y_train, k=5, label=None):
 
     # show most influential train instances
-    train_str = 'Train [{}], impact: {:.3f}, similarity: {:.3f}, weight: {:.3f}, label: {}'
+    n_items = len(impact_list[0])
 
-    print('\nPositive Train Instances')
-    for train_ndx, inf in pos_inf_list[:topk]:
-        train_coef = self.svm_.dual_coef_[0][np.where(self.svm_.support_ == train_ndx)[0][0]]
-        print(train_str.format(train_ndx, inf, sim[train_ndx], train_coef, self.y_train[train_ndx]))
+    if n_items == 2:
+        train_str = 'Train [{}], impact: {:.3f}, label: {}'
+    elif n_items == 4:
+        train_str = 'Train [{}], impact: {:.3f}, similarity: {:.3f}, weight: {:.3f}, label: {}'
+    else:
+        exit('3 train impact items is ambiguous!')
 
-    print('\nNegative Train Instances')
-    for train_ndx, inf in neg_inf_list[:topk]:
-        train_coef = self.svm_.dual_coef_[0][np.where(self.svm_.support_ == train_ndx)[0][0]]
-        print(train_str.format(train_ndx, inf, sim[train_ndx], train_coef, self.y_train[train_ndx]))
+    print('\nMost Impactful Train Instances')
+    for items in impact_list[:k]:
+        train_label = y_train[items[0]] if label is None else label[y_train[items[0]]]
+        items += (train_label,)
+        print(train_str.format(*items))
 
 
 def main(args):
@@ -63,15 +63,20 @@ def main(args):
     X = data['data']
     y = data['target']
     label = data['target_names']
+    print(label)
 
     # split dataset
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=args.rs, stratify=y)
 
+    # train a tree ensemble
     model = clf.fit(X_train, y_train)
     explainer = TreeExplainer(model, X_train, y_train, encoding=args.encoding, random_state=args.rs)
 
-    imp_list = explainer.train_impact(X_test[0].reshape(1, -1))
-    print(sorted(imp_list, key=lambda tup: abs(tup[1]), reverse=True))
+    test_ndx = 1
+    impact_list, (svm_pred, pred_label) = explainer.train_impact(X_test[test_ndx].reshape(1, -1), pred_svm=True)
+    impact_list = sorted(impact_list, key=lambda tup: abs(tup[1]), reverse=True)
+    show_test_instance(test_ndx, svm_pred, pred_label, y_test=y_test, label=label)
+    show_train_instances(impact_list, y_train, k=args.topk, label=label)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Feature representation extractions for tree ensembles',
@@ -85,5 +90,4 @@ if __name__ == '__main__':
     parser.add_argument('--plot_similarity', default=False, action='store_true', help='plot train similarities.')
     args = parser.parse_args()
     print(args)
-
     main(args)

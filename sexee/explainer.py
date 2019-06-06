@@ -50,7 +50,7 @@ class TreeExplainer:
         else:
             self.svm_ = clf.fit(self.train_feature_, self.y_train)
 
-    def train_impact(self, x, similarity=False, weight=False):
+    def train_impact(self, x, similarity=False, weight=False, pred_svm=False):
         """
         Compute the impact of each support vector on a single test instance.
 
@@ -62,13 +62,16 @@ class TreeExplainer:
             If True, returns the similarity of each support vector to `x`.
         weight: bool
             If True, returns the weight of each support vector.
+        pred_svm: bool
+            If True, returns a (<distance to separator>, <predicted_label>) tuple from the svm.
 
         Returns
         -------
-        list of (<train_ndx>, <impact>, <sim>, <weight>) tuples for each support vector.
+        impact_list: list of (<train_ndx>, <impact>, <sim>, <weight>) tuples for each support vector.
             A positive <impact> score means the support vector contributed towards the predicted label, while a
             negative score means it contributed against the predicted label. <sim> is addded if `similarity`
             is True and <weight> is added if `weight` is True.
+        If `pred_svm` is True, the return object becomes (impact_list, <svm_pred>) tuple.
         """
 
         # error checking
@@ -87,6 +90,7 @@ class TreeExplainer:
             self.svm_ = self.ovr_.estimators_[pred_label]
         else:
             assert self.svm_ is not None, 'svm_ is not fitted!'
+            pred_label = self.svm_.predict(x_feature)[0]
 
         # TODO: compute similarity only to support vectors?
         # compute similarity of this instance to all train instances
@@ -97,6 +101,12 @@ class TreeExplainer:
         decision_pred = self.svm_.decision_function(x_feature)[0]
         assert np.isclose(prediction, decision_pred), 'svm.decision_function does not match decomposition!'
 
+        # flip impact scores for binary case if predicted label is 0
+        # this ensures positive impact scores represent contributions toward the predicted label
+        if self.n_classes_ == 2 and pred_label == 0:
+            impact *= -1
+            decision_pred *= -1
+
         # assemble items to be returned
         impact_list = [self.svm_.support_, impact]
         if similarity:
@@ -105,6 +115,9 @@ class TreeExplainer:
             impact_list.append(self.svm_.dual_coef_[0])
 
         result = list(zip(*impact_list))
+
+        if pred_svm:
+            result = (result, (decision_pred, pred_label))
 
         # clear chosen svm if multiclass
         if self.n_classes_ > 2:
