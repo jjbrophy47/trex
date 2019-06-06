@@ -15,8 +15,7 @@ class TreeExtractor:
         Parameters
         ----------
         model: object
-            Trained tree ensemble. Supported: RandomForestClassifier, LightGBM.
-            Unsupported: XGBoost, CatBoost.
+            Trained tree ensemble. Supported: RandomForestClassifier, LightGBM. Unsupported: XGBoost, CatBoost.
         encoding: str, {'tree_path', 'tree_output'}, (default='tree_path')
             Type of feature representation to extract from the tree ensemble.
         """
@@ -29,6 +28,19 @@ class TreeExtractor:
         self.encoding = encoding
 
     def fit_transform(self, X):
+        """
+        Outputs a feature representation for each x in X.
+
+        Parameters
+        ----------
+        X: 2d array-like
+            Each row in X is a separate instance.
+
+        Returns
+        -------
+        Feature representation of X with the same number of rows as X.
+        If encoding='tree_path', also returns the fitted one_hot_encoder.
+        """
         assert X.ndim == 2, 'X is not 2d!'
 
         if self.encoding == 'tree_path':
@@ -40,6 +52,18 @@ class TreeExtractor:
         return X_feature
 
     def transform(self, X):
+        """
+        Outputs a feature representation for each x in X.
+
+        Parameters
+        ----------
+        X: 2d array-like
+            Each row in X is a separate instance.
+
+        Returns
+        -------
+        Feature representation of X with the same number of rows as X.
+        """
         assert X.ndim == 2, 'X is not 2d!'
 
         if self.encoding == 'tree_path':
@@ -87,7 +111,7 @@ def tree_path_encoding(model, X, one_hot_enc=None, to_dense=True, timeit=False):
     return encoding, one_hot_enc
 
 
-def tree_output_encoding(model, X):
+def tree_output_encoding(model, X, timeit=False):
     """
     Encodes each x in X as a concatenation of one-hot encodings, one for each tree.
     Each one-hot encoding represents the class or output at the leaf x traversed to.
@@ -102,7 +126,6 @@ def tree_output_encoding(model, X):
 
     # DO NOT USE! An instance can be more similar with other instances than itself, since these are leaf values
     elif str(model).startswith('LGBMClassifier'):
-        exit('tree output encoding for LGB not good, do not use!')
         leaves = model.predict_proba(X, pred_leaf=True)
         encoding = np.zeros(leaves.shape)
 
@@ -110,10 +133,9 @@ def tree_output_encoding(model, X):
             for j in range(leaves.shape[1]):  # per tree
                 encoding[i][j] = model.booster_.get_leaf_output(j, leaves[i][j])
 
-    else:
-        exit('model {} not implemented!'.format(str(model)))
+    if timeit:
+        print('output encoding time: {:.3f}'.format(time.time() - start))
 
-    print('output encoding time: {:.3f}'.format(time.time() - start))
     return encoding
 
 
