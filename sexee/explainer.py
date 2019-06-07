@@ -3,19 +3,43 @@ Explainer for a tree ensemble using an SVMs.
 Currently supports: sklearn's RandomForestClassifier, lightgbm.
 Future support: XGBoost, CatBoost.
 """
+import copy
+
 import numpy as np
 from sklearn.utils.validation import check_X_y
-from .extractor import TreeExtractor
 from sklearn.svm import SVC
 from sklearn.multiclass import OneVsRestClassifier
+from sklearn.metrics.pairwise import linear_kernel, rbf_kernel
+
+from . import util
+from .extractor import TreeExtractor
 
 
 class TreeExplainer:
 
-    def __init__(self, model, X_train, y_train, encoding='tree_path', random_state=None):
+    def __init__(self, model, X_train, y_train, encoding='tree_path', random_state=None, use_predicted_labels=False):
+        """
+        Trains an svm on feature representations from the learned tree ensemble.
+
+        Parameters
+        ----------
+        model : object
+            Learned tree ensemble. Supported: RandomForestClassifier, LightGBM.
+            Unsupported: XGBoost, CatBoost.
+        X_train : 2d array-like
+            Train instances in original feature space.
+        y_train : 1d array-like (default=None)
+            Ground-truth train labels.
+        encoding : str (default='tree_path')
+            Feature representation to extract from the tree ensemble.
+        use_predicted_labels : bool (default=False)
+            If True, predicted labels from the tree ensemble are used to train the SVM.
+        random_state : int (default=None)
+            Random state to promote reproducibility.
+        """
 
         # error checking
-        self._validate_model(model)
+        self.model_type_ = util.validate_model(model)
         self._validate_data(X_train, y_train)
         assert encoding in ['tree_path', 'tree_output'], '{} encoding unsupported!'.format(encoding)
 
@@ -23,6 +47,7 @@ class TreeExplainer:
         self.X_train = X_train
         self.y_train = y_train
         self.encoding = encoding
+        self.use_predicted_labels = use_predicted_labels
         self.random_state = random_state
 
         # extract feature representations from the tree ensemble
@@ -31,24 +56,31 @@ class TreeExplainer:
 
         # set kernel for svm
         if self.encoding == 'tree_path':
-            self.kernel_ = lambda x, y: np.dot(x, y.T)  # linear kernel
+            self.kernel_ = 'linear'
 
         elif self.encoding == 'tree_output':
 
             if self.model_type_ == 'RandomForestClassifier':
-                self.kernel_ = lambda x, y: np.dot(x, y.T)
+                self.kernel_ = 'linear'
             else:
                 self.kernel_ = 'rbf'
 
         # train svm on feature representations and true or predicted labels
-        clf = SVC(kernel=self.kernel_, random_state=self.random_state, C=0.1)  # TODO: grid search over C?
+        # TODO: grid search over C?
+        # TODO: grid search over gamma when rbf kernel?
+        clf = SVC(kernel=self.kernel_, random_state=self.random_state, C=0.1, gamma='scale')
 
-        # TODO: option to train on predicted labels?
+        # choose train labels to train on, ground truth or predicted labels
+        train_label = self.y_train
+        if use_predicted_labels:
+            train_label = self.model.predict(X_train)
+
+        # train `n_classes_` SVM models if multiclass, otherwise just train one SVM
         if self.n_classes_ > 2:
-            self.ovr_ = OneVsRestClassifier(clf).fit(self.train_feature_, self.y_train)
+            self.ovr_ = OneVsRestClassifier(clf).fit(self.train_feature_, train_label)
             self.svm_ = None
         else:
-            self.svm_ = clf.fit(self.train_feature_, self.y_train)
+            self.svm_ = clf.fit(self.train_feature_, train_label)
 
     def train_impact(self, x, similarity=False, weight=False, pred_svm=False):
         """
@@ -86,18 +118,18 @@ class TreeExplainer:
         if self.n_classes_ > 2:
             assert self.ovr_ is not None, 'ovr_ is not fitted!'
             assert self.svm_ is None, 'svm_ already fitted!'
-            pred_label = self.ovr_.predict(x_feature)[0]
+            pred_label = int(self.ovr_.predict(x_feature)[0])
             self.svm_ = self.ovr_.estimators_[pred_label]
         else:
             assert self.svm_ is not None, 'svm_ is not fitted!'
-            pred_label = self.svm_.predict(x_feature)[0]
+            pred_label = int(self.svm_.predict(x_feature)[0])
 
         # TODO: compute similarity only to support vectors?
         # compute similarity of this instance to all train instances
-        sim, sim_ndx = self._similarity(x_feature)
+        sim = self._similarity(x_feature)
 
         # ensure the decomposition matches the decision function prediction from the svm
-        prediction, impact = self._svm_decomposition(x_feature)
+        prediction, impact = self._decomposition(x_feature)
         decision_pred = self.svm_.decision_function(x_feature)[0]
         assert np.isclose(prediction, decision_pred), 'svm.decision_function does not match decomposition!'
 
@@ -106,13 +138,16 @@ class TreeExplainer:
         if self.n_classes_ == 2 and pred_label == 0:
             impact *= -1
             decision_pred *= -1
+            dual_weight = self.svm_.dual_coef_[0] * -1
+        else:
+            dual_weight = self.svm_.dual_coef_
 
         # assemble items to be returned
         impact_list = [self.svm_.support_, impact]
         if similarity:
             impact_list.append(sim[self.svm_.support_])
         if weight:
-            impact_list.append(self.svm_.dual_coef_[0])
+            impact_list.append(dual_weight)
 
         result = list(zip(*impact_list))
 
@@ -125,7 +160,40 @@ class TreeExplainer:
 
         return result
 
-    def _svm_decomposition(self, x_feature):
+    def similarity(self, x_feature, sort=False):
+        """Finds which instances are most similar to x_feature."""
+
+        assert self.train_feature_ is not None, 'train_feature_ is not fitted!'
+
+        if x_feature.ndim == 2:
+            x_feature = x_feature[0]
+
+        # compute similarity
+        if self.kernel_ == 'linear':
+            sim = linear_kernel(self.train_feature_, x_feature).flatten()
+        elif self.kernel_ == 'rbf':
+            sim = rbf_kernel(self.train_feature_, x_feature, gamma=self.svm_._gamma).flatten()
+
+        result = sim
+
+        # put train instances in descending order of similarity
+        if sort:
+            sim_ndx = np.argsort(sim)[::-1]
+            result = (sim, sim_ndx)
+
+        return result
+
+    def get_svm(self):
+        """Return a copy of the learned svm model."""
+
+        if self.n_classes_ > 2:
+            return copy.deepcopy(self.ovr_)
+        else:
+            svm_model = copy.deepcopy(self.svm_)
+
+        return svm_model
+
+    def _decomposition(self, x_feature):
         """
         Computes the prediction for a query point as a weighted sum of support vectors.
         This should match the `svm.decision_function` method.
@@ -135,34 +203,19 @@ class TreeExplainer:
         sv_feature = self.train_feature_[self.svm_.support_]  # support vector train instances
         sv_weight = self.svm_.dual_coef_[0]  # support vector weights
 
-        sim_prod = np.matmul(sv_feature, x_feature[0])
+        if self.kernel_ == 'linear':
+            sim_prod = linear_kernel(sv_feature, x_feature).flatten()
+        elif self.kernel_ == 'rbf':
+            sim_prod = rbf_kernel(sv_feature, x_feature, gamma=self.svm_._gamma).flatten()
+
         weighted_prod = sim_prod * sv_weight
         prediction = (np.sum(weighted_prod) + self.svm_.intercept_)[0]
 
         return prediction, weighted_prod
 
-    def _similarity(self, x_feature):
-        """Finds which instances are most similar to x_feature."""
-        # TODO: This is a linear kernel, which only works for `tree_path` encodings!
-
-        assert self.train_feature_ is not None, 'train_feature_ is not fitted!'
-
-        if x_feature.ndim == 2:
-            x_feature = x_feature[0]
-
-        sim = np.matmul(self.train_feature_, x_feature)
-        sim_ndx = np.argsort(sim)[::-1]
-
-        return sim, sim_ndx
-
-    def _validate_model(self, model):
-        """Makes sure the model is a supported model type."""
-
-        model_type = str(model).split('(')[0]
-        assert model_type in ['RandomForestClassifier', 'LGBMClassifier'], '{} not supportted!'.format(model_type)
-        self.model_type_ = model_type
-
     def _validate_data(self, X, y):
+        """Make sure the data is well-formed."""
+
         check_X_y(X, y)
         if y.dtype == np.float and not np.all(np.mod(y, 1) == 0):
             raise ValueError('Unknown label type: ')

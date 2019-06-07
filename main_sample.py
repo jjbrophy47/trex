@@ -2,14 +2,21 @@
 Sample explanation for tree ensembles with SEXEE.
 """
 import argparse
-import lightgbm as lgb
+import catboost
+import lightgbm
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.datasets import load_iris, load_breast_cancer, load_wine
 from sklearn.model_selection import train_test_split
+
 from sexee.explainer import TreeExplainer
+from util import model_util
 
 
 def show_test_instance(test_ndx, svm_pred, pred_label, y_test=None, label=None):
+
+    print(pred_label)
+    print(label)
+    print(label[pred_label])
 
     # show test instance
     if y_test is not None and label is not None:
@@ -48,7 +55,9 @@ def main(args):
 
     # create model
     if args.model == 'lgb':
-        clf = lgb.LGBMClassifier(random_state=args.rs, n_estimators=args.n_estimators)
+        clf = lightgbm.LGBMClassifier(random_state=args.rs, n_estimators=args.n_estimators)
+    elif args.model == 'cb':
+        clf = catboost.CatBoostClassifier(random_state=args.rs, n_estimators=args.n_estimators)
     elif args.model == 'rf':
         clf = RandomForestClassifier(random_state=args.rs, n_estimators=args.n_estimators)
 
@@ -70,10 +79,18 @@ def main(args):
 
     # train a tree ensemble
     model = clf.fit(X_train, y_train)
-    explainer = TreeExplainer(model, X_train, y_train, encoding=args.encoding, random_state=args.rs)
+    model_util.performance(model, X_train, y_train, X_test, y_test)
 
-    test_ndx = 1
-    impact_list, (svm_pred, pred_label) = explainer.train_impact(X_test[test_ndx].reshape(1, -1), pred_svm=True)
+    # train an svm on learned representations from the tree ensemble
+    explainer = TreeExplainer(model, X_train, y_train, encoding=args.encoding, random_state=args.rs,
+                              use_predicted_labels=True)
+    test_feature = explainer.extractor_.transform(X_test)
+    model_util.performance(explainer.get_svm(), explainer.train_feature_, y_train, test_feature, y_test)
+
+    test_ndx = 2
+    impact_list, (svm_pred, pred_label) = explainer.train_impact(X_test[test_ndx].reshape(1, -1), pred_svm=True,
+                                                                 similarity=True, weight=True)
+    print(svm_pred, pred_label)
     impact_list = sorted(impact_list, key=lambda tup: abs(tup[1]), reverse=True)
     show_test_instance(test_ndx, svm_pred, pred_label, y_test=y_test, label=label)
     show_train_instances(impact_list, y_train, k=args.topk, label=label)
@@ -87,7 +104,6 @@ if __name__ == '__main__':
     parser.add_argument('--n_estimators', metavar='N', type=int, default=20, help='number of trees in random forest.')
     parser.add_argument('--rs', metavar='RANDOM_STATE', type=int, default=69, help='for reproducibility.')
     parser.add_argument('--topk', metavar='NUM', type=int, default=5, help='Num of similar instances to display.')
-    parser.add_argument('--plot_similarity', default=False, action='store_true', help='plot train similarities.')
     args = parser.parse_args()
     print(args)
     main(args)

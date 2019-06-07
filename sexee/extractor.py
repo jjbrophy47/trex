@@ -2,8 +2,12 @@
 Feature representation extractor for different tree ensemble models.
 """
 import time
+
+import catboost
 import numpy as np
 from sklearn.preprocessing import OneHotEncoder
+
+from . import util
 
 
 class TreeExtractor:
@@ -19,9 +23,7 @@ class TreeExtractor:
         encoding: str, {'tree_path', 'tree_output'}, (default='tree_path')
             Type of feature representation to extract from the tree ensemble.
         """
-        model_type_ = str(model).split('(')[0]
-
-        assert model_type_ in ['RandomForestClassifier', 'LGBMClassifier'], '{} not supported!'.format(model_type_)
+        self.model_type_ = util.validate_model(model)
         assert encoding in ['tree_path', 'tree_output'], '{} encoding not supported!'.format(encoding)
 
         self.model = model
@@ -44,10 +46,10 @@ class TreeExtractor:
         assert X.ndim == 2, 'X is not 2d!'
 
         if self.encoding == 'tree_path':
-            X_feature, self.path_enc_ = tree_path_encoding(self.model, X)
+            X_feature, self.path_enc_ = self._tree_path_encoding(X)
 
         elif self.encoding == 'tree_output':
-            X_feature = tree_output_encoding(self.model, X)
+            X_feature = self._tree_output_encoding(X)
 
         return X_feature
 
@@ -68,99 +70,88 @@ class TreeExtractor:
 
         if self.encoding == 'tree_path':
             assert self.path_enc_ is not None, 'path_enc_ is not fitted!'
-            X_feature, _ = tree_path_encoding(self.model, X, one_hot_enc=self.path_enc_)
+            X_feature, _ = self._tree_path_encoding(X, one_hot_enc=self.path_enc_)
 
         elif self.encoding == 'tree_output':
-            X_feature = tree_output_encoding(self.model, X)
+            X_feature = self._tree_output_encoding(X)
 
         return X_feature
 
+    def _tree_path_encoding(self, X, one_hot_enc=None, to_dense=True, timeit=False):
+        """
+        Encodes each x in X as a binary vector whose length is equal to the number of
+        leaves or nodes in the ensemble, with 1's representing the instance ending at that leaf,
+        0 otherwise.
+        """
+        assert X.ndim == 2, 'X is not 2d!'
+        start = time.time()
 
-# utility methods
-def tree_path_encoding(model, X, one_hot_enc=None, to_dense=True, timeit=False):
-    """
-    Encodes each x in X as a binary vector whose length is equal to the number of
-    leaves or nodes in the ensemble, with 1's representing the instance ending at that leaf,
-    0 otherwise.
-    """
-    assert X.ndim == 2, 'X is not 2d!'
-    start = time.time()
+        # get the leaf ids and num leaves or nodes of each tree for all instances
+        if self.model_type_ == 'RandomForestClassifier':
+            leaves = self.model.apply(X)
+            leaves_per_tree = util.parse_rf_model(self.model, nodes_per_tree=True)  # actually nodes, could refine
 
-    # get the leaf ids and num leaves or nodes of each tree for all instances
-    if str(model).startswith('RandomForestClassifier'):
-        leaves = model.apply(X)
-        leaves_per_tree = _parse_rf_model(model, nodes_per_tree=True)  # actually using nodes, could refine
+        elif self.model_type_ == 'LGBMClassifier':
+            leaves = self.model.predict_proba(X, pred_leaf=True)
+            leaves_per_tree = util.parse_lgb_model(self.model, leaves_per_tree=True)
 
-    elif str(model).startswith('LGBMClassifier'):
-        leaves = model.predict_proba(X, pred_leaf=True)
-        leaves_per_tree = _parse_lgb_model(model, leaves_per_tree=True)
+        elif self.model_type_ == 'CatBoostClassifier':
+            leaves = self.model.calc_leaf_indexes(catboost.Pool(X))
+            leaves_per_tree = self.model.get_tree_leaf_counts()
 
-    if one_hot_enc is None:
+        # TODO: don't really need to return fitted encoder anymore now that categories is in place
+        if one_hot_enc is None:
+            categories = [np.arange(n_leaves) for n_leaves in leaves_per_tree]
+            one_hot_enc = OneHotEncoder(categories=categories).fit(leaves)
 
-        # make sure all leaves have been seen at least once
-        assert np.all(np.max(leaves, axis=0) + 1 == leaves_per_tree), 'lgb leaves do not match max leaves found'
-        one_hot_enc = OneHotEncoder(categories='auto').fit(leaves)
+        encoding = one_hot_enc.transform(leaves)
+        if to_dense:
+            encoding = np.array(encoding.todense())
 
-    encoding = one_hot_enc.transform(leaves)
-    if to_dense:
-        encoding = np.array(encoding.todense())
+        if timeit:
+            print('path encoding time: {:.3f}'.format(time.time() - start))
 
-    if timeit:
-        print('path encoding time: {:.3f}'.format(time.time() - start))
+        return encoding, one_hot_enc
 
-    return encoding, one_hot_enc
+    def _tree_output_encoding(self, X, timeit=False):
+        """
+        Encodes each x in X as a concatenation of one-hot encodings, one for each tree.
+        Each one-hot encoding represents the class or output at the leaf x traversed to.
+        All one-hot encodings are concatenated, to get a vector of size n_trees * n_classes.
+        """
+        assert X.ndim == 2, 'X is not 2d!'
+        start = time.time()
 
+        if self.model_type_ == 'RandomForestClassifier':
+            one_hot_preds = [tree.predict_proba(X) for tree in self.model.estimators_]
+            encoding = np.hstack(one_hot_preds)
 
-def tree_output_encoding(model, X, timeit=False):
-    """
-    Encodes each x in X as a concatenation of one-hot encodings, one for each tree.
-    Each one-hot encoding represents the class or output at the leaf x traversed to.
-    All one-hot encodings are concatenated, to get a vector of size n_trees * n_classes.
-    """
-    assert X.ndim == 2, 'X is not 2d!'
-    start = time.time()
+        elif self.model_type_ == 'LGBMClassifier':
+            leaves = self.model.predict_proba(X, pred_leaf=True)
+            encoding = np.zeros(leaves.shape)
 
-    if str(model).startswith('RandomForestClassifier'):
-        one_hot_preds = [tree.predict_proba(X) for tree in model.estimators_]
-        encoding = np.hstack(one_hot_preds)
+            for i in range(leaves.shape[0]):  # per instance
+                for j in range(leaves.shape[1]):  # per tree
+                    encoding[i][j] = self.model.booster_.get_leaf_output(j, leaves[i][j])
 
-    # DO NOT USE! An instance can be more similar with other instances than itself, since these are leaf values
-    elif str(model).startswith('LGBMClassifier'):
-        leaves = model.predict_proba(X, pred_leaf=True)
-        encoding = np.zeros(leaves.shape)
+        elif self.model_type_ == 'CatBoostClassifier':
 
-        for i in range(leaves.shape[0]):  # per instance
-            for j in range(leaves.shape[1]):  # per tree
-                encoding[i][j] = model.booster_.get_leaf_output(j, leaves[i][j])
+            # for multiclass, leaf_values has n_classes times leaf_counts.sum() values, why is this?
+            # we only use the first segment of leaf_values: leaf_values[:leaf_counts.sum()]
+            leaves = self.model.calc_leaf_indexes(catboost.Pool(X))  # 2d (n_samples, n_trees)
+            leaf_values = self.model.get_leaf_values()  # leaf values for all trees in a 1d array
+            leaf_counts = self.model.get_tree_leaf_counts()  # 1d array of leaf counts for each tree
 
-    if timeit:
-        print('output encoding time: {:.3f}'.format(time.time() - start))
+            encoding = np.zeros(leaves.shape)
+            for i in range(leaves.shape[0]):  # per instance
+                for j in range(leaves.shape[1]):  # per tree
+                    leaf_ndx = leaf_counts[:j].sum() + leaves[i][j]
+                    encoding[i][j] = leaf_values[leaf_ndx]
 
-    return encoding
+        else:
+            exit('tree output encoding not supported for {}'.format(self.model_type_))
 
+        if timeit:
+            print('output encoding time: {:.3f}'.format(time.time() - start))
 
-# private methods
-def _parse_rf_model(model, leaves_per_tree=False, nodes_per_tree=False):
-    """Returns low-level information about sklearn's RandomForestClassifier."""
-
-    result = None
-
-    if leaves_per_tree:
-        result = np.array([tree.get_n_leaves() for tree in model.estimators_])
-
-    elif nodes_per_tree:
-        result = np.array([tree.tree_.node_count for tree in model.estimators_])
-
-    return result
-
-
-def _parse_lgb_model(model, leaves_per_tree=False):
-    """Returns the low-level information about the lgb model."""
-
-    result = None
-
-    if leaves_per_tree:
-        model_dict = model.booster_.dump_model()
-        result = np.array([tree_dict['num_leaves'] for tree_dict in model_dict['tree_info']])
-
-    return result
+        return encoding
