@@ -17,22 +17,22 @@ from .extractor import TreeExtractor
 
 class TreeExplainer:
 
-    def __init__(self, model, X_train, y_train, encoding='tree_path', random_state=None, use_predicted_labels=False):
+    def __init__(self, model, X_train, y_train, encoding='tree_path', use_predicted_labels=True, random_state=None):
         """
-        Trains an svm on feature representations from the learned tree ensemble.
+        Trains an svm on feature representations from a learned tree ensemble.
 
         Parameters
         ----------
         model : object
-            Learned tree ensemble. Supported: RandomForestClassifier, LightGBM.
-            Unsupported: XGBoost, CatBoost.
+            Learned tree ensemble. Supported: RandomForestClassifier, LightGBM, CatBoost.
+            Unsupported: XGBoost.
         X_train : 2d array-like
             Train instances in original feature space.
         y_train : 1d array-like (default=None)
             Ground-truth train labels.
         encoding : str (default='tree_path')
             Feature representation to extract from the tree ensemble.
-        use_predicted_labels : bool (default=False)
+        use_predicted_labels : bool (default=True)
             If True, predicted labels from the tree ensemble are used to train the SVM.
         random_state : int (default=None)
             Random state to promote reproducibility.
@@ -70,10 +70,11 @@ class TreeExplainer:
         # TODO: grid search over gamma when rbf kernel?
         clf = SVC(kernel=self.kernel_, random_state=self.random_state, C=0.1, gamma='scale')
 
-        # choose train labels to train on, ground truth or predicted labels
-        train_label = self.y_train
+        # choose ground truth or predicted labels to train the svm on
         if use_predicted_labels:
             train_label = self.model.predict(X_train)
+        else:
+            train_label = self.y_train
 
         # train `n_classes_` SVM models if multiclass, otherwise just train one SVM
         if self.n_classes_ > 2:
@@ -95,7 +96,7 @@ class TreeExplainer:
         weight: bool
             If True, returns the weight of each support vector.
         pred_svm: bool
-            If True, returns a (<distance to separator>, <predicted_label>) tuple from the svm.
+            If True, returns an svm_pred: (<distance to separator>, <predicted_label>) tuple from the svm.
 
         Returns
         -------
@@ -103,7 +104,7 @@ class TreeExplainer:
             A positive <impact> score means the support vector contributed towards the predicted label, while a
             negative score means it contributed against the predicted label. <sim> is addded if `similarity`
             is True and <weight> is added if `weight` is True.
-        If `pred_svm` is True, the return object becomes (impact_list, <svm_pred>) tuple.
+        If `pred_svm` is True, the return object becomes (impact_list, svm_pred) tuple.
         """
 
         # error checking
@@ -126,7 +127,7 @@ class TreeExplainer:
 
         # TODO: compute similarity only to support vectors?
         # compute similarity of this instance to all train instances
-        sim = self._similarity(x_feature)
+        sim = self.similarity(x_feature)
 
         # ensure the decomposition matches the decision function prediction from the svm
         prediction, impact = self._decomposition(x_feature)

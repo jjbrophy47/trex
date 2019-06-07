@@ -90,7 +90,6 @@ def main(args):
     test_ndx = 2
     impact_list, (svm_pred, pred_label) = explainer.train_impact(X_test[test_ndx].reshape(1, -1), pred_svm=True,
                                                                  similarity=True, weight=True)
-    print(svm_pred, pred_label)
     impact_list = sorted(impact_list, key=lambda tup: abs(tup[1]), reverse=True)
     show_test_instance(test_ndx, svm_pred, pred_label, y_test=y_test, label=label)
     show_train_instances(impact_list, y_train, k=args.topk, label=label)
