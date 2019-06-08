@@ -2,21 +2,12 @@
 Sample explanation for tree ensembles with SEXEE.
 """
 import argparse
-import catboost
-import lightgbm
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.datasets import load_iris, load_breast_cancer, load_wine
-from sklearn.model_selection import train_test_split
 
 from sexee.explainer import TreeExplainer
-from util import model_util
+from util import model_util, data_util
 
 
 def show_test_instance(test_ndx, svm_pred, pred_label, y_test=None, label=None):
-
-    print(pred_label)
-    print(label)
-    print(label[pred_label])
 
     # show test instance
     if y_test is not None and label is not None:
@@ -44,6 +35,10 @@ def show_train_instances(impact_list, y_train, k=5, label=None):
     else:
         exit('3 train impact items is ambiguous!')
 
+    nonzero_sv = [items[0] for items in impact_list if abs(items[1]) > 0]
+    print('\nSupport Vectors: {}'.format(len(impact_list)))
+    print('Nonzero Support Vectors: {}'.format(len(nonzero_sv)))
+
     print('\nMost Impactful Train Instances')
     for items in impact_list[:k]:
         train_label = y_train[items[0]] if label is None else label[y_train[items[0]]]
@@ -53,46 +48,31 @@ def show_train_instances(impact_list, y_train, k=5, label=None):
 
 def main(args):
 
-    # create model
-    if args.model == 'lgb':
-        clf = lightgbm.LGBMClassifier(random_state=args.rs, n_estimators=args.n_estimators)
-    elif args.model == 'cb':
-        clf = catboost.CatBoostClassifier(random_state=args.rs, n_estimators=args.n_estimators)
-    elif args.model == 'rf':
-        clf = RandomForestClassifier(random_state=args.rs, n_estimators=args.n_estimators)
-
-    # load dataset
-    if args.dataset == 'iris':
-        data = load_iris()
-    elif args.dataset == 'breast':
-        data = load_breast_cancer()
-    elif args.dataset == 'wine':
-        data = load_wine()
-
-    X = data['data']
-    y = data['target']
-    label = data['target_names']
-    print(label)
-
-    # split dataset
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=args.rs, stratify=y)
+    # get model and data
+    clf = model_util.get_classifier(args.model)
+    X_train, X_test, y_train, y_test, label = data_util.get_data(args.dataset, random_state=args.rs)
 
     # train a tree ensemble
     model = clf.fit(X_train, y_train)
-    model_util.performance(model, X_train, y_train, X_test, y_test)
+    tree_yhat = model_util.performance(model, X_train, y_train, X_test, y_test)
 
     # train an svm on learned representations from the tree ensemble
-    explainer = TreeExplainer(model, X_train, y_train, encoding=args.encoding, random_state=args.rs,
-                              use_predicted_labels=True)
+    explainer = TreeExplainer(model, X_train, y_train, encoding=args.encoding, random_state=args.rs)
     test_feature = explainer.extractor_.transform(X_test)
-    model_util.performance(explainer.get_svm(), explainer.train_feature_, y_train, test_feature, y_test)
+    svm_yhat = model_util.performance(explainer.get_svm(), explainer.train_feature_, y_train, test_feature, y_test)
 
-    test_ndx = 2
-    impact_list, (svm_pred, pred_label) = explainer.train_impact(X_test[test_ndx].reshape(1, -1), pred_svm=True,
-                                                                 similarity=True, weight=True)
-    impact_list = sorted(impact_list, key=lambda tup: abs(tup[1]), reverse=True)
-    show_test_instance(test_ndx, svm_pred, pred_label, y_test=y_test, label=label)
-    show_train_instances(impact_list, y_train, k=args.topk, label=label)
+    # test instances that tree and svm models missed
+    tree_yhat_train, tree_yhat_test = tree_yhat
+    svm_yhat_train, svm_yhat_test = svm_yhat
+    both_missed = model_util.missed_instances(tree_yhat_test, svm_yhat_test, y_test)
+
+    # show explanations for missed instances
+    for test_ndx in both_missed[:args.topk_test]:
+        impact_list, (svm_pred, pred_label) = explainer.train_impact(X_test[test_ndx].reshape(1, -1), pred_svm=True,
+                                                                     similarity=True, weight=True)
+        impact_list = sorted(impact_list, key=lambda tup: abs(tup[1]), reverse=True)
+        show_test_instance(test_ndx, svm_pred, pred_label, y_test=y_test, label=label)
+        show_train_instances(impact_list, y_train, k=args.topk_train, label=label)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Feature representation extractions for tree ensembles',
@@ -102,7 +82,8 @@ if __name__ == '__main__':
     parser.add_argument('--encoding', type=str, default='tree_path', help='type of encoding.')
     parser.add_argument('--n_estimators', metavar='N', type=int, default=20, help='number of trees in random forest.')
     parser.add_argument('--rs', metavar='RANDOM_STATE', type=int, default=69, help='for reproducibility.')
-    parser.add_argument('--topk', metavar='NUM', type=int, default=5, help='Num of similar instances to display.')
+    parser.add_argument('--topk_train', metavar='NUM', type=int, default=5, help='Train instances to show.')
+    parser.add_argument('--topk_test', metavar='NUM', type=int, default=1, help='Missed test instances to show.')
     args = parser.parse_args()
     print(args)
     main(args)

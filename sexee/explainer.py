@@ -3,6 +3,7 @@ Explainer for a tree ensemble using an SVMs.
 Currently supports: sklearn's RandomForestClassifier, lightgbm.
 Future support: XGBoost, CatBoost.
 """
+import time
 import copy
 
 import numpy as np
@@ -17,7 +18,8 @@ from .extractor import TreeExtractor
 
 class TreeExplainer:
 
-    def __init__(self, model, X_train, y_train, encoding='tree_path', use_predicted_labels=True, random_state=None):
+    def __init__(self, model, X_train, y_train, encoding='tree_path', use_predicted_labels=True, random_state=None,
+                 timeit=False):
         """
         Trains an svm on feature representations from a learned tree ensemble.
 
@@ -36,6 +38,8 @@ class TreeExplainer:
             If True, predicted labels from the tree ensemble are used to train the SVM.
         random_state : int (default=None)
             Random state to promote reproducibility.
+        timeit : bool (default=False)
+            Displays feature extraction and SVM fit times.
         """
 
         # error checking
@@ -51,8 +55,10 @@ class TreeExplainer:
         self.random_state = random_state
 
         # extract feature representations from the tree ensemble
+        start = time.time()
         self.extractor_ = TreeExtractor(self.model, encoding=self.encoding)
         self.train_feature_ = self.extractor_.fit_transform(self.X_train)
+        print('train feature extraction took {}s'.format(time.time() - start))
 
         # set kernel for svm
         if self.encoding == 'tree_path':
@@ -77,11 +83,13 @@ class TreeExplainer:
             train_label = self.y_train
 
         # train `n_classes_` SVM models if multiclass, otherwise just train one SVM
+        start = time.time()
         if self.n_classes_ > 2:
             self.ovr_ = OneVsRestClassifier(clf).fit(self.train_feature_, train_label)
             self.svm_ = None
         else:
             self.svm_ = clf.fit(self.train_feature_, train_label)
+        print('svm fitting took {}s'.format(time.time() - start))
 
     def train_impact(self, x, similarity=False, weight=False, pred_svm=False):
         """
@@ -125,7 +133,6 @@ class TreeExplainer:
             assert self.svm_ is not None, 'svm_ is not fitted!'
             pred_label = int(self.svm_.predict(x_feature)[0])
 
-        # TODO: compute similarity only to support vectors?
         # compute similarity of this instance to all train instances
         sim = self.similarity(x_feature)
 
@@ -141,7 +148,7 @@ class TreeExplainer:
             decision_pred *= -1
             dual_weight = self.svm_.dual_coef_[0] * -1
         else:
-            dual_weight = self.svm_.dual_coef_
+            dual_weight = self.svm_.dual_coef_[0]
 
         # assemble items to be returned
         impact_list = [self.svm_.support_, impact]
@@ -165,9 +172,6 @@ class TreeExplainer:
         """Finds which instances are most similar to x_feature."""
 
         assert self.train_feature_ is not None, 'train_feature_ is not fitted!'
-
-        if x_feature.ndim == 2:
-            x_feature = x_feature[0]
 
         # compute similarity
         if self.kernel_ == 'linear':

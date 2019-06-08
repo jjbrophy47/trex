@@ -2,7 +2,31 @@
 Utility methods to make life easier.
 """
 import numpy as np
+import catboost
+import lightgbm
+from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import accuracy_score
+
+
+def get_classifier(model, n_estimators=20, random_state=69):
+    """Returns a tree ensemble classifier."""
+
+    # create model
+    if model == 'lgb':
+        clf = lightgbm.LGBMClassifier(random_state=random_state, n_estimators=n_estimators)
+    elif model == 'cb':
+        clf = catboost.CatBoostClassifier(random_state=random_state, n_estimators=n_estimators, verbose=False)
+    elif model == 'rf':
+        clf = RandomForestClassifier(random_state=random_state, n_estimators=n_estimators)
+
+    return clf
+
+
+def missed_instances(y1, y2, y_true):
+    """Returns indexes missed by both y1 and y2."""
+
+    both_ndx = np.where((y1 == y2) & (y1 != y_true))[0]
+    return both_ndx
 
 
 def performance(model, X_train, y_train, X_test=None, y_test=None):
@@ -15,12 +39,16 @@ def performance(model, X_train, y_train, X_test=None, y_test=None):
     print('\nModel ({})'.format(model_type))
     print('train set acc: {:4f}'.format(accuracy_score(y_train, y_hat_train)))
     print('missed train instances ({}): {}'.format(len(tree_missed_train), tree_missed_train))
+    result = y_hat_train
 
     if X_test is not None and y_test is not None:
         y_hat_test = model.predict(X_test).flatten()
         tree_missed_test = np.where(y_hat_test != y_test)[0]
         print('test set acc: {:4f}'.format(accuracy_score(y_test, y_hat_test)))
         print('missed test instances ({}): {}'.format(len(tree_missed_test), tree_missed_test))
+        result = y_hat_train, y_hat_test
+
+    return result
 
 
 def validate_model(model):
