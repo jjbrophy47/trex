@@ -53,12 +53,14 @@ class TreeExplainer:
         self.encoding = encoding
         self.use_predicted_labels = use_predicted_labels
         self.random_state = random_state
+        self.timeit = timeit
 
         # extract feature representations from the tree ensemble
         start = time.time()
         self.extractor_ = TreeExtractor(self.model, encoding=self.encoding)
         self.train_feature_ = self.extractor_.fit_transform(self.X_train)
-        print('train feature extraction took {}s'.format(time.time() - start))
+        if self.timeit:
+            print('train feature extraction took {}s'.format(time.time() - start))
 
         # set kernel for svm
         if self.encoding == 'tree_path':
@@ -89,7 +91,8 @@ class TreeExplainer:
             self.svm_ = None
         else:
             self.svm_ = clf.fit(self.train_feature_, train_label)
-        print('svm fitting took {}s'.format(time.time() - start))
+        if self.timeit:
+            print('fitting svm took {}s'.format(time.time() - start))
 
     def train_impact(self, x, similarity=False, weight=False, pred_svm=False):
         """
@@ -114,6 +117,7 @@ class TreeExplainer:
             is True and <weight> is added if `weight` is True.
         If `pred_svm` is True, the return object becomes (impact_list, svm_pred) tuple.
         """
+        start = time.time()
 
         # error checking
         assert self.train_feature_ is not None, 'train_feature_ is not fitted!'
@@ -165,6 +169,9 @@ class TreeExplainer:
         # clear chosen svm if multiclass
         if self.n_classes_ > 2:
             self.svm_ = None
+
+        if self.timeit:
+            print('computing impact from train instances took {}s'.format(time.time() - start))
 
         return result
 

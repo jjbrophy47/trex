@@ -46,6 +46,19 @@ def show_train_instances(impact_list, y_train, k=5, label=None):
         print(train_str.format(*items))
 
 
+def show_fidelity(both_train, diff_train, y_train, both_test=None, diff_test=None, y_test=None):
+    print('\nFidelity')
+
+    n_both, n_diff, n_train = len(both_train), len(diff_train), len(y_train)
+    print('train overlap: {} ({:.3f})'.format(n_both, n_both / n_train))
+    print('train difference: {} ({:.3f})'.format(n_diff, n_diff / n_train))
+
+    if both_test is not None and diff_test is not None and y_test is not None:
+        n_both, n_diff, n_test = len(both_test), len(diff_test), len(y_test)
+        print('test overlap: {} ({:.3f})'.format(n_both, n_both / n_test))
+        print('test difference: {} ({:.3f})'.format(n_diff, n_diff / n_test))
+
+
 def main(args):
 
     # get model and data
@@ -57,17 +70,25 @@ def main(args):
     tree_yhat = model_util.performance(model, X_train, y_train, X_test, y_test)
 
     # train an svm on learned representations from the tree ensemble
-    explainer = TreeExplainer(model, X_train, y_train, encoding=args.encoding, random_state=args.rs)
+    explainer = TreeExplainer(model, X_train, y_train, encoding=args.encoding, random_state=args.rs,
+                              timeit=args.timeit)
     test_feature = explainer.extractor_.transform(X_test)
     svm_yhat = model_util.performance(explainer.get_svm(), explainer.train_feature_, y_train, test_feature, y_test)
 
-    # test instances that tree and svm models missed
+    # extract predictions
     tree_yhat_train, tree_yhat_test = tree_yhat
     svm_yhat_train, svm_yhat_test = svm_yhat
-    both_missed = model_util.missed_instances(tree_yhat_test, svm_yhat_test, y_test)
+
+    # test fidelity on train and test predictions
+    both_train, diff_train = model_util.fidelity(tree_yhat_train, svm_yhat_train)
+    both_test, diff_test = model_util.fidelity(tree_yhat_test, svm_yhat_test)
+    show_fidelity(both_train, diff_train, y_train, both_test, diff_test, y_test)
+
+    # test instances that tree and svm models missed
+    both_missed_test = model_util.missed_instances(tree_yhat_test, svm_yhat_test, y_test)
 
     # show explanations for missed instances
-    for test_ndx in both_missed[:args.topk_test]:
+    for test_ndx in both_missed_test[:args.topk_test]:
         impact_list, (svm_pred, pred_label) = explainer.train_impact(X_test[test_ndx].reshape(1, -1), pred_svm=True,
                                                                      similarity=True, weight=True)
         impact_list = sorted(impact_list, key=lambda tup: abs(tup[1]), reverse=True)
@@ -84,6 +105,7 @@ if __name__ == '__main__':
     parser.add_argument('--rs', metavar='RANDOM_STATE', type=int, default=69, help='for reproducibility.')
     parser.add_argument('--topk_train', metavar='NUM', type=int, default=5, help='Train instances to show.')
     parser.add_argument('--topk_test', metavar='NUM', type=int, default=1, help='Missed test instances to show.')
+    parser.add_argument('--timeit', action='store_true', default=False, help='Show timing info for explainer.')
     args = parser.parse_args()
     print(args)
     main(args)

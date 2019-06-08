@@ -22,6 +22,15 @@ def get_classifier(model, n_estimators=20, random_state=69):
     return clf
 
 
+def fidelity(y1, y2):
+    """Returns an (overlap, difference) tuple."""
+
+    overlap = np.where(y1 == y2)[0]
+    difference = np.where(y1 != y2)[0]
+
+    return overlap, difference
+
+
 def missed_instances(y1, y2, y_true):
     """Returns indexes missed by both y1 and y2."""
 
