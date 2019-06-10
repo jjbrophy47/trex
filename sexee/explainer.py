@@ -27,7 +27,7 @@ class TreeExplainer:
         ----------
         model : object
             Learned tree ensemble. Supported: RandomForestClassifier, LightGBM, CatBoost.
-            Unsupported: XGBoost.
+            Unsupported: XGBoost, GBM.
         X_train : 2d array-like
             Train instances in original feature space.
         y_train : 1d array-like (default=None)
@@ -57,7 +57,7 @@ class TreeExplainer:
 
         # extract feature representations from the tree ensemble
         start = time.time()
-        self.extractor_ = TreeExtractor(self.model, encoding=self.encoding)
+        self.extractor_ = TreeExtractor(self.model, encoding=self.encoding, sparse=False)
         self.train_feature_ = self.extractor_.fit_transform(self.X_train)
         if self.timeit:
             print('train feature extraction took {}s'.format(time.time() - start))
@@ -125,7 +125,7 @@ class TreeExplainer:
         assert x.shape[0] == 1, 'x must be a single instance!'
 
         # get test instance feature representation
-        x_feature = self.extractor_.transform(x)
+        x_feature = self.extractor_.transform(x.copy())
 
         # if multiclass, get svm of whose class is predicted
         if self.n_classes_ > 2:
@@ -219,6 +219,14 @@ class TreeExplainer:
             sim_prod = linear_kernel(sv_feature, x_feature).flatten()
         elif self.kernel_ == 'rbf':
             sim_prod = rbf_kernel(sv_feature, x_feature, gamma=self.svm_._gamma).flatten()
+
+        # # TODO: sparse computation
+        # sv_weight = np.array(sv_weight.todense())[0]
+
+        # print(sim_prod, sim_prod.shape)
+        # print(sv_weight, sv_weight.shape)
+
+        # print(type(sv_weight))
 
         weighted_prod = sim_prod * sv_weight
         prediction = (np.sum(weighted_prod) + self.svm_.intercept_)[0]

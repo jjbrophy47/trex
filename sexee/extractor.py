@@ -12,7 +12,7 @@ from . import util
 
 class TreeExtractor:
 
-    def __init__(self, model, encoding='tree_path'):
+    def __init__(self, model, encoding='tree_path', sparse=False):
         """
         Extracts model-specific feature representations for data instances from a trained tree ensemble.
 
@@ -22,12 +22,15 @@ class TreeExtractor:
             Trained tree ensemble. Supported: RandomForestClassifier, LightGBM. Unsupported: XGBoost, CatBoost.
         encoding: str, {'tree_path', 'tree_output'}, (default='tree_path')
             Type of feature representation to extract from the tree ensemble.
+        sparse: bool (default=False)
+            If True, feature representations are returned in a sparse format if possible.
         """
         self.model_type_ = util.validate_model(model)
         assert encoding in ['tree_path', 'tree_output'], '{} encoding not supported!'.format(encoding)
 
         self.model = model
         self.encoding = encoding
+        self.sparse = sparse
 
     def fit_transform(self, X):
         """
@@ -77,7 +80,7 @@ class TreeExtractor:
 
         return X_feature
 
-    def _tree_path_encoding(self, X, one_hot_enc=None, to_dense=True, timeit=False):
+    def _tree_path_encoding(self, X, one_hot_enc=None, timeit=False):
         """
         Encodes each x in X as a binary vector whose length is equal to the number of
         leaves or nodes in the ensemble, with 1's representing the instance ending at that leaf,
@@ -89,11 +92,16 @@ class TreeExtractor:
         # get the leaf ids and num leaves or nodes of each tree for all instances
         if self.model_type_ == 'RandomForestClassifier':
             leaves = self.model.apply(X)
-            leaves_per_tree = util.parse_rf_model(self.model, nodes_per_tree=True)  # actually nodes, could refine
+            leaves_per_tree = np.array([tree.tree_.node_count for tree in self.model.estimators_])  # actually nodes
+
+        elif self.model_type_ == 'GradientBoostingClassifier':
+            leaves = self.model.apply(X)
+            leaves = leaves.reshape(leaves.shape[0], leaves.shape[1] * leaves.shape[2])  # (n_samples, n_est * n_class)
+            leaves_per_tree = np.array([t.tree_.node_count for est in self.model.estimators_ for t in est])  # nodes
 
         elif self.model_type_ == 'LGBMClassifier':
             leaves = self.model.predict_proba(X, pred_leaf=True)
-            leaves_per_tree = util.parse_lgb_model(self.model, leaves_per_tree=True)
+            leaves_per_tree = np.array([tree['num_leaves'] for tree in self.model.booster_.dump_model()['tree_info']])
 
         elif self.model_type_ == 'CatBoostClassifier':
             leaves = self.model.calc_leaf_indexes(catboost.Pool(X))
@@ -105,11 +113,13 @@ class TreeExtractor:
             one_hot_enc = OneHotEncoder(categories=categories).fit(leaves)
 
         encoding = one_hot_enc.transform(leaves)
-        if to_dense:
+        if not self.sparse:
             encoding = np.array(encoding.todense())
 
         if timeit:
             print('path encoding time: {:.3f}'.format(time.time() - start))
+
+        print(encoding, encoding.shape)
 
         return encoding, one_hot_enc
 
@@ -125,6 +135,12 @@ class TreeExtractor:
         if self.model_type_ == 'RandomForestClassifier':
             one_hot_preds = [tree.predict_proba(X) for tree in self.model.estimators_]
             encoding = np.hstack(one_hot_preds)
+
+        elif self.model_type_ == 'GradientBoostingClassifier':
+            one_hot_preds = [tree.predict(X) for est in self.model.estimators_ for tree in est]
+            encoding = np.vstack(one_hot_preds).T
+
+            print(encoding, encoding.shape)
 
         elif self.model_type_ == 'LGBMClassifier':
             leaves = self.model.predict_proba(X, pred_leaf=True)
@@ -150,6 +166,10 @@ class TreeExtractor:
 
         else:
             exit('tree output encoding not supported for {}'.format(self.model_type_))
+
+        # TODO: convert encoding to sparse format
+        if self.model_type_ == 'RandomForestClassifier' and self.sparse:
+            encoding = scipy.to_sparse(encoding)
 
         if timeit:
             print('output encoding time: {:.3f}'.format(time.time() - start))

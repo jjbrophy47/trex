@@ -15,10 +15,21 @@ def get_data(dataset, test_size=0.2, random_state=69):
         data = load_breast_cancer()
     elif dataset == 'wine':
         data = load_wine()
+
     elif dataset == 'adult':
         train = np.load('data/adult/train.npy')
         test = np.load('data/adult/test.npy')
         label = ['<=50K', '>50k']
+        X_train = train[:, :-1]
+        y_train = train[:, -1].astype(np.int32)
+        X_test = test[:, :-1]
+        y_test = test[:, -1].astype(np.int32)
+        return X_train, X_test, y_train, y_test, label
+
+    elif dataset == 'medifor':
+        train = np.load('data/medifor/NC17_EvalPart1.npy')
+        test = np.load('data/medifor/MFC18_EvalPart1.npy')
+        label = ['non-manipulated', 'manipulated']
         X_train = train[:, :-1]
         y_train = train[:, -1].astype(np.int32)
         X_test = test[:, :-1]
