@@ -1,7 +1,7 @@
 """
 Utility methods for sexee modules.
 """
-# import numpy as np
+import numpy as np
 
 
 def validate_model(model):
@@ -17,33 +17,35 @@ def validate_model(model):
         model_type = 'LGBMClassifier'
     elif 'CatBoostClassifier' in str(model):
         model_type = 'CatBoostClassifier'
+    elif 'XGBClassifier' in str(model):
+        model_type = 'XGBClassifier'
     else:
         exit('{} model not currently supported!'.format(str(model)))
 
     return model_type
 
 
-# def parse_sklearn_model(model, leaves_per_tree=False, nodes_per_tree=False):
-#     """Returns low-level information about sklearn's RandomForestClassifier and GradientBoostingClassifier."""
+def parse_xgb(model, nodes_per_tree=False, leaf_values=False):
+    """Parses the xgb raw string data for leaf information."""
 
-#     result = None
+    assert validate_model(model) == 'XGBClassifier'
 
-#     if leaves_per_tree:
-#         result = np.array([tree.get_n_leaves() for tree in model.estimators_])
+    if nodes_per_tree:
+        dump = model._Booster.get_dump()
+        nodes_per_tree = [len(tree.strip().replace('\t', '').split('\n')) for tree in dump]
+        result = nodes_per_tree
 
-#     elif nodes_per_tree:
-#         result = np.array([tree.tree_.node_count for tree in model.estimators_])
+    elif leaf_values:
 
-#     return result
+        trees = {}
+        for i, tree in enumerate(model._Booster.get_dump()):
+            nodes = tree.strip().replace('\t', '').split('\n')
+            trees[i] = np.array([float(node.split('=')[1]) if 'leaf' in node else 0.0 for node in nodes])
 
+        assert len(trees) == model.n_estimators * model.n_classes_, 'trees len does not equal num total trees!'
+        return trees
 
-# def parse_lgb_model(model, leaves_per_tree=False):
-#     """Returns the low-level information about the lgb model."""
+    else:
+        exit('No info specified to extract!')
 
-#     result = None
-
-#     if leaves_per_tree:
-#         model_dict = model.booster_.dump_model()
-#         result = np.array([tree_dict['num_leaves'] for tree_dict in model_dict['tree_info']])
-
-#     return result
+    return result

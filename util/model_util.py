@@ -4,6 +4,7 @@ Utility methods to make life easier.
 import numpy as np
 import catboost
 import lightgbm
+import xgboost
 from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
 from sklearn.metrics import accuracy_score
 
@@ -20,6 +21,8 @@ def get_classifier(model, n_estimators=20, random_state=69):
         clf = RandomForestClassifier(random_state=random_state, n_estimators=n_estimators)
     elif model == 'gbm':
         clf = GradientBoostingClassifier(random_state=random_state, n_estimators=n_estimators)
+    elif model == 'xgb':
+        clf = xgboost.XGBClassifier(random_state=random_state, n_estimators=n_estimators)
     else:
         exit('{} model not supported!')
 
@@ -76,6 +79,8 @@ def validate_model(model):
         model_type = 'LGBMClassifier'
     elif 'CatBoostClassifier' in str(model):
         model_type = 'CatBoostClassifier'
+    elif 'XGBClassifier' in str(model):
+        model_type = 'XGBClassifier'
     elif model_type == 'OneVsRestClassifier':
         model_type = 'OneVsRestClassifier'
     elif model_type == 'SVC':

@@ -107,6 +107,10 @@ class TreeExtractor:
             leaves = self.model.calc_leaf_indexes(catboost.Pool(X))
             leaves_per_tree = self.model.get_tree_leaf_counts()
 
+        elif self.model_type_ == 'XGBClassifier':
+            leaves = self.model.apply(X)
+            leaves_per_tree = [len(t.strip().replace('\t', '').split('\n')) for t in self.model._Booster.get_dump()]
+
         # TODO: don't really need to return fitted encoder anymore now that categories is in place
         if one_hot_enc is None:
             categories = [np.arange(n_leaves) for n_leaves in leaves_per_tree]
@@ -163,6 +167,15 @@ class TreeExtractor:
                 for j in range(leaves.shape[1]):  # per tree
                     leaf_ndx = leaf_counts[:j].sum() + leaves[i][j]
                     encoding[i][j] = leaf_values[leaf_ndx]
+
+        elif self.model_type_ == 'XGBClassifier':
+            leaves = self.model.apply(X)
+            leaf_values = util.parse_xgb(self.model, leaf_values=True)
+
+            encoding = np.zeros(leaves.shape)
+            for i in range(leaves.shape[0]):  # per instance
+                for j in range(leaves.shape[1]):  # per tree
+                    encoding[i][j] = leaf_values[j][leaves[i][j]]
 
         else:
             exit('tree output encoding not supported for {}'.format(self.model_type_))
