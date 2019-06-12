@@ -79,7 +79,7 @@ class TreeExplainer:
         # train svm on feature representations and true or predicted labels
         # TODO: grid search over C?
         # TODO: grid search over gamma when rbf kernel?
-        clf = SVC(kernel=self.kernel_, random_state=self.random_state, C=0.1, gamma='scale')
+        clf = SVC(kernel=self.kernel_, random_state=self.random_state, C=0.5, gamma='scale')
 
         # choose ground truth or predicted labels to train the svm on
         if use_predicted_labels:

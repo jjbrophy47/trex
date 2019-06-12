@@ -26,6 +26,26 @@ def get_data(dataset, test_size=0.2, random_state=69):
         y_test = test[:, -1].astype(np.int32)
         return X_train, X_test, y_train, y_test, label
 
+    elif dataset == 'amazon':
+        train = np.load('data/amazon/train.npy')
+        test = np.load('data/amazon/test.npy')
+        label = ['0', '1']
+        X_train = train[:, 1:]
+        y_train = train[:, 0].astype(np.int32)
+        X_test = test[:, 1:]
+        y_test = test[:, 0].astype(np.int32)
+        return X_train, X_test, y_train, y_test, label
+
+    elif dataset == 'hospital':
+        train = np.load('data/adult/train.npy')
+        test = np.load('data/adult/test.npy')
+        label = ['not readmitted', 'readmitted']
+        X_train = train[:, :-1]
+        y_train = train[:, -1].astype(np.int32)
+        X_test = test[:, :-1]
+        y_test = test[:, -1].astype(np.int32)
+        return X_train, X_test, y_train, y_test, label
+
     elif dataset == 'medifor':
         train = np.load('data/medifor/NC17_EvalPart1.npy')
         test = np.load('data/medifor/MFC18_EvalPart1.npy')

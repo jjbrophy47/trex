@@ -50,13 +50,13 @@ def show_fidelity(both_train, diff_train, y_train, both_test=None, diff_test=Non
     print('\nFidelity')
 
     n_both, n_diff, n_train = len(both_train), len(diff_train), len(y_train)
-    print('train overlap: {} ({:.3f})'.format(n_both, n_both / n_train))
-    print('train difference: {} ({:.3f})'.format(n_diff, n_diff / n_train))
+    print('train overlap: {} ({:.4f})'.format(n_both, n_both / n_train))
+    print('train difference: {} ({:.4f})'.format(n_diff, n_diff / n_train))
 
     if both_test is not None and diff_test is not None and y_test is not None:
         n_both, n_diff, n_test = len(both_test), len(diff_test), len(y_test)
-        print('test overlap: {} ({:.3f})'.format(n_both, n_both / n_test))
-        print('test difference: {} ({:.3f})'.format(n_diff, n_diff / n_test))
+        print('test overlap: {} ({:.4f})'.format(n_both, n_both / n_test))
+        print('test difference: {} ({:.4f})'.format(n_diff, n_diff / n_test))
 
 
 def main(args):
