@@ -106,6 +106,7 @@ if __name__ == '__main__':
     parser.add_argument('--topk_train', metavar='NUM', type=int, default=5, help='Train instances to show.')
     parser.add_argument('--topk_test', metavar='NUM', type=int, default=1, help='Missed test instances to show.')
     parser.add_argument('--timeit', action='store_true', default=False, help='Show timing info for explainer.')
+    parser.add_argument('--sparse', action='store_true', default=False, help='Use sparse feature representations.')
     args = parser.parse_args()
     print(args)
     main(args)

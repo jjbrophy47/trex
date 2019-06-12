@@ -73,7 +73,7 @@ def validate_model(model):
     model_type = str(model).split('(')[0]
     if 'RandomForestClassifier' in str(model):
         model_type = 'RandomForestClassifier'
-    if 'GradientBoostingClassifier' in str(model):
+    elif 'GradientBoostingClassifier' in str(model):
         model_type = 'GradientBoostingClassifier'
     elif 'LGBMClassifier' in str(model):
         model_type = 'LGBMClassifier'

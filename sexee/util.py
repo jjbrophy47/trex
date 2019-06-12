@@ -42,7 +42,11 @@ def parse_xgb(model, nodes_per_tree=False, leaf_values=False):
             nodes = tree.strip().replace('\t', '').split('\n')
             trees[i] = np.array([float(node.split('=')[1]) if 'leaf' in node else 0.0 for node in nodes])
 
-        assert len(trees) == model.n_estimators * model.n_classes_, 'trees len does not equal num total trees!'
+        if model.n_classes_ > 2:
+            assert len(trees) == model.n_estimators * model.n_classes_, 'trees len does not equal num total trees!'
+        else:
+            assert len(trees) == model.n_estimators, 'trees len does not equal num total trees!'
+
         return trees
 
     else:

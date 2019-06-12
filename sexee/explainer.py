@@ -55,23 +55,26 @@ class TreeExplainer:
         self.random_state = random_state
         self.timeit = timeit
 
-        # extract feature representations from the tree ensemble
-        start = time.time()
-        self.extractor_ = TreeExtractor(self.model, encoding=self.encoding, sparse=False)
-        self.train_feature_ = self.extractor_.fit_transform(self.X_train)
-        if self.timeit:
-            print('train feature extraction took {}s'.format(time.time() - start))
-
         # set kernel for svm
         if self.encoding == 'tree_path':
             self.kernel_ = 'linear'
+            self.sparse_ = True
 
         elif self.encoding == 'tree_output':
 
             if self.model_type_ == 'RandomForestClassifier':
                 self.kernel_ = 'linear'
+                self.sparse_ = True
             else:
                 self.kernel_ = 'rbf'
+                self.sparse_ = False
+
+        # extract feature representations from the tree ensemble
+        start = time.time()
+        self.extractor_ = TreeExtractor(self.model, encoding=self.encoding, sparse=self.sparse_)
+        self.train_feature_ = self.extractor_.fit_transform(self.X_train)
+        if self.timeit:
+            print('train feature extraction took {}s'.format(time.time() - start))
 
         # train svm on feature representations and true or predicted labels
         # TODO: grid search over C?
@@ -154,6 +157,9 @@ class TreeExplainer:
         else:
             dual_weight = self.svm_.dual_coef_[0]
 
+        if self.sparse_:
+            dual_weight = np.array(dual_weight.todense())[0]
+
         # assemble items to be returned
         impact_list = [self.svm_.support_, impact]
         if similarity:
@@ -212,22 +218,19 @@ class TreeExplainer:
         """
         assert x_feature.ndim == 2, 'x_feature is not 2d!'
 
+        # get support vector instances and weights
         sv_feature = self.train_feature_[self.svm_.support_]  # support vector train instances
         sv_weight = self.svm_.dual_coef_[0]  # support vector weights
+        if self.sparse_:
+            sv_weight = np.array(sv_weight.todense())[0]
 
+        # compute similarity to the test instance
         if self.kernel_ == 'linear':
             sim_prod = linear_kernel(sv_feature, x_feature).flatten()
         elif self.kernel_ == 'rbf':
             sim_prod = rbf_kernel(sv_feature, x_feature, gamma=self.svm_._gamma).flatten()
 
-        # # TODO: sparse computation
-        # sv_weight = np.array(sv_weight.todense())[0]
-
-        # print(sim_prod, sim_prod.shape)
-        # print(sv_weight, sv_weight.shape)
-
-        # print(type(sv_weight))
-
+        # decompose prediction to a weighted sum of the support vectors
         weighted_prod = sim_prod * sv_weight
         prediction = (np.sum(weighted_prod) + self.svm_.intercept_)[0]
 

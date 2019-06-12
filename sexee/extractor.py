@@ -3,6 +3,7 @@ Feature representation extractor for different tree ensemble models.
 """
 import time
 
+import scipy
 import catboost
 import numpy as np
 from sklearn.preprocessing import OneHotEncoder
@@ -123,8 +124,6 @@ class TreeExtractor:
         if timeit:
             print('path encoding time: {:.3f}'.format(time.time() - start))
 
-        print(encoding, encoding.shape)
-
         return encoding, one_hot_enc
 
     def _tree_output_encoding(self, X, timeit=False):
@@ -143,8 +142,6 @@ class TreeExtractor:
         elif self.model_type_ == 'GradientBoostingClassifier':
             one_hot_preds = [tree.predict(X) for est in self.model.estimators_ for tree in est]
             encoding = np.vstack(one_hot_preds).T
-
-            print(encoding, encoding.shape)
 
         elif self.model_type_ == 'LGBMClassifier':
             leaves = self.model.predict_proba(X, pred_leaf=True)
@@ -180,9 +177,8 @@ class TreeExtractor:
         else:
             exit('tree output encoding not supported for {}'.format(self.model_type_))
 
-        # TODO: convert encoding to sparse format
         if self.model_type_ == 'RandomForestClassifier' and self.sparse:
-            encoding = scipy.to_sparse(encoding)
+            encoding = scipy.sparse.csr_matrix(encoding)
 
         if timeit:
             print('output encoding time: {:.3f}'.format(time.time() - start))
