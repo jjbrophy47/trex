@@ -2,7 +2,7 @@
 Simple integration tests to make sure the tree explainer works for all models, encodings, and binary / multi-class
 datasets. These do NOT test correctness of the values returned by the tree explainer.
 """
-from main_sample import example
+from experiments.scripts.sample import example
 
 
 def test_model(model='lgb', encodings=['tree_path', 'tree_output'],

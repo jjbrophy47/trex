@@ -2,3 +2,7 @@
 **.npy
 **.csv
 myenv
+dist
+build
+.*
+*.egg-info

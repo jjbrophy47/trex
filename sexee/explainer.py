@@ -1,7 +1,6 @@
 """
 Explainer for a tree ensemble using an SVMs.
-Currently supports: sklearn's RandomForestClassifier, lightgbm.
-Future support: XGBoost, CatBoost.
+Currently supports: sklearn's RandomForestClassifier, GBMClassifier, lightgbm, xgboost, and catboost.
 """
 import time
 import copy
@@ -18,8 +17,8 @@ from .extractor import TreeExtractor
 
 class TreeExplainer:
 
-    def __init__(self, model, X_train, y_train, encoding='tree_path', use_predicted_labels=True, random_state=None,
-                 timeit=False):
+    def __init__(self, model, X_train, y_train, encoding='tree_path', C=0.1, use_predicted_labels=True,
+                 random_state=None, timeit=False):
         """
         Trains an svm on feature representations from a learned tree ensemble.
 
@@ -34,6 +33,8 @@ class TreeExplainer:
             Ground-truth train labels.
         encoding : str (default='tree_path')
             Feature representation to extract from the tree ensemble.
+        C : float (default=0.1)
+            Hyperparameter for the SVM.
         use_predicted_labels : bool (default=True)
             If True, predicted labels from the tree ensemble are used to train the SVM.
         random_state : int (default=None)
@@ -51,6 +52,7 @@ class TreeExplainer:
         self.X_train = X_train
         self.y_train = y_train
         self.encoding = encoding
+        self.C = C
         self.use_predicted_labels = use_predicted_labels
         self.random_state = random_state
         self.timeit = timeit
@@ -79,7 +81,7 @@ class TreeExplainer:
         # train svm on feature representations and true or predicted labels
         # TODO: grid search over C?
         # TODO: grid search over gamma when rbf kernel?
-        clf = SVC(kernel=self.kernel_, random_state=self.random_state, C=0.5, gamma='scale')
+        clf = SVC(kernel=self.kernel_, random_state=self.random_state, C=self.C, gamma='scale')
 
         # choose ground truth or predicted labels to train the svm on
         if use_predicted_labels:
@@ -210,6 +212,28 @@ class TreeExplainer:
             svm_model = copy.deepcopy(self.svm_)
 
         return svm_model
+
+    def get_train_weight(self, sort=True):
+        """
+        Return a list of (train_ndx, weight) tuples for all support vectors.
+        Currently only supports binary classification.
+        Parameters
+        ----------
+        sorted : bool (default=True)
+            If True, sorts support vectors by absolute weight value in descending order.
+        """
+
+        assert self.n_classes_ == 2, 'n_classes_ is not 2!'
+
+        if self.sparse_:
+            train_weight = list(zip(self.svm_.support_, np.array(self.svm_.dual_coef_.todense())[0]))
+        else:
+            train_weight = list(zip(self.svm_.support_, self.svm_.dual_coef_[0]))
+
+        if sort:
+            train_weight = sorted(train_weight, key=lambda tup: abs(tup[1]), reverse=True)
+
+        return train_weight
 
     def _decomposition(self, x_feature):
         """
