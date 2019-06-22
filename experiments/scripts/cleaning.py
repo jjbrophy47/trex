@@ -13,6 +13,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from sklearn.base import clone
 from sklearn.metrics import accuracy_score
+from sklearn.preprocessing import minmax_scale
 
 import sexee
 from util import model_util, data_util, exp_util
@@ -23,11 +24,11 @@ def num_labels_to_flip(dataset):
     """Returns the number of labels to flip for each dataset."""
 
     if dataset == 'adult':
-        result = 15000
+        result = 13024  # 15000
     elif dataset == 'hospital':
         result = 6000
     elif dataset == 'amazon':
-        result = 12000
+        result = 10486  # 12000
     elif dataset == 'upselling':
         result = 3500
     elif dataset == 'breast':
@@ -35,7 +36,7 @@ def num_labels_to_flip(dataset):
     elif dataset == 'medifor':
         result = 1500
     elif dataset == 'medifor2':
-        result = 1100
+        result = 800  # 1100
     else:
         exit('{} dataset not available'.format(dataset))
 
@@ -134,7 +135,10 @@ def loss_method(noisy_ndx, y_train_proba, y_train, interval, to_check=1):
     else:
         exit('to_check not int')
 
-    y_probas = model_util.positive_class_proba(y_train, y_train_proba)
+    if y_train_proba.ndim > 1:
+        y_probas = model_util.positive_class_proba(y_train, y_train_proba)
+    else:
+        y_probas = y_train_proba
     y_ll = exp_util.instance_log_loss(y_probas, y_train)
     train_order = np.argsort(y_ll)[:n_check]  # ascending order
     ckpt_ndx, fix_ndx = record_fixes(train_order, noisy_ndx, y_train, interval)
@@ -169,7 +173,7 @@ def influence_method(explainer, noisy_ndx, X_train, y_train, y_train_noisy, inte
 
 
 def noise_detection(model_type='lgb', encoding='tree_path', dataset='iris', n_estimators=100, random_state=69,
-                    timeit=False, inf_k=None):
+                    timeit=False, inf_k=None, svm_loss=False, data_dir='data'):
     """
     Main method that trains a tree ensemble, flips a percentage of train labels, prioritizes train
     instances using various methods, and computes how effective each method is at cleaning the data.
@@ -177,7 +181,7 @@ def noise_detection(model_type='lgb', encoding='tree_path', dataset='iris', n_es
 
     # get model and data
     clf = model_util.get_classifier(model_type, n_estimators=n_estimators, random_state=random_state)
-    X_train, X_test, y_train, y_test, label = data_util.get_data(dataset, random_state=random_state)
+    X_train, X_test, y_train, y_test, label = data_util.get_data(dataset, random_state=random_state, data_dir=data_dir)
     data = X_train, y_train, X_test, y_test
 
     print('train instances: {}'.format(len(X_train)))
@@ -193,7 +197,9 @@ def noise_detection(model_type='lgb', encoding='tree_path', dataset='iris', n_es
     model_noisy = clone(clf).fit(X_train, y_train_noisy)
 
     # show model performance before and after noise
+    print('\nBefore noise:') 
     model_util.performance(model, X_test=X_test, y_test=y_test)
+    print('\nAfter noise:')
     model_util.performance(model_noisy, X_test=X_test, y_test=y_test)
 
     # check accuracy before and after noise
@@ -210,10 +216,17 @@ def noise_detection(model_type='lgb', encoding='tree_path', dataset='iris', n_es
     ckpt_ndx, fix_ndx = random_method(noisy_ndx, y_train, interval, to_check=n_check, random_state=random_state)
     random_results = interval_performance(ckpt_ndx, fix_ndx, noisy_ndx, clf, data, acc_test_noisy)
 
-    # loss method
+    # tree loss method
     y_train_proba = model_noisy.predict_proba(X_train)
     ckpt_ndx, fix_ndx = loss_method(noisy_ndx, y_train_proba, y_train, interval, to_check=n_check)
-    loss_results = interval_performance(ckpt_ndx, fix_ndx, noisy_ndx, clf, data, acc_test_noisy)
+    tree_loss_results = interval_performance(ckpt_ndx, fix_ndx, noisy_ndx, clf, data, acc_test_noisy)
+
+    # svm loss method - squish svm decision values to between 0 and 1
+    if svm_loss:
+        y_train_proba = explainer.decision_function(X_train)
+        y_train_proba = minmax_scale(y_train_proba)
+        ckpt_ndx, fix_ndx = loss_method(noisy_ndx, y_train_proba, y_train, interval, to_check=n_check)
+        svm_loss_results = interval_performance(ckpt_ndx, fix_ndx, noisy_ndx, clf, data, acc_test_noisy)
 
     # influence method
     if model_type == 'cb' and inf_k is not None:
@@ -236,24 +249,28 @@ def noise_detection(model_type='lgb', encoding='tree_path', dataset='iris', n_es
     # plot results
     sexee_check_pct, sexee_acc, sexee_fix_pct = sexee_results
     rand_check_pct, rand_acc, rand_fix_pct = random_results
-    loss_check_pct, loss_acc, loss_fix_pct = loss_results
+    tree_loss_check_pct, tree_loss_acc, tree_loss_fix_pct = tree_loss_results
 
-    fig, axs = plt.subplots(1, 2)
+    fig, axs = plt.subplots(1, 2, figsize=(14, 4))
     axs[0].plot(sexee_check_pct, sexee_acc, marker='.', color='g', label='sexee')
-    axs[0].plot(rand_check_pct, rand_acc, marker='.', color='r', label='random')
-    axs[0].plot(loss_check_pct, loss_acc, marker='.', color='c', label='loss')
+    axs[0].plot(rand_check_pct, rand_acc, marker='^', color='r', label='random')
+    axs[0].plot(tree_loss_check_pct, tree_loss_acc, marker='p', color='c', label='tree_loss')
     axs[0].axhline(acc_test_clean, color='k', linestyle='--')
     axs[0].set_xlabel('fraction of train data checked')
     axs[0].set_ylabel('test accuracy')
     axs[1].plot(sexee_check_pct, sexee_fix_pct, marker='.', color='g', label='sexee')
-    axs[1].plot(rand_check_pct, rand_fix_pct, marker='.', color='r', label='random')
-    axs[1].plot(loss_check_pct, loss_fix_pct, marker='.', color='c', label='loss')
+    axs[1].plot(rand_check_pct, rand_fix_pct, marker='^', color='r', label='random')
+    axs[1].plot(tree_loss_check_pct, tree_loss_fix_pct, marker='p', color='c', label='tree_loss')
     axs[1].set_xlabel('fraction of train data checked')
     axs[1].set_ylabel('fraction of flips fixed')
+    if svm_loss:
+        svm_loss_check_pct, svm_loss_acc, svm_loss_fix_pct = svm_loss_results
+        axs[0].plot(svm_loss_check_pct, svm_loss_acc, marker='*', color='y', label='svm_loss')
+        axs[1].plot(svm_loss_check_pct, svm_loss_fix_pct, marker='*', color='y', label='svm_loss')
     if model_type == 'cb' and inf_k is not None:
         influence_check_pct, influence_acc, influence_fix_pct = influence_results
-        axs[0].plot(influence_check_pct, influence_acc, marker='.', color='m', label='leafinfluence')
-        axs[1].plot(influence_check_pct, influence_fix_pct, marker='.', color='m', label='leafinfluence')
+        axs[0].plot(influence_check_pct, influence_acc, marker='+', color='m', label='leafinfluence')
+        axs[1].plot(influence_check_pct, influence_fix_pct, marker='+', color='m', label='leafinfluence')
     axs[0].legend()
     axs[1].legend()
     plt.show()
@@ -265,9 +282,10 @@ if __name__ == '__main__':
     parser.add_argument('--dataset', type=str, default='adult', help='dataset to explain.')
     parser.add_argument('--model', type=str, default='lgb', help='model to use.')
     parser.add_argument('--encoding', type=str, default='tree_path', help='type of encoding.')
-    parser.add_argument('--n_estimators', metavar='N', type=int, default=20, help='number of trees in random forest.')
+    parser.add_argument('--n_estimators', metavar='N', type=int, default=100, help='number of trees in random forest.')
     parser.add_argument('--rs', metavar='RANDOM_STATE', type=int, default=69, help='for reproducibility.')
     parser.add_argument('--timeit', action='store_true', default=False, help='Show timing info for explainer.')
+    parser.add_argument('--svm_loss', action='store_true', default=False, help='Include svm loss in results.')
     args = parser.parse_args()
     print(args)
-    noise_detection(args.model, args.encoding, args.dataset, args.n_estimators, args.rs, args.timeit)
+    noise_detection(args.model, args.encoding, args.dataset, args.n_estimators, args.rs, args.timeit, args.svm_loss)

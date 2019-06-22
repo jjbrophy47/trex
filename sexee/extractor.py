@@ -112,6 +112,8 @@ class TreeExtractor:
             leaves = self.model.apply(X)
             leaves_per_tree = [len(t.strip().replace('\t', '').split('\n')) for t in self.model._Booster.get_dump()]
 
+        self.num_trees_ = len(leaves_per_tree)
+
         # TODO: don't really need to return fitted encoder anymore now that categories is in place
         if one_hot_enc is None:
             categories = [np.arange(n_leaves) for n_leaves in leaves_per_tree]
@@ -138,14 +140,17 @@ class TreeExtractor:
         if self.model_type_ == 'RandomForestClassifier':
             one_hot_preds = [tree.predict_proba(X) for tree in self.model.estimators_]
             encoding = np.hstack(one_hot_preds)
+            self.num_trees_ = len(one_hot_preds)
 
         elif self.model_type_ == 'GradientBoostingClassifier':
             one_hot_preds = [tree.predict(X) for est in self.model.estimators_ for tree in est]
             encoding = np.vstack(one_hot_preds).T
+            self.num_trees_ = len(one_hot_preds)
 
         elif self.model_type_ == 'LGBMClassifier':
             leaves = self.model.predict_proba(X, pred_leaf=True)
             encoding = np.zeros(leaves.shape)
+            self.num_trees = leaves.shape[1]
 
             for i in range(leaves.shape[0]):  # per instance
                 for j in range(leaves.shape[1]):  # per tree
@@ -168,6 +173,7 @@ class TreeExtractor:
         elif self.model_type_ == 'XGBClassifier':
             leaves = self.model.apply(X)
             leaf_values = util.parse_xgb(self.model, leaf_values=True)
+            self.num_trees_ = leaves.shape[1]
 
             encoding = np.zeros(leaves.shape)
             for i in range(leaves.shape[0]):  # per instance

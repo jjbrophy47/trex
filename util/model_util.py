@@ -17,8 +17,6 @@ def get_classifier(model, n_estimators=20, learning_rate=0.03, random_state=69):
         clf = lightgbm.LGBMClassifier(random_state=random_state, n_estimators=n_estimators)
     elif model == 'cb':
         clf = catboost.CatBoostClassifier(random_state=random_state, n_estimators=n_estimators, verbose=False)
-        # clf = catboost.CatBoostClassifier(random_state=random_state, n_estimators=n_estimators,
-        #                                   learning_rate=learning_rate, verbose=False)
     elif model == 'rf':
         clf = RandomForestClassifier(random_state=random_state, n_estimators=n_estimators)
     elif model == 'gbm':
@@ -121,8 +119,10 @@ def validate_model(model):
 
 
 def positive_class_proba(labels, probas):
-    """Given the predicted label of each sample and the probabilities for each class for each sample,
-    return the probabilities of the positive class for each sample."""
+    """
+    Given the predicted label of each sample and the probabilities for each class for each sample,
+    return the probabilities of the positive class for each sample.
+    """
 
     assert labels.ndim == 1, 'labels is not 1d!'
     assert probas.ndim == 2, 'probas is not 2d!'

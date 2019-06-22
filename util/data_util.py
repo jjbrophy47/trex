@@ -8,6 +8,7 @@ from sklearn.model_selection import train_test_split
 
 
 def get_data(dataset, test_size=0.2, random_state=69, data_dir='data'):
+    """Returns a train and test set from the desired dataset."""
 
     X = None
     y = None
@@ -102,7 +103,7 @@ def flip_labels(arr, k=100, random_state=69, return_indices=True):
 
 
 def flip_labels_with_indices(arr, indices):
-    """Flips the label of random elements in an array; only for binary arrays."""
+    """Flips the label of specified elements in an array; only for binary arrays."""
 
     assert arr.ndim == 1, 'arr is not 1d!'
     assert np.all(np.unique(arr) == np.array([0, 1])), 'arr is not binary!'

@@ -1,5 +1,5 @@
 """
-Explainer for a tree ensemble using an SVMs.
+Explainer for a tree ensemble using an SVM.
 Currently supports: sklearn's RandomForestClassifier, GBMClassifier, lightgbm, xgboost, and catboost.
 """
 import time
@@ -126,7 +126,8 @@ class TreeExplainer:
 
         # error checking
         assert self.train_feature_ is not None, 'train_feature_ is not fitted!'
-        assert x.ndim == 2, 'x is not 2d!'
+        if x.ndim == 1:
+            x = x.reshape(1, -1)
         assert x.shape[0] == 1, 'x must be a single instance!'
 
         # get test instance feature representation
@@ -183,22 +184,33 @@ class TreeExplainer:
 
         return result
 
-    def similarity(self, x_feature, sort=False):
-        """Finds which instances are most similar to x_feature."""
+    def similarity(self, x, sort=False, train_indices=None):
+        """Finds which instances are most similar to x."""
 
         assert self.train_feature_ is not None, 'train_feature_ is not fitted!'
+        if x.ndim == 1:
+            x = x.reshape(1, -1)
+        x_feature = self.extractor_.transform(x.copy())
+        assert x_feature.shape[1] == self.train_feature_.shape[1], 'num features do not match!'
+
+        if train_indices is not None:
+            train_feature = self.train_feature_[train_indices]
+        else:
+            train_feature = self.train_feature_
 
         # compute similarity
         if self.kernel_ == 'linear':
-            sim = linear_kernel(self.train_feature_, x_feature).flatten()
+            sim = linear_kernel(train_feature, x_feature).flatten()
+            sim /= self.extractor_.num_trees_
         elif self.kernel_ == 'rbf':
-            sim = rbf_kernel(self.train_feature_, x_feature, gamma=self.svm_._gamma).flatten()
+            sim = rbf_kernel(train_feature, x_feature, gamma=self.svm_._gamma).flatten()
 
         result = sim
 
         # put train instances in descending order of similarity
         if sort:
             sim_ndx = np.argsort(sim)[::-1]
+            sim = sim[sim_ndx]
             result = (sim, sim_ndx)
 
         return result
@@ -212,6 +224,22 @@ class TreeExplainer:
             svm_model = copy.deepcopy(self.svm_)
 
         return svm_model
+
+    def decision_function(self, X):
+        """
+        Return decision function values from learned SVM.
+        Currently only supports binary classification.
+        """
+        assert self.n_classes_ == 2, 'n_classes_ is not 2!'
+
+        if X.ndim == 1:
+            X = X.reshape(1, -1)
+        assert X.shape[1] == self.n_feats_, 'num features do not match!'
+
+        X_feature = self.extractor_.transform(X)
+        assert X_feature.shape[1] == self.train_feature_.shape[1], 'num features do not match!'
+
+        return self.svm_.decision_function(X_feature)
 
     def get_train_weight(self, sort=True):
         """
