@@ -1,6 +1,7 @@
 **.pyc
 **.npy
 **.csv
+**catboost_info
 myenv
 dist
 build

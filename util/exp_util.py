@@ -29,7 +29,7 @@ def avg_impact(explainer, test_indices, X_test, progress=False):
 
     # compute average impact of support vectors over test indices
     for test_ndx in tqdm.tqdm(test_indices, disable=not progress):
-        impact_list = explainer.train_impact(X_test[test_ndx].reshape(1, -1))
+        impact_list = explainer.train_impact(X_test[test_ndx])
 
         # update the train instance impacts
         for train_ndx, train_impact in impact_list:

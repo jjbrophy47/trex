@@ -77,6 +77,8 @@ def runtime(model_type='lgb', encoding='tree_path', dataset='iris', n_estimators
         # sexee method
         print('sexee...')
         fine_tune, test_time = sexee_method(test_ndx, X_test, model, X_train, y_train, encoding, random_state)
+        print('fine tune: {:.3f}s'.format(fine_tune))
+        print('test time: {:.3f}s'.format(test_time))
         sexee_fine_tune.append(fine_tune)
         sexee_test_time.append(test_time)
 
@@ -84,6 +86,8 @@ def runtime(model_type='lgb', encoding='tree_path', dataset='iris', n_estimators
         if model_type == 'cb' and inf_k is not None:
             print('leafinfluence...')
             fine_tune, test_time = influence_method(model, test_ndx, X_train, y_train, X_test, y_test, inf_k)
+            print('fine tune: {:.3f}s'.format(fine_tune))
+            print('test time: {:.3f}s'.format(test_time))
             inf_fine_tune.append(fine_tune)
             inf_test_time.append(test_time)
 

@@ -6,7 +6,7 @@ import catboost
 import lightgbm
 import xgboost
 from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
-from sklearn.metrics import accuracy_score, log_loss
+from sklearn.metrics import accuracy_score, log_loss, roc_auc_score
 
 
 def get_classifier(model, n_estimators=20, learning_rate=0.03, random_state=69):
@@ -50,19 +50,20 @@ def missed_instances(y1, y2, y_true):
     return both_ndx
 
 
+# TODO: add AUROC as another metric if it's a binary problem
 def performance(model, X_train=None, y_train=None, X_test=None, y_test=None):
     """Displays train and test performance for a learned model."""
 
     model_type = validate_model(model)
 
     result = tuple()
+    print('model ({})'.format(model_type))
 
     if X_train is not None and y_train is not None:
         y_hat_pred = model.predict(X_train).flatten()
         tree_missed_train = np.where(y_hat_pred != y_train)[0]
         acc_train = accuracy_score(y_train, y_hat_pred)
 
-        print('model ({})'.format(model_type))
         print('train set acc: {:4f}'.format(acc_train))
         print('missed train instances ({})'.format(len(tree_missed_train)))
 
@@ -71,6 +72,15 @@ def performance(model, X_train=None, y_train=None, X_test=None, y_test=None):
             ll_train = log_loss(y_train, y_hat_proba)
             print('train log loss: {:.5f}'.format(ll_train))
 
+            if len(np.unique(y_train)) == 2:
+                auroc_train = roc_auc_score(y_train, y_hat_proba[:, 1])
+                print('train auroc: {:.3f}'.format(auroc_train))
+
+        if hasattr(model, 'decision_function') and len(np.unique(y_train)) == 2:
+            y_hat_proba = model.decision_function(X_train)
+            auroc_train = roc_auc_score(y_train, y_hat_proba)
+            print('train auroc: {:.3f}'.format(auroc_train))
+
         result += (y_hat_pred,)
 
     if X_test is not None and y_test is not None:
@@ -78,7 +88,6 @@ def performance(model, X_train=None, y_train=None, X_test=None, y_test=None):
         tree_missed_test = np.where(y_hat_pred != y_test)[0]
         acc_test = accuracy_score(y_test, y_hat_pred)
 
-        print('model ({})'.format(model_type))
         print('test set acc: {:4f}'.format(acc_test))
         print('missed test instances ({})'.format(len(tree_missed_test)))
 
@@ -86,6 +95,15 @@ def performance(model, X_train=None, y_train=None, X_test=None, y_test=None):
             y_hat_proba = model.predict_proba(X_test)
             ll_test = log_loss(y_test, y_hat_proba)
             print('test log loss: {:.5f}'.format(ll_test))
+
+            if len(np.unique(y_test)) == 2:
+                auroc = roc_auc_score(y_test, y_hat_proba[:, 1])
+                print('test auroc: {:.3f}'.format(auroc))
+
+        if hasattr(model, 'decision_function') and len(np.unique(y_test)) == 2:
+            y_hat_proba = model.decision_function(X_test)
+            auroc = roc_auc_score(y_test, y_hat_proba)
+            print('test auroc: {:.3f}'.format(auroc))
 
         result += (y_hat_pred,)
 

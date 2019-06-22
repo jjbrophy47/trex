@@ -130,8 +130,11 @@ class TreeExplainer:
             x = x.reshape(1, -1)
         assert x.shape[0] == 1, 'x must be a single instance!'
 
+        # make a copy to avoid modifying the original
+        x = x.copy()
+
         # get test instance feature representation
-        x_feature = self.extractor_.transform(x.copy())
+        x_feature = self.extractor_.transform(x)
 
         # if multiclass, get svm of whose class is predicted
         if self.n_classes_ > 2:
@@ -142,9 +145,6 @@ class TreeExplainer:
         else:
             assert self.svm_ is not None, 'svm_ is not fitted!'
             pred_label = int(self.svm_.predict(x_feature)[0])
-
-        # compute similarity of this instance to all train instances
-        sim = self.similarity(x_feature)
 
         # ensure the decomposition matches the decision function prediction from the svm
         prediction, impact = self._decomposition(x_feature)
@@ -166,6 +166,7 @@ class TreeExplainer:
         # assemble items to be returned
         impact_list = [self.svm_.support_, impact]
         if similarity:
+            sim = self.similarity(x)
             impact_list.append(sim[self.svm_.support_])
         if weight:
             impact_list.append(dual_weight)
