@@ -10,26 +10,32 @@ from collections import defaultdict
 from copy import deepcopy
 
 from influence_boosting.influence.leaf_influence import CBLeafInfluenceEnsemble
+from . import model_util
 
 
-def avg_impact(explainer, test_indices, X_test, progress=False):
+def avg_impact(explainer, X_test, test_indices=None, progress=False):
     """
     Returns avg impacts of train instances over a given set of test instances.
     Parameters
     ----------
     explainer : sexee.TreeExplainer
         SVM explainer for the tree ensemble.
-    test_indices : 1d array-like
-        Indexes to compute the average impact over.
     X_test : 2d array-like
         Test instances in original feature space.
+    test_indices : 1d array-like
+        Indexes to compute the average impact over.
     """
 
     result = defaultdict(float)
 
+    if test_indices is not None:
+        X_test_instances = X_test[test_indices]
+    else:
+        X_test_instances = X_test
+
     # compute average impact of support vectors over test indices
-    for test_ndx in tqdm.tqdm(test_indices, disable=not progress):
-        impact_list = explainer.train_impact(X_test[test_ndx])
+    for x_test in tqdm.tqdm(X_test_instances, disable=not progress):
+        impact_list = explainer.train_impact(x_test)
 
         # update the train instance impacts
         for train_ndx, train_impact in impact_list:
@@ -37,8 +43,9 @@ def avg_impact(explainer, test_indices, X_test, progress=False):
 
     # divide by the number of test instances
     for train_ndx, train_val in result.items():
-        result[train_ndx] = train_val / len(test_indices)
+        result[train_ndx] = train_val / len(X_test_instances)
 
+    result = list(result.items())
     return result
 
 
@@ -60,8 +67,8 @@ def log_loss_increase(yhat1, yhat2, y_true, sort='ascending', k=50):
 
     assert len(yhat1) == len(yhat2) == len(y_true), 'yhat, yhat2, and y_true are not the same length!'
 
-    yhat1_ll = instance_log_loss(yhat1, y_true)
-    yhat2_ll = instance_log_loss(yhat2, y_true)
+    yhat1_ll = instance_loss(yhat1, y_true, logloss=True)
+    yhat2_ll = instance_loss(yhat2, y_true, logloss=True)
     diff = yhat1_ll - yhat2_ll
     diff_ndx = np.argsort(diff)
     if sort == 'descending':
@@ -69,9 +76,54 @@ def log_loss_increase(yhat1, yhat2, y_true, sort='ascending', k=50):
     return diff_ndx[:k]
 
 
-def instance_log_loss(y_hat, y_true):
-    """Returns the log loss per instance."""
-    return np.log(1 - np.abs(y_hat - y_true))
+def instance_loss(y_hat, y_true=None, logloss=False):
+    """
+    Returns the log loss per instance.
+    Parameters
+    ----------
+    y_hat : 1d or 2d array-like
+        If 1d, probability of positive class.
+        If 2d, array of 1d arrays denoting the probability of each class.
+    y_true : 1d array-like (default=None)
+        True labels.
+    logloss : bool (default=False)
+        If True, returns loss values in log form.
+    Returns
+    -------
+    1d array-like of loss values, one for each instance.
+    """
+
+    if y_hat.ndim == 2 and y_true is not None:
+        assert len(y_hat) == len(y_true), 'y_hat is not the same len as y_true!'
+        assert y_hat.shape[1] == len(np.unique(y_true)), 'number of classes do not match!'
+        y_hat = model_util.positive_class_proba(y_true, y_hat)
+
+    if logloss:
+        result = np.log(y_hat)
+    else:
+        result = 1 - y_hat
+
+    return result
+
+
+def make_multiclass(yhat):
+    """
+    Turn a 1d array of porbabilities for a positive class into a 2d array of
+    probabilities for each class.
+    Parameters
+    ----------
+    yhat : 1d array-like
+        Array of probabilities for the positive class.
+    Returns
+    -------
+    2d array of shape (n_samples, n_classes) where column 0 are probabilities
+    for the negative class and column 1 are probabilities for the positive class.
+    """
+    assert yhat.ndim == 1, 'yhat is not 1d!'
+
+    yhat = yhat.reshape(-1, 1)
+    yhat = np.hstack([1 - yhat, yhat])
+    return yhat
 
 
 def get_influence_explainer(model, X_train, y_train, inf_k):

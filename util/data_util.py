@@ -7,7 +7,7 @@ from sklearn.datasets import load_iris, load_breast_cancer, load_wine
 from sklearn.model_selection import train_test_split
 
 
-def get_data(dataset, test_size=0.2, random_state=69, data_dir='data'):
+def get_data(dataset, test_size=0.2, random_state=69, data_dir='data', return_feature=False):
     """Returns a train and test set from the desired dataset."""
 
     X = None
@@ -55,12 +55,16 @@ def get_data(dataset, test_size=0.2, random_state=69, data_dir='data'):
     elif dataset == 'medifor':
         train = np.load(os.path.join(data_dir, 'medifor/NC17_EvalPart1.npy'))
         test = np.load(os.path.join(data_dir, 'medifor/MFC18_EvalPart1.npy'))
+        feature = np.load(os.path.join(data_dir, 'medifor/feature.npy'))
         label = ['non-manipulated', 'manipulated']
         X_train = train[:, :-1]
         y_train = train[:, -1].astype(np.int32)
         X_test = test[:, :-1]
         y_test = test[:, -1].astype(np.int32)
-        return X_train, X_test, y_train, y_test, label
+        if return_feature:
+            return X_train, X_test, y_train, y_test, label, feature
+        else:
+            return X_train, X_test, y_train, y_test, label
 
     elif dataset == 'medifor2':
         data = np.load(os.path.join(data_dir, 'medifor/NC17_EvalPart1.npy'))

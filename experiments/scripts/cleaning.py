@@ -34,7 +34,7 @@ def num_labels_to_flip(dataset):
     elif dataset == 'breast':
         result = 90
     elif dataset == 'medifor':
-        result = 1500
+        result = 1510
     elif dataset == 'medifor2':
         result = 800  # 1100
     else:
@@ -124,8 +124,8 @@ def random_method(noisy_ndx, y_train, interval, to_check=1, random_state=69):
     return ckpt_ndx, fix_ndx
 
 
-def loss_method(noisy_ndx, y_train_proba, y_train, interval, to_check=1):
-    """Sorts train instances by largest train log loss."""
+def loss_method(noisy_ndx, y_train_proba, y_train, interval, to_check=1, logloss=False):
+    """Sorts train instances by largest train loss."""
 
     n_train = len(y_train)
 
@@ -135,12 +135,21 @@ def loss_method(noisy_ndx, y_train_proba, y_train, interval, to_check=1):
     else:
         exit('to_check not int')
 
+    # extract 1d array of probabilities representing the probability of the target label
     if y_train_proba.ndim > 1:
-        y_probas = model_util.positive_class_proba(y_train, y_train_proba)
+        y_proba = model_util.positive_class_proba(y_train, y_train_proba)
     else:
-        y_probas = y_train_proba
-    y_ll = exp_util.instance_log_loss(y_probas, y_train)
-    train_order = np.argsort(y_ll)[:n_check]  # ascending order
+        y_proba = y_train_proba
+
+    # compute the loss for each instance
+    y_loss = exp_util.instance_loss(y_proba, y_train, logloss=logloss)
+
+    # put train instances in order based on decreasing absolute loss
+    if logloss:
+        train_order = np.argsort(y_loss)[:n_check]  # ascending order, most negative first
+    else:
+        train_order = np.argsort(y_loss)[::-1][:n_check]  # descending order, most positive first
+
     ckpt_ndx, fix_ndx = record_fixes(train_order, noisy_ndx, y_train, interval)
     return ckpt_ndx, fix_ndx
 
@@ -224,6 +233,8 @@ def noise_detection(model_type='lgb', encoding='tree_path', dataset='iris', n_es
     # svm loss method - squish svm decision values to between 0 and 1
     if svm_loss:
         y_train_proba = explainer.decision_function(X_train)
+        if y_train_proba.ndim == 1:
+            y_train_proba = exp_util.make_multiclass(y_train_proba)
         y_train_proba = minmax_scale(y_train_proba)
         ckpt_ndx, fix_ndx = loss_method(noisy_ndx, y_train_proba, y_train, interval, to_check=n_check)
         svm_loss_results = interval_performance(ckpt_ndx, fix_ndx, noisy_ndx, clf, data, acc_test_noisy)
@@ -252,13 +263,13 @@ def noise_detection(model_type='lgb', encoding='tree_path', dataset='iris', n_es
     tree_loss_check_pct, tree_loss_acc, tree_loss_fix_pct = tree_loss_results
 
     fig, axs = plt.subplots(1, 2, figsize=(14, 4))
-    axs[0].plot(sexee_check_pct, sexee_acc, marker='.', color='g', label='sexee')
+    axs[0].plot(sexee_check_pct, sexee_acc, marker='.', color='g', label='ours')
     axs[0].plot(rand_check_pct, rand_acc, marker='^', color='r', label='random')
     axs[0].plot(tree_loss_check_pct, tree_loss_acc, marker='p', color='c', label='tree_loss')
     axs[0].axhline(acc_test_clean, color='k', linestyle='--')
     axs[0].set_xlabel('fraction of train data checked')
     axs[0].set_ylabel('test accuracy')
-    axs[1].plot(sexee_check_pct, sexee_fix_pct, marker='.', color='g', label='sexee')
+    axs[1].plot(sexee_check_pct, sexee_fix_pct, marker='.', color='g', label='ours')
     axs[1].plot(rand_check_pct, rand_fix_pct, marker='^', color='r', label='random')
     axs[1].plot(tree_loss_check_pct, tree_loss_fix_pct, marker='p', color='c', label='tree_loss')
     axs[1].set_xlabel('fraction of train data checked')

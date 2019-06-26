@@ -1,0 +1,299 @@
+(myenv) ubuntu@uomlmedifor:~/trees$ python experiments/scripts/runtime.py --dataset adult --encoding tree_output --model cb --repeats 10 --inf_k 0
+Namespace(dataset='adult', encoding='tree_output', inf_k=0, model='cb', n_estimators=100, repeats=10, rs=69)
+
+run 0
+train instances: 32561
+num features: 14
+model (CatBoostClassifier)
+test set acc: 0.871445
+missed test instances (2093)
+test log loss: 0.28516
+sexee...
+leafinfluence...
+100%|██████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 32561/32561 [55:33<00:00,  8.96it/s]
+
+run 1
+train instances: 32561
+num features: 14
+model (CatBoostClassifier)
+test set acc: 0.868681
+missed test instances (2138)
+test log loss: 0.28541
+sexee...
+leafinfluence...
+100%|██████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 32561/32561 [55:34<00:00,  9.76it/s]
+
+run 2
+train instances: 32561
+num features: 14
+model (CatBoostClassifier)
+test set acc: 0.869418
+missed test instances (2126)
+test log loss: 0.28610
+sexee...
+leafinfluence...
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 32561/32561 [1:06:36<00:00,  8.15it/s]
+
+run 3
+train instances: 32561
+num features: 14
+model (CatBoostClassifier)
+test set acc: 0.868128
+missed test instances (2147)
+test log loss: 0.28733
+sexee...
+leafinfluence...
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 32561/32561 [1:03:13<00:00,  9.89it/s]
+
+run 4
+train instances: 32561
+num features: 14
+model (CatBoostClassifier)
+test set acc: 0.868804
+missed test instances (2136)
+test log loss: 0.28692
+sexee...
+leafinfluence...
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 32561/32561 [1:02:45<00:00, 11.29it/s]
+
+run 5
+train instances: 32561
+num features: 14
+model (CatBoostClassifier)
+test set acc: 0.867883
+missed test instances (2151)
+test log loss: 0.28793
+sexee...
+leafinfluence...
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 32561/32561 [1:06:13<00:00,  7.57it/s]
+
+run 6
+train instances: 32561
+num features: 14
+model (CatBoostClassifier)
+test set acc: 0.867084
+missed test instances (2164)
+test log loss: 0.28611
+sexee...
+leafinfluence...
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 32561/32561 [1:07:39<00:00, 10.56it/s]
+
+run 7
+train instances: 32561
+num features: 14
+model (CatBoostClassifier)
+test set acc: 0.869357
+missed test instances (2127)
+test log loss: 0.28428
+sexee...
+leafinfluence...
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 32561/32561 [1:01:59<00:00, 10.23it/s]
+
+run 8
+train instances: 32561
+num features: 14
+model (CatBoostClassifier)
+test set acc: 0.869971
+missed test instances (2117)
+test log loss: 0.28571
+sexee...
+leafinfluence...
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 32561/32561 [1:02:08<00:00, 11.21it/s]
+
+run 9
+train instances: 32561
+num features: 14
+model (CatBoostClassifier)
+test set acc: 0.867944
+missed test instances (2150)
+test log loss: 0.28598
+sexee...
+leafinfluence...
+100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 32561/32561 [1:00:39<00:00, 10.36it/s]
+
+sexee
+fine tuning: 48.901s +/- 5.212s
+test time: 0.060s +/- 0.015s
+
+leafinfluence
+fine tuning: 9.256s +/- 8.958s
+test time: 3751.317s +/- 239.445s
+
+
+
+
+
+
+
+
+(myenv) ubuntu@uomlmedifor:~/trees$ python experiments/scripts/runtime.py --dataset amazon --encoding tree_output --model cb --repeats 10 --inf_k 0
+Namespace(dataset='amazon', encoding='tree_output', inf_k=0, model='cb', n_estimators=100, repeats=10, rs=69)
+
+run 0
+train instances: 26215
+num features: 9
+model (CatBoostClassifier)
+test set acc: 0.942478
+missed test instances (377)
+test log loss: 0.18156
+test auroc: 0.812
+sexee...
+fine tune: 16.149s
+test time: 0.023s
+leafinfluence...
+100%|██████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 26215/26215 [50:21<00:00,  8.16it/s]
+fine tune: 5.744s
+test time: 3031.627s
+
+run 1
+train instances: 26215
+num features: 9
+model (CatBoostClassifier)
+test set acc: 0.942173
+missed test instances (379)
+test log loss: 0.18437
+test auroc: 0.809
+sexee...
+fine tune: 17.340s
+test time: 0.017s
+leafinfluence...
+100%|██████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 26215/26215 [52:50<00:00,  9.91it/s]
+fine tune: 6.709s
+test time: 3180.065s
+
+run 2
+train instances: 26215
+num features: 9
+model (CatBoostClassifier)
+test set acc: 0.942020
+missed test instances (380)
+test log loss: 0.18379
+test auroc: 0.803
+sexee...
+fine tune: 17.054s
+test time: 0.011s
+leafinfluence...
+100%|██████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 26215/26215 [52:24<00:00,  8.81it/s]
+fine tune: 5.698s
+test time: 3158.357s
+
+run 3
+train instances: 26215
+num features: 9
+model (CatBoostClassifier)
+test set acc: 0.942173
+missed test instances (379)
+test log loss: 0.18134
+test auroc: 0.816
+sexee...
+fine tune: 17.939s
+test time: 0.021s
+leafinfluence...
+100%|██████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 26215/26215 [52:06<00:00,  9.89it/s]
+fine tune: 7.610s
+test time: 3138.595s
+
+run 4
+train instances: 26215
+num features: 9
+model (CatBoostClassifier)
+test set acc: 0.941105
+missed test instances (386)
+test log loss: 0.18177
+test auroc: 0.816
+sexee...
+fine tune: 18.126s
+test time: 0.009s
+leafinfluence...
+100%|██████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 26215/26215 [55:04<00:00,  8.02it/s]
+fine tune: 5.644s
+test time: 3319.638s
+
+run 5
+train instances: 26215
+num features: 9
+model (CatBoostClassifier)
+test set acc: 0.941715
+missed test instances (382)
+test log loss: 0.18309
+test auroc: 0.817
+sexee...
+fine tune: 16.521s
+test time: 0.023s
+leafinfluence...
+100%|██████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 26215/26215 [55:36<00:00,  5.15it/s]
+fine tune: 5.337s
+test time: 3349.604s
+
+run 6
+train instances: 26215
+num features: 9
+model (CatBoostClassifier)
+test set acc: 0.941868
+missed test instances (381)
+test log loss: 0.18200
+test auroc: 0.815
+sexee...
+fine tune: 20.464s
+test time: 0.027s
+leafinfluence...
+100%|██████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 26215/26215 [56:15<00:00,  6.72it/s]
+fine tune: 6.680s
+test time: 3388.008s
+
+run 7
+train instances: 26215
+num features: 9
+model (CatBoostClassifier)
+test set acc: 0.941868
+missed test instances (381)
+test log loss: 0.18412
+test auroc: 0.802
+sexee...
+fine tune: 18.014s
+test time: 0.014s
+leafinfluence...
+100%|██████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 26215/26215 [55:36<00:00,  8.33it/s]
+fine tune: 5.256s
+test time: 3348.566s
+
+run 8
+train instances: 26215
+num features: 9
+model (CatBoostClassifier)
+test set acc: 0.940952
+missed test instances (387)
+test log loss: 0.18389
+test auroc: 0.807
+sexee...
+fine tune: 16.626s
+test time: 0.020s
+leafinfluence...
+100%|██████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 26215/26215 [54:50<00:00,  8.95it/s]
+fine tune: 5.651s
+test time: 3303.910s
+
+run 9
+train instances: 26215
+num features: 9
+model (CatBoostClassifier)
+test set acc: 0.941105
+missed test instances (386)
+test log loss: 0.18559
+test auroc: 0.806
+sexee...
+fine tune: 16.626s
+test time: 0.025s
+leafinfluence...
+100%|██████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 26215/26215 [52:21<00:00,  8.14it/s]
+fine tune: 5.494s
+test time: 3151.541s
+
+sexee
+fine tuning: 17.486s +/- 1.190s
+test time: 0.019s +/- 0.006s
+
+leafinfluence
+fine tuning: 5.982s +/- 0.722s
+test time: 3236.991s +/- 113.061s
+(myenv) ubuntu@uomlmedifor:~/trees$

@@ -14,6 +14,8 @@ def example(model='lgb', encoding='tree_path', dataset='iris', n_estimators=100,
     clf = model_util.get_classifier(model, n_estimators=n_estimators, random_state=random_state)
     X_train, X_test, y_train, y_test, label = data_util.get_data(dataset, random_state=random_state)
 
+    print(label)
+
     # train a tree ensemble
     model = clf.fit(X_train, y_train)
     tree_yhat = model_util.performance(model, X_train, y_train, X_test, y_test)
@@ -37,10 +39,16 @@ def example(model='lgb', encoding='tree_path', dataset='iris', n_estimators=100,
 
     # show explanations for missed instances
     for test_ndx in both_missed_test[:topk_test]:
-        impact_list, (svm_pred, pred_label) = explainer.train_impact(X_test[test_ndx].reshape(1, -1), pred_svm=True,
-                                                                     similarity=True, weight=True)
+        x_test = X_test[test_ndx]
+        train_ndx, impact, sim, weight = explainer.train_impact(x_test, similarity=True, weight=True)
+        impact_list = zip(train_ndx, impact, sim, weight)
         impact_list = sorted(impact_list, key=lambda tup: abs(tup[1]), reverse=True)
+        svm_pred, pred_label = explainer.decision_function(x_test, pred_svm=True)
+        print(impact, impact.sum())
+        print(svm_pred, pred_label)
+        print(type(svm_pred), type(pred_label))
         print_util.show_test_instance(test_ndx, svm_pred, pred_label, y_test=y_test, label=label)
+        print(train_ndx.shape, impact.shape, sim.shape, weight.shape)
         print_util.show_train_instances(impact_list, y_train, k=topk_train, label=label)
 
 if __name__ == '__main__':

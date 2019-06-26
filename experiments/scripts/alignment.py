@@ -4,17 +4,130 @@ training data from NC17_EvalPart1; or if we can identify instances to be added t
 """
 import argparse
 
+import shap
 import tqdm
 import sexee
 import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.base import clone
+from sklearn.metrics import roc_auc_score
 
 from util import model_util, data_util, exp_util
 
+"""
+Three phases:
+1) Feature Removal - Removing features that are causing a domain mismatch.
+2) Relabel - identify and relabel training instances to better align with the test set.
+3) Data Removal - Remove training instances that cause a domain mismatch.
+4) Reweight - upweight and downweight specific training instances to better align with the test set.
+"""
 
-def alignment(model='lgb', encoding='tree_path', dataset='medifor', n_estimators=20,
-              random_state=69, timeit=False, iterations=5):
+
+def _shap_method(tree, X_test_miss, plot=False):
+    """Returns the most impactful features on the specified test instances based on SHAP values."""
+
+    shap_explainer = shap.TreeExplainer(tree)
+    test_shap = shap_explainer.shap_values(X_test_miss)
+    feature_order = np.argsort(np.sum(np.abs(test_shap), axis=0))[::-1]
+
+    if plot:
+        shap.summary_plot(test_shap, X_test_miss)
+
+    return feature_order
+
+
+def _sexee_method(tree, X_test_miss, X_train, y_train, plot=False, topk=100):
+    """
+    Returns the most impactful features on the specific test instances by finding the most impactful
+    train instances, then getting the SHAP values of those instances.
+    """
+
+    # find the most impactful train instances on the test instances
+    sexee_explainer = sexee.TreeExplainer(tree, X_train, y_train)
+    train_impact = sexee_explainer.get_train_weight()[:topk]
+    pos_ndx, pos_val = zip(*train_impact)
+    pos_ndx = np.array(pos_ndx)
+
+    shap_explainer = shap.TreeExplainer(tree)
+    train_shap = shap_explainer.shap_values(X_train[pos_ndx])
+    feature_order = np.argsort(np.sum(np.abs(train_shap), axis=0))[::-1]
+
+    if plot:
+        shap.summary_plot(train_shap, X_train[pos_ndx])
+
+    return feature_order
+
+
+def _retrain(train_order, clf, X_train, y_train, X_test, y_test, k=6):
+    """Return model performance as features are removed from the data."""
+
+    auroc = []
+    for i in tqdm.tqdm(range(1, k)):
+        remove = train_order[:i]
+        new_X_train = np.delete(X_train, remove, axis=1)
+        new_X_test = np.delete(X_test, remove, axis=1)
+        new_tree = clone(clf).fit(new_X_train, y_train)
+        yhat = new_tree.predict_proba(new_X_test)[:, 1]
+        auroc.append(roc_auc_score(y_test, yhat))
+
+    return auroc
+
+
+def remove_feature(model='lgb', encoding='tree_path', dataset='medifor', n_estimators=100,
+                   random_state=69, plot=False, data_dir='data', test_subset=200, n_remove=8):
+    """Can we identify features to remove that would improve model performance on the test set."""
+
+    # get model and data
+    clf = model_util.get_classifier(model, n_estimators=n_estimators, random_state=random_state)
+    X_train, X_test, y_train, y_test, label = data_util.get_data(dataset, random_state=random_state, data_dir=data_dir)
+
+    # train a tree ensemble and explainer
+    tree = clone(clf).fit(X_train, y_train)
+    yhat = tree.predict_proba(X_test)[:, 1]
+    og_auroc = roc_auc_score(y_test, yhat)
+    model_util.performance(tree, X_train, y_train, X_test, y_test)
+
+    # get worst test instance loss
+    test_dist = exp_util.instance_loss(tree.predict_proba(X_test), y_test)
+    test_dist_ndx = np.argsort(test_dist)[::-1][:test_subset]
+    test_dist = test_dist[test_dist_ndx]
+    X_test_miss = X_test[test_dist_ndx]
+
+    # plot test instance loss
+    if plot:
+        fig, ax = plt.subplots()
+        ax.plot(np.arange(len(test_dist)), test_dist)
+        ax.set_ylabel('l1 loss')
+        ax.set_xlabel('test instances sorted by loss')
+        plt.show()
+
+    # # get test instance shap values
+    feature_order_shap = _shap_method(tree, X_test_miss, plot=plot)
+    feature_order_sexee = _sexee_method(tree, X_test_miss, X_train, y_train, plot=plot)
+
+    # get feature order to remove
+    num_features = n_remove + 1
+    shap_auroc = _retrain(feature_order_shap, clf, X_train, y_train, X_test, y_test, k=num_features)
+    sexee_auroc = _retrain(feature_order_sexee, clf, X_train, y_train, X_test, y_test, k=num_features)
+
+    # plot results
+    x_labels = [str(x) for x in np.arange(1, num_features)]
+    x_labels.insert(0, '0')
+    shap_auroc.insert(0, og_auroc)
+    sexee_auroc.insert(0, og_auroc)
+
+    fig, ax = plt.subplots()
+    ax.axhline(og_auroc, color='k', linestyle='--')
+    ax.plot(x_labels, shap_auroc, marker='.', color='orange', label='shap')
+    ax.plot(x_labels, sexee_auroc, marker='.', color='green', label='ours')
+    ax.set_xlabel('# features removed')
+    ax.set_ylabel('auroc')
+    ax.legend()
+    plt.show()
+
+
+def reweight(model='lgb', encoding='tree_path', dataset='medifor', n_estimators=100,
+             random_state=69, timeit=False, iterations=5):
 
     # get model and data
     clf = model_util.get_classifier(model, n_estimators=n_estimators, random_state=random_state)
@@ -38,16 +151,18 @@ def alignment(model='lgb', encoding='tree_path', dataset='medifor', n_estimators
         # a negative impact means the train instances contributed away from the model's prediction
         explainer = sexee.TreeExplainer(tree, new_X_train, new_y_train)
         # missed_indices = np.where(tree.predict(X_test) != y_test)[0]
-        impact_incorrect = exp_util.avg_impact(explainer, missed_indices[:4000], X_test, progress=True)
+        impact_incorrect = exp_util.avg_impact(explainer, missed_indices[:1000], X_test, progress=True)
         harmful_train = [impact for impact in impact_incorrect.items() if impact[1] > 0]
         helpful_train = [impact for impact in impact_incorrect.items() if impact[1] < 0]
 
+        mult = 10
+
         # reweight impactful training samples
         for train_ndx, impact_val in harmful_train:
-            sample_weight[train_ndx] -= impact_val
+            sample_weight[train_ndx] -= (impact_val * mult)
 
         for train_ndx, impact_val in helpful_train:
-            sample_weight[train_ndx] -= impact_val
+            sample_weight[train_ndx] -= (impact_val * mult)
 
         # print(harmful_train, len(harmful_train))
         # print()
@@ -77,4 +192,5 @@ if __name__ == '__main__':
     parser.add_argument('--iterations', metavar='NUM', type=int, default=5, help='Number of reweighting rounds.')
     args = parser.parse_args()
     print(args)
-    alignment(args.model, args.encoding, args.dataset, args.n_estimators, args.rs, args.timeit, args.iterations)
+    # alignment(args.model, args.encoding, args.dataset, args.n_estimators, args.rs, args.timeit, args.iterations)
+    remove_feature(args.model, args.encoding, args.dataset, args.n_estimators, args.rs)
