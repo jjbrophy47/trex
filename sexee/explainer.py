@@ -138,27 +138,19 @@ class TreeExplainer:
             assert self.ovr_ is not None, 'ovr_ is not fitted!'
             assert self.svm_ is None, 'svm_ already fitted!'
             pred_label = int(self.ovr_.predict(X_feature)[0])
-            self.svm_ = self.ovr_.estimators_[pred_label]
+            svm = self.ovr_.estimators_[pred_label]
         else:
             assert self.svm_ is not None, 'svm_ is not fitted!'
-            pred_label = self.svm_.predict(X_feature)
+            svm = self.svm_
+            pred_label = svm.predict(X_feature)
 
         # decompose instance predictions into weighted sums of the train instances
-        impact = self._decomposition(X_feature)
+        impact = self._decomposition(X_feature, svm=svm)
 
-        # ensure the decomposition matches the decision function prediction from the svm
-        # impact = self._decomposition(X_feature)
-        # decision_pred = self.svm_.decision_function(X_feature)[0]
-        # assert np.isclose(prediction, decision_pred), 'svm.decision_function does not match decomposition!'
-
-        # flip impact scores for binary case if predicted label is 0
-        # this ensures positive impact scores represent contributions toward the predicted label
-
-        dual_weight = self.svm_.dual_coef_[0]
+        # get support vector weights
+        dual_weight = svm.dual_coef_[0]
         if self.sparse_:
             dual_weight = np.array(dual_weight.todense())[0]
-
-        # if self.n_classes_ == 2 and pred_label == 0:
 
         # flip impact scores for binary case if predicted label is 0
         # this ensures positive impact scores represent contributions toward the predicted label
@@ -168,33 +160,21 @@ class TreeExplainer:
             dual_weight[pred_ndx] = dual_weight[pred_ndx] * -1
             dual_weight = dual_weight.T
             impact *= -1
-            # decision_pred *= -1
-            # dual_weight *= -1
-        # else:
-        #     dual_weight = self.svm_.dual_coef_[0]
 
-        # if self.sparse_:
-        #     dual_weight = np.array(dual_weight.todense())[0]
-
+        # return a 1d array if a single instance is given
         if X_feature.shape[0] == 1:
             impact = impact.flatten()
             dual_weight = dual_weight.flatten()
 
         # assemble items to be returned
-        impact_tuple = (self.svm_.support_, impact)
+        impact_tuple = (svm.support_, impact)
         if similarity:
             sim = self.similarity(X)
             if X_feature.shape[0] == 1:
                 sim = sim.flatten()
-            impact_tuple += (sim[self.svm_.support_],)
+            impact_tuple += (sim[svm.support_],)
         if weight:
             impact_tuple += (dual_weight,)
-
-        # result = list(zip(*impact_list))
-
-        # clear chosen svm if multiclass
-        if self.n_classes_ > 2:
-            self.svm_ = None
 
         if self.timeit:
             print('computing impact from train instances took {}s'.format(time.time() - start))
@@ -204,15 +184,24 @@ class TreeExplainer:
     def similarity(self, X, train_indices=None):
         """Finds which instances are most similar to each x in X."""
 
+        # error checking
         assert self.train_feature_ is not None, 'train_feature_ is not fitted!'
         if X.ndim == 1:
             X = X.reshape(1, -1)
         X_feature = self.extractor_.transform(X.copy())
         assert X_feature.shape[1] == self.train_feature_.shape[1], 'num features do not match!'
 
+        # if multiclass, get svm of whose class is predicted
         if self.n_classes_ > 2:
             assert X.shape[0] == 1, 'must be 1 instance if n_classes_ > 2!'
+            assert self.ovr_ is not None, 'ovr_ is not fitted!'
+            pred_label = int(self.ovr_.predict(X_feature)[0])
+            svm = self.ovr_.estimators_[pred_label]
+        else:
+            assert self.svm_ is not None, 'svm_ is not fitted!'
+            svm = self.svm_
 
+        # return similarity only for a subset of train instances
         if train_indices is not None:
             train_feature = self.train_feature_[train_indices]
         else:
@@ -220,22 +209,12 @@ class TreeExplainer:
 
         # compute similarity
         if self.kernel_ == 'linear':
-            # sim = linear_kernel(train_feature, x_feature).flatten()
             sim = linear_kernel(train_feature, X_feature)
             sim /= self.extractor_.num_trees_
         elif self.kernel_ == 'rbf':
-            # sim = rbf_kernel(train_feature, x_feature, gamma=self.svm_._gamma).flatten()
-            sim = rbf_kernel(train_feature, X_feature, gamma=self.svm_._gamma)
+            sim = rbf_kernel(train_feature, X_feature, gamma=svm._gamma)
 
-        result = sim
-
-        # # put train instances in descending order of similarity
-        # if sort:
-        #     sim_ndx = np.argsort(sim)[::-1]
-        #     sim = sim[sim_ndx]
-        #     result = (sim, sim_ndx)
-
-        return result
+        return sim
 
     def get_svm(self):
         """Return a copy of the learned svm model."""
@@ -309,7 +288,7 @@ class TreeExplainer:
 
         return train_weight
 
-    def _decomposition(self, X_feature):
+    def _decomposition(self, X_feature, svm):
         """
         Computes the prediction for a query point as a weighted sum of support vectors.
         This should match the `svm.decision_function` method.
@@ -319,28 +298,24 @@ class TreeExplainer:
             assert X_feature.shape[0] == 1, 'X_feature must be 1 instance if n_classes_ > 2!'
 
         # get support vector instances and weights
-        sv_feature = self.train_feature_[self.svm_.support_]  # support vector train instances
-        sv_weight = self.svm_.dual_coef_[0]  # support vector weights
+        sv_feature = self.train_feature_[svm.support_]  # support vector train instances
+        sv_weight = svm.dual_coef_[0]  # support vector weights
         if self.sparse_:
             sv_weight = np.array(sv_weight.todense())[0]
         sv_weight = sv_weight.reshape(-1, 1)
 
         # compute similarity to the test instance
         if self.kernel_ == 'linear':
-            # sim_prod = linear_kernel(sv_feature, X_feature).flatten()
             sim_prod = linear_kernel(sv_feature, X_feature)
         elif self.kernel_ == 'rbf':
-            # sim_prod = rbf_kernel(sv_feature, X_feature, gamma=self.svm_._gamma).flatten()
-            sim_prod = rbf_kernel(sv_feature, X_feature, gamma=self.svm_._gamma)
+            sim_prod = rbf_kernel(sv_feature, X_feature, gamma=svm._gamma)
 
         # decompose prediction to a weighted sum of the support vectors
         weighted_prod = sim_prod * sv_weight
-        prediction = np.sum(weighted_prod, axis=0) + self.svm_.intercept_[0]
-
-        print(self.svm_.intercept_[0])
+        prediction = np.sum(weighted_prod, axis=0) + svm.intercept_[0]
 
         # check to make sure this decomposition is valid
-        svm_decision = self.svm_.decision_function(X_feature)
+        svm_decision = svm.decision_function(X_feature)
         assert np.allclose(prediction, svm_decision), 'decomposition do not match svm decision!'
 
         return weighted_prod
