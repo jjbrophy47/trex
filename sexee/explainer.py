@@ -6,6 +6,7 @@ import time
 import copy
 
 import numpy as np
+from sklearn.base import clone
 from sklearn.utils.validation import check_X_y
 from sklearn.svm import SVC
 from sklearn.multiclass import OneVsRestClassifier
@@ -95,7 +96,7 @@ class TreeExplainer:
             self.ovr_ = OneVsRestClassifier(clf).fit(self.train_feature_, train_label)
             self.svm_ = None
         else:
-            self.svm_ = clf.fit(self.train_feature_, train_label)
+            self.svm_ = clone(clf).fit(self.train_feature_, train_label)
         if self.timeit:
             print('fitting svm took {}s'.format(time.time() - start))
 
@@ -266,6 +267,24 @@ class TreeExplainer:
 
         return result
 
+    def predict(self, X):
+        """Return prediction label for each x in X."""
+
+        if X.ndim == 1:
+            X = X.reshape(1, -1)
+            assert X.shape[0] == 1, 'x must be a single instance!'
+        assert X.shape[1] == self.n_feats_, 'num features do not match!'
+
+        X_feature = self.extractor_.transform(X)
+        assert X_feature.shape[1] == self.train_feature_.shape[1], 'num features do not match!'
+
+        if self.n_classes_ > 2:
+            result = self.ovr_.predict(X_feature)
+        else:
+            result = self.svm_.predict(X_feature)
+
+        return result
+
     def get_train_weight(self, sort=True):
         """
         Return a list of (train_ndx, weight) tuples for all support vectors.
@@ -287,6 +306,19 @@ class TreeExplainer:
             train_weight = sorted(train_weight, key=lambda tup: abs(tup[1]), reverse=True)
 
         return train_weight
+
+    def transform(self, X):
+        """Transform X using the extractor."""
+
+        if X.ndim == 1:
+            X = X.reshape(1, -1)
+            assert X.shape[0] == 1, 'x must be a single instance!'
+        assert X.shape[1] == self.n_feats_, 'num features do not match!'
+
+        X_feature = self.extractor_.transform(X)
+        assert X_feature.shape[1] == self.train_feature_.shape[1], 'num features do not match!'
+
+        return X_feature
 
     def _decomposition(self, X_feature, svm):
         """

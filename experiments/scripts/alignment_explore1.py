@@ -9,6 +9,8 @@ import sexee
 import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.base import clone
+from sklearn.decomposition import PCA, TruncatedSVD
+from sklearn.manifold import TSNE
 
 from util import model_util, data_util
 
@@ -109,6 +111,61 @@ def feature_similarity(model='lgb', encoding='tree_path', dataset='medifor', n_e
     plt.tight_layout()
     plt.show()
 
+
+def feature_clustering(model='lgb', encoding='tree_path', dataset='medifor', n_estimators=100,
+                       random_state=69, verbose=0, data_dir='data', pca_components=50):
+
+    # get model and data
+    clf = model_util.get_classifier(model, n_estimators=n_estimators, random_state=random_state)
+    X_train, X_test, y_train, y_test, label = data_util.get_data(dataset, random_state=random_state, data_dir=data_dir)
+
+    # train a tree ensemble and explainer
+    tree = clone(clf).fit(X_train, y_train)
+    model_util.performance(tree, X_train, y_train, X_test, y_test)
+
+    # store indexes of different subgroups
+    train0 = np.where(y_train == 0)[0]
+    train1 = np.where(y_train == 1)[0]
+    test0 = np.where(y_test == 0)[0]
+    test1 = np.where(y_test == 1)[0]
+
+    # run tsne
+    print('concatenating X_train and X_test...')
+    X_feature = np.concatenate([X_train, X_test])
+
+    if encoding in ['tree_output', 'tree_path']:
+        print('exracting tree features...')
+        explainer = sexee.TreeExplainer(tree, X_train, y_train, encoding=encoding, random_state=random_state)
+        X_feature = explainer.transform(X_feature)
+
+    if X_feature.shape[1] > pca_components:
+        if encoding == 'tree_path':
+            print('reducing dimensions from {} to {} with TruncatedSVD...'.format(X_feature.shape[1], pca_components))
+            X_feature = TruncatedSVD(n_components=pca_components).fit_transform(X_feature)
+        else:
+            print('reducing dimensions from {} to {} with PCA...'.format(X_feature.shape[1], pca_components))
+            X_feature = PCA(n_components=pca_components).fit_transform(X_feature)
+
+    print('embedding with tsne...')
+    X_embed = TSNE(verbose=verbose).fit_transform(X_feature)
+
+    # plot results
+    n_train = len(y_train)
+
+    fig, ax = plt.subplots()
+    ax.scatter(X_embed[:, 0][:n_train][train0], X_embed[:, 1][:n_train][train0], color='blue', alpha=0.25,
+               label='train (non-manip)')
+    ax.scatter(X_embed[:, 0][:n_train][train1], X_embed[:, 1][:n_train][train1], color='red', alpha=0.25,
+               label='train (manip)')
+    ax.scatter(X_embed[:, 0][n_train:][test0], X_embed[:, 1][n_train:][test0], color='cyan', alpha=0.25,
+               label='test (non-manip)')
+    ax.scatter(X_embed[:, 0][n_train:][test1], X_embed[:, 1][n_train:][test1], color='orange', alpha=0.25,
+               label='test (manip)')
+    ax.set_xlabel('tsne 0')
+    ax.set_ylabel('tsne 1')
+    ax.legend()
+    plt.show()
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Feature representation extractions for tree ensembles',
                                      formatter_class=argparse.ArgumentDefaultsHelpFormatter)
@@ -120,7 +177,9 @@ if __name__ == '__main__':
     parser.add_argument('--test_subset', metavar='N', default=1000, type=int, help='test points to sample.')
     parser.add_argument('--train_subset', metavar='N', default=None, type=int, help='train points to compare.')
     parser.add_argument('--agg_type', metavar='TYPE', default='mean', type=str, help='aggregate function to use.')
+    parser.add_argument('--verbose', metavar='LEVEL', default=0, type=int, help='verbosity of tsne output.')
     args = parser.parse_args()
     print(args)
-    feature_similarity(args.model, args.encoding, args.dataset, args.n_estimators, args.rs, args.test_subset,
-                       args.train_subset, args.agg_type)
+    # feature_similarity(args.model, args.encoding, args.dataset, args.n_estimators, args.rs, args.test_subset,
+    #                    args.train_subset, args.agg_type)
+    feature_clustering(args.model, args.encoding, args.dataset, args.n_estimators, args.rs, args.verbose)

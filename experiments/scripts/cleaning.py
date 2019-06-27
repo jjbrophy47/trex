@@ -24,11 +24,11 @@ def num_labels_to_flip(dataset):
     """Returns the number of labels to flip for each dataset."""
 
     if dataset == 'adult':
-        result = 13024  # 15000
+        result = 13024
     elif dataset == 'hospital':
         result = 6000
     elif dataset == 'amazon':
-        result = 10486  # 12000
+        result = 10486
     elif dataset == 'upselling':
         result = 3500
     elif dataset == 'breast':
@@ -36,7 +36,9 @@ def num_labels_to_flip(dataset):
     elif dataset == 'medifor':
         result = 1510
     elif dataset == 'medifor2':
-        result = 800  # 1100
+        result = 800
+    elif dataset == 'medifor3':
+        result = 6968
     else:
         exit('{} dataset not available'.format(dataset))
 
@@ -206,10 +208,10 @@ def noise_detection(model_type='lgb', encoding='tree_path', dataset='iris', n_es
     model_noisy = clone(clf).fit(X_train, y_train_noisy)
 
     # show model performance before and after noise
-    print('\nBefore noise:') 
-    model_util.performance(model, X_test=X_test, y_test=y_test)
+    print('\nBefore noise:')
+    model_util.performance(model, X_train, y_train, X_test=X_test, y_test=y_test)
     print('\nAfter noise:')
-    model_util.performance(model_noisy, X_test=X_test, y_test=y_test)
+    model_util.performance(model_noisy, X_train, y_train_noisy, X_test=X_test, y_test=y_test)
 
     # check accuracy before and after noise
     acc_test_clean = accuracy_score(y_test, model.predict(X_test))
@@ -227,7 +229,7 @@ def noise_detection(model_type='lgb', encoding='tree_path', dataset='iris', n_es
 
     # tree loss method
     y_train_proba = model_noisy.predict_proba(X_train)
-    ckpt_ndx, fix_ndx = loss_method(noisy_ndx, y_train_proba, y_train, interval, to_check=n_check)
+    ckpt_ndx, fix_ndx = loss_method(noisy_ndx, y_train_proba, y_train_noisy, interval, to_check=n_check)
     tree_loss_results = interval_performance(ckpt_ndx, fix_ndx, noisy_ndx, clf, data, acc_test_noisy)
 
     # svm loss method - squish svm decision values to between 0 and 1

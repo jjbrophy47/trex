@@ -61,11 +61,11 @@ def performance(model, X_train=None, y_train=None, X_test=None, y_test=None):
 
     if X_train is not None and y_train is not None:
         y_hat_pred = model.predict(X_train).flatten()
-        tree_missed_train = np.where(y_hat_pred != y_train)[0]
+        # tree_missed_train = np.where(y_hat_pred != y_train)[0]
         acc_train = accuracy_score(y_train, y_hat_pred)
 
         print('train set acc: {:4f}'.format(acc_train))
-        print('missed train instances ({})'.format(len(tree_missed_train)))
+        # print('missed train instances ({})'.format(len(tree_missed_train)))
 
         if hasattr(model, 'predict_proba'):
             y_hat_proba = model.predict_proba(X_train)
@@ -85,11 +85,11 @@ def performance(model, X_train=None, y_train=None, X_test=None, y_test=None):
 
     if X_test is not None and y_test is not None:
         y_hat_pred = model.predict(X_test).flatten()
-        tree_missed_test = np.where(y_hat_pred != y_test)[0]
+        # tree_missed_test = np.where(y_hat_pred != y_test)[0]
         acc_test = accuracy_score(y_test, y_hat_pred)
 
         print('test set acc: {:4f}'.format(acc_test))
-        print('missed test instances ({})'.format(len(tree_missed_test)))
+        # print('missed test instances ({})'.format(len(tree_missed_test)))
 
         if hasattr(model, 'predict_proba'):
             y_hat_proba = model.predict_proba(X_test)

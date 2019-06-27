@@ -3,6 +3,7 @@ Simple integration tests to make sure the tree explainer works for all models, e
 datasets. These do NOT test correctness of the values returned by the tree explainer.
 """
 import lightgbm
+import numpy as np
 
 import sexee
 from util import data_util
@@ -134,6 +135,30 @@ def test_multiclass_multi_instance_decision_function_output(n_test=11):
         print('test_multiclass_multi_instance_decision_function_output: pass')
 
 
+def test_binaryclass_multi_instance_impact_equals_iterative_single_instance_impact(n_test=2):
+    X_train, X_test, y_train, y_test, label = data_util.get_data(dataset='medifor')
+    tree = lightgbm.LGBMClassifier().fit(X_train, y_train)
+    explainer = sexee.TreeExplainer(tree, X_train, y_train)
+
+    impact_1 = explainer.train_impact(X_test[:n_test], similarity=True, weight=True)
+    impact_2a = explainer.train_impact(X_test[0], similarity=True, weight=True)
+    impact_2b = explainer.train_impact(X_test[1], similarity=True, weight=True)
+
+    ndx1, vals1, sim1, weight1 = impact_1
+    ndx2a, vals2a, sim2a, weight2a = impact_2a
+    ndx2b, vals2b, sim2b, weight2b = impact_2b
+
+    assert np.all(ndx1 == ndx2a)
+    assert np.all(ndx1 == ndx2b)
+    assert np.all(vals1[:, 0] == vals2a)
+    assert np.all(vals1[:, 1] == vals2b)
+    assert np.all(sim1[:, 0] == sim2a)
+    assert np.all(sim1[:, 1] == sim2b)
+    assert np.all(weight1[:, 0] == weight2a)
+    assert np.all(weight1[:, 1] == weight2b)
+    print('test_binaryclass_multi_instance_impact_equals_iterative_single_instance_impact: pass')
+
+
 # integration tests
 
 def test_model(model='lgb', encodings=['tree_path', 'tree_output'],
@@ -163,6 +188,8 @@ def main():
     test_binaryclass_multi_instance_decision_function_output()
     test_multiclass_single_instance_decision_function_output()
     test_multiclass_multi_instance_decision_function_output()
+
+    test_binaryclass_multi_instance_impact_equals_iterative_single_instance_impact()
 
     test_model(model='rf')
     test_model(model='gbm')

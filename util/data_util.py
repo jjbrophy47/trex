@@ -72,6 +72,12 @@ def get_data(dataset, test_size=0.2, random_state=69, data_dir='data', return_fe
         X = data[:, :-1]
         y = data[:, -1].astype(np.int32)
 
+    elif dataset == 'medifor3':
+        data = np.load(os.path.join(data_dir, 'medifor/MFC18_EvalPart1.npy'))
+        label = ['non-manipulated', 'manipulated']
+        X = data[:, :-1]
+        y = data[:, -1].astype(np.int32)
+
     if X is None and y is None and label is None:
         X = data['data']
         y = data['target']
@@ -97,8 +103,21 @@ def flip_labels(arr, k=100, random_state=69, return_indices=True):
     indices = np.random.choice(np.arange(len(arr)), size=k, replace=False)
 
     new_arr = arr.copy()
+    ones_flipped = 0
+    zeros_flipped = 0
+
     for ndx in indices:
+        if new_arr[ndx] == 1:
+            ones_flipped += 1
+        else:
+            zeros_flipped += 1
         new_arr[ndx] = 0 if new_arr[ndx] == 1 else 1
+
+    print('sum before: {}'.format(np.sum(arr)))
+    print('ones flipped: {}'.format(ones_flipped))
+    print('zeros flipped: {}'.format(zeros_flipped))
+    print('sum after: {}'.format(np.sum(new_arr)))
+    assert np.sum(new_arr) == np.sum(arr) - ones_flipped + zeros_flipped
 
     if return_indices:
         return new_arr, indices

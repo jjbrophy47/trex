@@ -126,12 +126,40 @@ def remove_feature(model='lgb', encoding='tree_path', dataset='medifor', n_estim
     plt.show()
 
 
-def reweight(model='lgb', encoding='tree_path', dataset='medifor', n_estimators=100,
-             random_state=69, timeit=False, iterations=5):
+def relabel(model='lgb', encoding='tree_path', dataset='medifor', n_estimators=100,
+            random_state=69, timeit=False, iterations=5, data_dir='data'):
 
     # get model and data
     clf = model_util.get_classifier(model, n_estimators=n_estimators, random_state=random_state)
-    X_train, X_test, y_train, y_test, label = data_util.get_data(dataset, random_state=random_state)
+    X_train, X_test, y_train, y_test, label = data_util.get_data(dataset, random_state=random_state, data_dir=data_dir)
+
+    # train a tree ensemble and explainer
+    tree = clone(clf).fit(X_train, y_train)
+    model_util.performance(tree, X_train, y_train, X_test, y_test)
+    explainer = sexee.TreeExplainer(tree, X_train, y_train, encoding=encoding)
+
+    # compute impact of train instances on test instances
+    train_ndx, impact = explainer.train_impact(X_test)
+    impact = np.mean(impact, axis=1)
+
+    abs_ndx = np.argsort(np.abs(impact))[::-1][:200]
+    abs_train_ndx = train_ndx[abs_ndx]
+
+    print(impact[abs_ndx])
+
+    new_X_train = np.delete(X_train, abs_train_ndx, axis=0)
+    new_y_train = np.delete(y_train, abs_train_ndx)
+
+    new_tree = clone(clf).fit(new_X_train, new_y_train)
+    model_util.performance(new_tree, new_X_train, new_y_train, X_test, y_test)
+
+
+def reweight(model='lgb', encoding='tree_path', dataset='medifor', n_estimators=100,
+             random_state=69, timeit=False, iterations=5, data_dir='data'):
+
+    # get model and data
+    clf = model_util.get_classifier(model, n_estimators=n_estimators, random_state=random_state)
+    X_train, X_test, y_train, y_test, label = data_util.get_data(dataset, random_state=random_state, data_dir=data_dir)
 
     # train a tree ensemble and explainer
     tree = clone(clf).fit(X_train, y_train)
@@ -193,4 +221,5 @@ if __name__ == '__main__':
     args = parser.parse_args()
     print(args)
     # alignment(args.model, args.encoding, args.dataset, args.n_estimators, args.rs, args.timeit, args.iterations)
-    remove_feature(args.model, args.encoding, args.dataset, args.n_estimators, args.rs)
+    # remove_feature(args.model, args.encoding, args.dataset, args.n_estimators, args.rs)
+    relabel(args.model, args.encoding, args.dataset, args.n_estimators, args.rs)
