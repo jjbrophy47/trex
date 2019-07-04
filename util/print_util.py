@@ -3,7 +3,7 @@ Utility methods for displaying data.
 """
 
 
-def show_test_instance(test_ndx, svm_pred, pred_label, y_test=None, label=None):
+def show_test_instance(test_ndx, svm_pred, pred_label, y_test=None, label=None, X_test=None):
 
     # show test instance
     if y_test is not None and label is not None:
@@ -18,8 +18,11 @@ def show_test_instance(test_ndx, svm_pred, pred_label, y_test=None, label=None):
         test_str = '\n\nTest [{}], distance to separator: {:.3f}, prediction: {}'
         print(test_str.format(test_ndx, svm_pred, pred_label))
 
+    if X_test is not None:
+        print(X_test[test_ndx])
 
-def show_train_instances(impact_list, y_train, k=5, label=None):
+
+def show_train_instances(impact_list, y_train, k=5, label=None, X_train=None):
 
     # show most influential train instances
     n_items = len(impact_list[0])
@@ -27,7 +30,7 @@ def show_train_instances(impact_list, y_train, k=5, label=None):
     if n_items == 2:
         train_str = 'Train [{}], impact: {:.3f}, label: {}'
     elif n_items == 4:
-        train_str = 'Train [{}], impact: {:.3f}, similarity: {:.3f}, weight: {:.3f}, label: {}'
+        train_str = 'Train [{}], impact: {:.3f}, similarity: {:.3f}, weight: {:.5f}, label: {}'
     else:
         exit('3 train impact items is ambiguous!')
 
@@ -40,6 +43,9 @@ def show_train_instances(impact_list, y_train, k=5, label=None):
         train_label = y_train[items[0]] if label is None else label[y_train[items[0]]]
         items += (train_label,)
         print(train_str.format(*items))
+
+        if X_train is not None:
+            print(X_train[items[0]])
 
 
 def show_fidelity(both_train, diff_train, y_train, both_test=None, diff_test=None, y_test=None):

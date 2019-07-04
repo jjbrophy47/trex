@@ -2,9 +2,10 @@
 Sample explanation for tree ensembles with SEXEE.
 """
 import argparse
+import numpy as np
 
 from sexee.explainer import TreeExplainer
-from util import model_util, data_util, print_util
+from util import model_util, data_util, print_util, exp_util
 
 
 def example(model='lgb', encoding='tree_path', dataset='iris', n_estimators=100, random_state=69, timeit=False,
@@ -34,6 +35,13 @@ def example(model='lgb', encoding='tree_path', dataset='iris', n_estimators=100,
 
     # test instances that tree and svm models missed
     both_missed_test = model_util.missed_instances(tree_yhat_test, svm_yhat_test, y_test)
+
+    # get worst missed test indices
+    test_dist = exp_util.instance_loss(model.predict_proba(X_test), y_test)
+    test_dist_ndx = np.argsort(test_dist)[::-1]
+    test_dist = test_dist[test_dist_ndx]
+    X_test_miss = X_test[test_dist_ndx]
+    both_missed_test = test_dist_ndx
 
     # show explanations for missed instances
     for test_ndx in both_missed_test[:topk_test]:

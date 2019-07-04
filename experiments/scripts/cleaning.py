@@ -20,31 +20,6 @@ from util import model_util, data_util, exp_util
 from influence_boosting.influence.leaf_influence import CBLeafInfluenceEnsemble
 
 
-def num_labels_to_flip(dataset):
-    """Returns the number of labels to flip for each dataset."""
-
-    if dataset == 'adult':
-        result = 13024
-    elif dataset == 'hospital':
-        result = 6000
-    elif dataset == 'amazon':
-        result = 10486
-    elif dataset == 'upselling':
-        result = 3500
-    elif dataset == 'breast':
-        result = 90
-    elif dataset == 'medifor':
-        result = 1510
-    elif dataset == 'medifor2':
-        result = 800
-    elif dataset == 'medifor3':
-        result = 6968
-    else:
-        exit('{} dataset not available'.format(dataset))
-
-    return result
-
-
 def interval_performance(ckpt_ndx, fix_ndx, noisy_ndx, clf, data, acc_test_noisy):
     """
     Retrains the tree ensemble for each ckeckpoint, where a checkpoint represents
@@ -73,7 +48,7 @@ def interval_performance(ckpt_ndx, fix_ndx, noisy_ndx, clf, data, acc_test_noisy
     return checked_pct, accs, fix_pct
 
 
-def record_fixes(train_order, noisy_ndx, y_train, interval):
+def record_fixes(train_order, noisy_ndx, train_len, interval):
     """
     Returns the number of train instances checked and which train instances were
     fixed for each checkpoint.
@@ -89,7 +64,7 @@ def record_fixes(train_order, noisy_ndx, y_train, interval):
             fix_ndx.append(train_ndx)
         checked += 1
 
-        if float(checked / len(y_train)) >= (snapshot * interval):
+        if float(checked / train_len) >= (snapshot * interval):
             ckpt_ndx.append((checked, len(fix_ndx)))
             snapshot += 1
     fix_ndx = np.array(fix_ndx)
@@ -103,8 +78,26 @@ def sexee_method(explainer, noisy_ndx, y_train, points=10):
     train_weight = explainer.get_train_weight()
     n_check = len(train_weight)
     train_order = [train_ndx for train_ndx, weight in train_weight]
-    interval = (len(train_weight) / len(y_train)) / points
-    ckpt_ndx, fix_ndx = record_fixes(train_order, noisy_ndx, y_train, interval)
+    interval = (n_check / len(y_train)) / points
+    ckpt_ndx, fix_ndx = record_fixes(train_order, noisy_ndx, len(y_train), interval)
+
+    return ckpt_ndx, fix_ndx, interval, n_check
+
+
+def sexee_method2(explainer, noisy_ndx, X_train, y_train, points=10):
+    """Sorts train instances by largest total absolute impact on the train set."""
+
+    train_ndx, impact = explainer.train_impact(X_train)
+    impact = np.sum(impact, axis=1)
+    assert len(train_ndx) == len(impact)
+
+    impact_list = zip(train_ndx, impact)
+    impact_list = sorted(impact_list, key=lambda tup: abs(tup[1]), reverse=True)
+    train_order = [train_impact[0] for train_impact in impact_list]
+
+    n_check = len(train_order)
+    interval = (n_check / len(y_train)) / points
+    ckpt_ndx, fix_ndx = record_fixes(train_order, noisy_ndx, len(y_train), interval)
 
     return ckpt_ndx, fix_ndx, interval, n_check
 
@@ -122,7 +115,7 @@ def random_method(noisy_ndx, y_train, interval, to_check=1, random_state=69):
 
     np.random.seed(random_state + 1)  # +1 to avoid choosing the same indices as the noisy labels
     train_order = np.random.choice(n_train, size=n_check, replace=False)
-    ckpt_ndx, fix_ndx = record_fixes(train_order, noisy_ndx, y_train, interval)
+    ckpt_ndx, fix_ndx = record_fixes(train_order, noisy_ndx, n_train, interval)
     return ckpt_ndx, fix_ndx
 
 
@@ -152,7 +145,7 @@ def loss_method(noisy_ndx, y_train_proba, y_train, interval, to_check=1, logloss
     else:
         train_order = np.argsort(y_loss)[::-1][:n_check]  # descending order, most positive first
 
-    ckpt_ndx, fix_ndx = record_fixes(train_order, noisy_ndx, y_train, interval)
+    ckpt_ndx, fix_ndx = record_fixes(train_order, noisy_ndx, len(y_train), interval)
     return ckpt_ndx, fix_ndx
 
 
@@ -179,12 +172,13 @@ def influence_method(explainer, noisy_ndx, X_train, y_train, y_train_noisy, inte
 
     # sort by absolute value
     train_order = np.argsort(np.abs(influence_scores))[::-1][:n_check]
-    ckpt_ndx, fix_ndx = record_fixes(train_order, noisy_ndx, y_train, interval)
+    ckpt_ndx, fix_ndx = record_fixes(train_order, noisy_ndx, n_train, interval)
     return ckpt_ndx, fix_ndx
 
 
 def noise_detection(model_type='lgb', encoding='tree_path', dataset='iris', n_estimators=100, random_state=69,
-                    timeit=False, inf_k=None, svm_loss=False, data_dir='data'):
+                    timeit=False, inf_k=None, svm_loss=False, data_dir='data', flip_frac=0.4, true_label=False,
+                    sexee2=False):
     """
     Main method that trains a tree ensemble, flips a percentage of train labels, prioritizes train
     instances using various methods, and computes how effective each method is at cleaning the data.
@@ -199,7 +193,7 @@ def noise_detection(model_type='lgb', encoding='tree_path', dataset='iris', n_es
     print('test instances: {}'.format(len(X_test)))
 
     # add noise
-    y_train_noisy, noisy_ndx = data_util.flip_labels(y_train, k=num_labels_to_flip(dataset), random_state=random_state)
+    y_train_noisy, noisy_ndx = data_util.flip_labels(y_train, k=flip_frac, random_state=random_state)
     noisy_ndx = np.array(sorted(noisy_ndx))
     print('num noisy labels: {}'.format(len(noisy_ndx)))
 
@@ -219,9 +213,15 @@ def noise_detection(model_type='lgb', encoding='tree_path', dataset='iris', n_es
 
     # sexee method
     explainer = sexee.TreeExplainer(model_noisy, X_train, y_train_noisy, encoding=encoding,
-                                    random_state=random_state, timeit=timeit)
+                                    random_state=random_state, timeit=timeit, use_predicted_labels=not true_label)
     ckpt_ndx, fix_ndx, interval, n_check = sexee_method(explainer, noisy_ndx, y_train)
     sexee_results = interval_performance(ckpt_ndx, fix_ndx, noisy_ndx, clf, data, acc_test_noisy)
+
+    # sexee method 2
+    explainer = sexee.TreeExplainer(model_noisy, X_train, y_train_noisy, encoding=encoding,
+                                    random_state=random_state, timeit=timeit, use_predicted_labels=not true_label)
+    ckpt_ndx, fix_ndx, interval, n_check = sexee_method2(explainer, noisy_ndx, X_train, y_train)
+    sexee2_results = interval_performance(ckpt_ndx, fix_ndx, noisy_ndx, clf, data, acc_test_noisy)
 
     # random method
     ckpt_ndx, fix_ndx = random_method(noisy_ndx, y_train, interval, to_check=n_check, random_state=random_state)
@@ -276,6 +276,10 @@ def noise_detection(model_type='lgb', encoding='tree_path', dataset='iris', n_es
     axs[1].plot(tree_loss_check_pct, tree_loss_fix_pct, marker='p', color='c', label='tree_loss')
     axs[1].set_xlabel('fraction of train data checked')
     axs[1].set_ylabel('fraction of flips fixed')
+    if sexee2:
+        sexee2_check_pct, sexee2_acc, sexee2_fix_pct = sexee2_results
+        axs[0].plot(sexee2_check_pct, sexee2_acc, marker='<', color='orange', label='sexee2')
+        axs[1].plot(sexee2_check_pct, sexee2_fix_pct, marker='<', color='orange', label='sexee2')
     if svm_loss:
         svm_loss_check_pct, svm_loss_acc, svm_loss_fix_pct = svm_loss_results
         axs[0].plot(svm_loss_check_pct, svm_loss_acc, marker='*', color='y', label='svm_loss')

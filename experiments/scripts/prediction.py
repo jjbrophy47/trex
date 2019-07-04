@@ -1,6 +1,7 @@
 """
 Experiment: Do the tree ensemble prediction probabilities correlate with the SVM decision values?
 """
+import time
 import argparse
 
 import sexee
@@ -11,32 +12,11 @@ from scipy.stats import spearmanr
 from util import model_util, data_util
 
 
-# TODO: add another method to vary hyperparameters, and plot correlation as a function of the hyperparemeter
-def prediction(model='lgb', encoding='tree_path', dataset='iris', n_estimators=100, random_state=69,
-               timeit=False, true_labels=False, k=1000, data_dir='data'):
+def _svm_predictions(explainer, data, yhat_data, ax=None):
 
-    # get model and data
-    clf = model_util.get_classifier(model, n_estimators=n_estimators, random_state=random_state)
-    X_train, X_test, y_train, y_test, label = data_util.get_data(dataset, random_state=random_state, data_dir=data_dir)
-    n_classes = len(np.unique(y_train))
+    X_train, y_train, X_test, y_test = data
+    yhat_tree_train, yhat_tree_test = yhat_data
 
-    # train a tree ensemble
-    tree = clf.fit(X_train, y_train)
-    model_util.performance(tree, X_train, y_train, X_test, y_test)
-    yhat_tree_train = tree.predict_proba(X_train)
-    yhat_tree_test = tree.predict_proba(X_test)
-
-    if n_classes > 2:
-        yhat_tree_train = yhat_tree_train.flatten()
-        yhat_tree_test = yhat_tree_test.flatten()
-    else:
-        yhat_tree_train = yhat_tree_train[:, 1]
-        yhat_tree_test = yhat_tree_test[:, 1]
-
-    # train an svm on the tree ensemble features
-    explainer = sexee.TreeExplainer(tree, X_train, y_train, encoding=encoding, random_state=random_state,
-                                    timeit=timeit, use_predicted_labels=not true_labels)
-    model_util.performance(explainer, X_train, y_train, X_test, y_test)
     train_feature = explainer.extractor_.transform(X_train)
     test_feature = explainer.extractor_.transform(X_test)
 
@@ -56,14 +36,85 @@ def prediction(model='lgb', encoding='tree_path', dataset='iris', n_estimators=1
     train_label = 'train={:.3f} (p), {:.3f} (s)'.format(train_pear, train_spear)
     test_label = 'test={:.3f} (p), {:.3f} (s)'.format(test_pear, test_spear)
 
-    fig, ax = plt.subplots()
-    ax.scatter(yhat_svm_train[:k], yhat_tree_train[:k], color='blue', label=train_label)
-    ax.scatter(yhat_svm_test[:k], yhat_tree_test[:k], color='cyan', label=test_label)
-    ax.set_xlabel('svm decision')
-    ax.set_ylabel('{} proba'.format(model))
-    ax.set_title('Fidelity ({}, {}, {})'.format(model, encoding, dataset))
-    ax.legend()
+    ax.scatter(yhat_svm_train, yhat_tree_train, color='blue', label=train_label)
+    ax.scatter(yhat_svm_test, yhat_tree_test, color='cyan', label=test_label)
+
+
+# TODO: add another method to vary hyperparameters, and plot correlation as a function of the hyperparemeter
+def prediction(model='lgb', encoding='tree_path', dataset='iris', n_estimators=100, random_state=69,
+               timeit=False, true_labels=False, k=1000, data_dir='data'):
+
+    # get model and data
+    clf = model_util.get_classifier(model, n_estimators=n_estimators, random_state=random_state)
+    X_train, X_test, y_train, y_test, label = data_util.get_data(dataset, random_state=random_state, data_dir=data_dir)
+    n_classes = len(np.unique(y_train))
+
+    # train a tree ensemble
+    tree = clf.fit(X_train, y_train)
+    yhat_tree_train = tree.predict_proba(X_train)
+    yhat_tree_test = tree.predict_proba(X_test)
+
+    if n_classes > 2:
+        yhat_tree_train = yhat_tree_train.flatten()
+        yhat_tree_test = yhat_tree_test.flatten()
+    else:
+        yhat_tree_train = yhat_tree_train[:, 1]
+        yhat_tree_test = yhat_tree_test[:, 1]
+
+    # test different combinations of encodings and labelsfor the svm
+    data = X_train, y_train, X_test, y_test
+    yhat_data = yhat_tree_train, yhat_tree_test
+
+    fig, axs = plt.subplots(2, 2, figsize=(18, 8))
+    axs = axs.flatten()
+
+    i = 0
+    for encoding in ['tree_output', 'tree_path']:
+        for true_labels in [True, False]:
+            start = time.time()
+            explainer = sexee.TreeExplainer(tree, X_train, y_train, encoding=encoding, random_state=random_state,
+                                            timeit=timeit, use_predicted_labels=not true_labels)
+            _svm_predictions(explainer, data, yhat_data, ax=axs[i])
+            axs[i].set_xlabel('svm decision')
+            axs[i].set_ylabel('{} proba'.format(model))
+            axs[i].set_title('Fidelity ({}, {}, {}, true_label={})'.format(model, dataset, encoding, true_labels))
+            axs[i].legend()
+            i += 1
+            print('{} and true_label={} took {:.3f}s'.format(encoding, true_labels, time.time() - start))
+    plt.tight_layout()
     plt.show()
+
+    # # train an svm on the tree ensemble features
+    # explainer = sexee.TreeExplainer(tree, X_train, y_train, encoding=encoding, random_state=random_state,
+    #                                 timeit=timeit, use_predicted_labels=not true_labels)
+    # model_util.performance(explainer, X_train, y_train, X_test, y_test)
+    # train_feature = explainer.extractor_.transform(X_train)
+    # test_feature = explainer.extractor_.transform(X_test)
+
+    # # get svm decision outputs
+    # svm = explainer.get_svm()
+    # yhat_svm_train = svm.decision_function(train_feature).flatten()
+    # yhat_svm_test = svm.decision_function(test_feature).flatten()
+
+    # # compute correlation between tree probabilities and svm decision values
+    # train_pear = np.corrcoef(yhat_tree_train, yhat_svm_train)[0][1]
+    # test_pear = np.corrcoef(yhat_tree_test, yhat_svm_test)[0][1]
+
+    # train_spear = spearmanr(yhat_tree_train, yhat_svm_train)[0]
+    # test_spear = spearmanr(yhat_tree_test, yhat_svm_test)[0]
+
+    # # plot results
+    # train_label = 'train={:.3f} (p), {:.3f} (s)'.format(train_pear, train_spear)
+    # test_label = 'test={:.3f} (p), {:.3f} (s)'.format(test_pear, test_spear)
+
+    # fig, ax = plt.subplots()
+    # ax.scatter(yhat_svm_train[:k], yhat_tree_train[:k], color='blue', label=train_label)
+    # ax.scatter(yhat_svm_test[:k], yhat_tree_test[:k], color='cyan', label=test_label)
+    # ax.set_xlabel('svm decision')
+    # ax.set_ylabel('{} proba'.format(model))
+    # ax.set_title('Fidelity ({}, {}, {}, true_label={})'.format(model, dataset, encoding, true_labels))
+    # ax.legend()
+    # plt.show()
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Feature representation extractions for tree ensembles',

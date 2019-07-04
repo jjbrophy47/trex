@@ -153,14 +153,14 @@ class TreeExplainer:
         if self.sparse_:
             dual_weight = np.array(dual_weight.todense())[0]
 
-        # flip impact scores for binary case if predicted label is 0
-        # this ensures positive impact scores represent contributions toward the predicted label
-        if self.n_classes_ == 2:
-            pred_ndx = np.where(pred_label == 0)[0]
-            dual_weight = np.broadcast_to(dual_weight, (len(pred_label), len(dual_weight))).copy()
-            dual_weight[pred_ndx] = dual_weight[pred_ndx] * -1
-            dual_weight = dual_weight.T
-            impact *= -1
+        # # flip impact scores for binary case if predicted label is 0
+        # # this ensures positive impact scores represent contributions toward the predicted label
+        # if self.n_classes_ == 2:
+        #     pred_ndx = np.where(pred_label == 0)[0]
+        #     dual_weight = np.broadcast_to(dual_weight, (len(pred_label), len(dual_weight))).copy()
+        #     dual_weight[pred_ndx] = dual_weight[pred_ndx] * -1
+        #     dual_weight = dual_weight.T
+        #     impact *= -1
 
         # return a 1d array if a single instance is given
         if X_feature.shape[0] == 1:
@@ -211,7 +211,7 @@ class TreeExplainer:
         # compute similarity
         if self.kernel_ == 'linear':
             sim = linear_kernel(train_feature, X_feature)
-            sim /= self.extractor_.num_trees_
+            # sim /= self.extractor_.num_trees_
         elif self.kernel_ == 'rbf':
             sim = rbf_kernel(train_feature, X_feature, gamma=svm._gamma)
 
