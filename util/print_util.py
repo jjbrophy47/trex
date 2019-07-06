@@ -22,7 +22,7 @@ def show_test_instance(test_ndx, svm_pred, pred_label, y_test=None, label=None, 
         print(X_test[test_ndx])
 
 
-def show_train_instances(impact_list, y_train, k=5, label=None, X_train=None):
+def show_train_instances(impact_list, y_train, k=5, label=None, X_train=None, intercept=None):
 
     # show most influential train instances
     n_items = len(impact_list[0])
@@ -37,6 +37,8 @@ def show_train_instances(impact_list, y_train, k=5, label=None, X_train=None):
     nonzero_sv = [items[0] for items in impact_list if abs(items[1]) > 0]
     print('\nSupport Vectors: {}'.format(len(impact_list)))
     print('Nonzero Support Vectors: {}'.format(len(nonzero_sv)))
+    if intercept is not None:
+        print('intercept: {:.3f}'.format(intercept))
 
     print('\nMost Impactful Train Instances')
     for items in impact_list[:k]:

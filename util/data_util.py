@@ -175,7 +175,7 @@ def _load_medifor(data_dir='data', test_size=0.2, random_state=69, return_featur
         train_ndx, test_ndx = train_test_split(np.arange(len(X)), test_size=test_size,
                                                random_state=random_state, stratify=y)
         X_train, y_train = X[train_ndx], y[train_ndx]
-        X_test, y_test = X[train_ndx], y[train_ndx]
+        X_test, y_test = X[test_ndx], y[test_ndx]
         result += (X_train, X_test, y_train, y_test, label)
 
         if return_feature:
@@ -184,8 +184,10 @@ def _load_medifor(data_dir='data', test_size=0.2, random_state=69, return_featur
 
         if return_manipulation:
             manipulation = pd.read_csv(os.path.join(data_dir, dataset, 'manipulations.csv'))
+            manip_label = np.array(manipulation.columns)
+            manipulation = manipulation.to_numpy()[:, 2:]
             manip_train, manip_test = manipulation[train_ndx], manipulation[test_ndx]
-            result += (manip_train, manip_test)
+            result += (manip_train, manip_test, manip_label)
 
         if return_image_id:
             assert dataset in ['MFC18_EvalPart1', 'MFC19_EvalPart1'], 'image_id not supported for {}'.format(dataset)
@@ -203,8 +205,10 @@ def _load_medifor(data_dir='data', test_size=0.2, random_state=69, return_featur
             result += (feature,)
 
         if return_manipulation:
-            manipulation = pd.read_csv(os.path.join(data_dir, dataset, 'reference.csv'))
-            result += (manipulation,)
+            manipulation = pd.read_csv(os.path.join(data_dir, dataset, 'manipulations.csv'))
+            manip_label = np.array(manipulation.columns)
+            manipulation = manipulation.to_numpy()[:, 2:]
+            result += (manipulation, manip_label)
 
         if return_image_id:
             assert dataset in ['MFC18_EvalPart1', 'MFC19_EvalPart1'], 'image_id not supported for {}'.format(dataset)
@@ -214,8 +218,42 @@ def _load_medifor(data_dir='data', test_size=0.2, random_state=69, return_featur
         return result
 
 
+def _load_mnist(data_dir='data', dataset='mnist'):
+
+    train_data = np.load(os.path.join(data_dir, 'mnist', 'train.npy'))
+    test_data = np.load(os.path.join(data_dir, 'mnist', 'test.npy'))
+
+    X_train, y_train = train_data[:, 1:], train_data[:, 0]
+    X_test, y_test = test_data[:, 1:], test_data[:, 0]
+
+    # extract classes to keep
+    if '_' in dataset:
+        label = []
+        classes = dataset.split('_')[-1]
+        for c in classes:
+            c = int(c)
+            assert c >= 0 and c <= 9, '{} class not eligible!'.format(c)
+            label.append(c)
+
+        # filter images
+        train_ndx_list = []
+        test_ndx_list = []
+
+        for c in label:
+            train_ndx_list.append(np.where(y_train == c)[0])
+            test_ndx_list.append(np.where(y_test == c)[0])
+
+        train_ndx = np.sort(np.concatenate(train_ndx_list))
+        test_ndx = np.sort(np.concatenate(test_ndx_list))
+
+        X_train, y_train = X_train[train_ndx], y_train[train_ndx]
+        X_test, y_test = X_test[test_ndx], y_test[test_ndx]
+
+    return X_train, X_test, y_train, y_test, label
+
+
 def get_data(dataset, test_size=0.2, random_state=69, data_dir='data', return_feature=False,
-             return_manipulations=False, return_image_id=False):
+             return_manipulation=False, return_image_id=False):
     """Returns a train and test set from the desired dataset."""
 
     # load dataset
@@ -246,14 +284,20 @@ def get_data(dataset, test_size=0.2, random_state=69, data_dir='data', return_fe
     elif dataset == 'mfc18_mfc19_switch':
         return _load_mfc18_mfc19(data_dir=data_dir, feature=return_feature, switch=True)
     elif dataset == 'NC17_EvalPart1':
-        return _load_medifor(data_dir=data_dir, feature=return_feature, image_id=return_image_id, dataset=dataset,
-                             test_size=test_size, random_state=random_state)
+        return _load_medifor(data_dir=data_dir, return_feature=return_feature, return_manipulation=return_manipulation,
+                             dataset=dataset, test_size=test_size, random_state=random_state)
     elif dataset == 'MFC18_EvalPart1':
-        return _load_medifor(data_dir=data_dir, feature=return_feature, manipulations=return_manipulations,
-                             image_id=return_image_id, dataset=dataset, test_size=test_size, random_state=random_state)
+        return _load_medifor(data_dir=data_dir, return_feature=return_feature, return_manipulation=return_manipulation,
+                             return_image_id=return_image_id, dataset=dataset, test_size=test_size,
+                             random_state=random_state)
     elif dataset == 'MFC19_EvalPart1':
-        return _load_medifor(data_dir=data_dir, feature=return_feature, manipulations=return_manipulations,
-                             image_id=return_image_id, dataset=dataset, test_size=test_size, random_state=random_state)
+        return _load_medifor(data_dir=data_dir, return_feature=return_feature, return_manipulation=return_manipulation,
+                             return_image_id=return_image_id, dataset=dataset, test_size=test_size,
+                             random_state=random_state)
+    elif dataset.startswith('mnist'):
+        return _load_mnist(data_dir=data_dir, dataset=dataset)
+    else:
+        exit('dataset {} not supported'.format(dataset))
 
 
 def flip_labels(arr, k=100, random_state=69, return_indices=True):

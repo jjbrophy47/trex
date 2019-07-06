@@ -11,6 +11,7 @@ from sklearn.utils.validation import check_X_y
 from sklearn.svm import SVC
 from sklearn.multiclass import OneVsRestClassifier
 from sklearn.metrics.pairwise import linear_kernel, rbf_kernel
+from sklearn.preprocessing import LabelEncoder
 
 from . import util
 from .extractor import TreeExtractor
@@ -18,8 +19,8 @@ from .extractor import TreeExtractor
 
 class TreeExplainer:
 
-    def __init__(self, model, X_train, y_train, encoding='tree_path', C=0.1, use_predicted_labels=True,
-                 random_state=None, timeit=False):
+    def __init__(self, model, X_train, y_train, encoding='tree_path', C=0.1, gamma='scale',
+                 use_predicted_labels=True, random_state=None, timeit=False):
         """
         Trains an svm on feature representations from a learned tree ensemble.
 
@@ -54,6 +55,7 @@ class TreeExplainer:
         self.y_train = y_train
         self.encoding = encoding
         self.C = C
+        self.gamma = gamma
         self.use_predicted_labels = use_predicted_labels
         self.random_state = random_state
         self.timeit = timeit
@@ -79,18 +81,20 @@ class TreeExplainer:
         if self.timeit:
             print('train feature extraction took {}s'.format(time.time() - start))
 
-        # train svm on feature representations and true or predicted labels
-        # TODO: grid search over C?
-        # TODO: grid search over gamma when rbf kernel?
-        clf = SVC(kernel=self.kernel_, random_state=self.random_state, C=self.C, gamma='scale')
+        # train svm on feature representations and labels (true or predicted)
+        clf = SVC(kernel=self.kernel_, random_state=self.random_state, C=self.C, gamma=self.gamma)
 
-        # choose ground truth or predicted labels to train the svm on
+        # choose ground truth or predicted labels to train the svm
         if use_predicted_labels:
             train_label = self.model.predict(X_train)
         else:
             train_label = self.y_train
 
-        # train `n_classes_` SVM models if multiclass, otherwise just train one SVM
+        # encode class labels into numbers between 0 and n_classes - 1
+        self.le_ = LabelEncoder().fit(train_label)
+        train_label = self.le_.transform(train_label)
+
+        # if multiclass then train an SVM for each class, otherwise train one SVM
         start = time.time()
         if self.n_classes_ > 2:
             self.ovr_ = OneVsRestClassifier(clf).fit(self.train_feature_, train_label)
@@ -100,25 +104,44 @@ class TreeExplainer:
         if self.timeit:
             print('fitting svm took {}s'.format(time.time() - start))
 
-    def train_impact(self, X, similarity=False, weight=False):
+    def __str__(self):
+        s = '\nSEXEE Tree Explainer:'
+        s += '\ntrain shape: {}'.format(self.X_train.shape)
+        s += '\nclasses: {}'.format(self.le_.classes_)
+        s += '\nencoding: {}'.format(self.encoding)
+        s += '\nsparse: {}'.format(self.sparse_)
+        s += '\nkernel: {}'.format(self.kernel_)
+        s += '\nfit predicted labels: {}'.format(self.use_predicted_labels)
+        s += '\nC: {}'.format(self.C)
+        s += '\ngamma: {}'.format(self.gamma)
+        s += '\nrandom state: {}'.format(self.random_state)
+        s += '\n'
+        return s
+
+    def train_impact(self, X, similarity=False, weight=False, intercept=False):
         """
-        Compute the impact of each support vector on a single test instance.
+        Compute the impact of each support vector on one or multiple test instances.
+        Currently multiple test instances only supports binary classification problems.
 
         Parameters
         ----------
-        1: 1d or 2d array-like
+        X: 1d or 2d array-like
             Instance to explain in terms of the train instance impact.
         similarity: bool
             If True, returns the similarity of each support vector to `x`.
         weight: bool
             If True, returns the weight of each support vector.
+        intercept: bool
+            If True, returns the intercept of the svm.
 
         Returns
         -------
-        impact_list: list of (<train_ndx>, <impact>, <sim>, <weight>) tuples for each support vector.
-            A positive <impact> score means the support vector contributed towards the predicted label, while a
-            negative score means it contributed against the predicted label. <sim> is addded if `similarity`
-            is True and <weight> is added if `weight` is True.
+        impact_list: tuple of (<train_ndx>, <impact>, <sim>, <weight>, <intercept>).
+            A positive impact score means the support vector contributed towards the predicted label, while a
+            negative score means it contributed against the predicted label.
+            <sim> is addded if `similarity` is True.
+            <weight> is added if `weight` is True.
+            <intercept> is added if `intercept` is True.
         """
         start = time.time()
 
@@ -139,6 +162,7 @@ class TreeExplainer:
             assert self.ovr_ is not None, 'ovr_ is not fitted!'
             assert self.svm_ is None, 'svm_ already fitted!'
             pred_label = int(self.ovr_.predict(X_feature)[0])
+            svm = self.ovr_.estimators_[self.labels_[pred_label]]
             svm = self.ovr_.estimators_[pred_label]
         else:
             assert self.svm_ is not None, 'svm_ is not fitted!'
@@ -149,18 +173,28 @@ class TreeExplainer:
         impact = self._decomposition(X_feature, svm=svm)
 
         # get support vector weights
-        dual_weight = svm.dual_coef_[0]
+        dual_weight = svm.dual_coef_[0].copy()
         if self.sparse_:
             dual_weight = np.array(dual_weight.todense())[0]
 
-        # # flip impact scores for binary case if predicted label is 0
-        # # this ensures positive impact scores represent contributions toward the predicted label
-        # if self.n_classes_ == 2:
-        #     pred_ndx = np.where(pred_label == 0)[0]
-        #     dual_weight = np.broadcast_to(dual_weight, (len(pred_label), len(dual_weight))).copy()
-        #     dual_weight[pred_ndx] = dual_weight[pred_ndx] * -1
-        #     dual_weight = dual_weight.T
-        #     impact *= -1
+        # get intercept
+        svm_intercept = svm.intercept_[0]
+
+        # flip impact scores for binary case if predicted label is 0
+        # this ensures positive impact scores represent contributions toward the predicted label
+        if self.n_classes_ == 2:
+            dual_weight = np.broadcast_to(dual_weight, (len(pred_label), len(dual_weight))).copy()
+
+            pred_ndx = np.where(pred_label == 0)[0]
+            dual_weight[pred_ndx] = dual_weight[pred_ndx] * -1
+            dual_weight = dual_weight.T
+            impact[:, pred_ndx] *= -1
+            svm_intercept *= -1
+        else:
+            if pred_label == 0:
+                impact *= -1
+                dual_weight *= -1
+                svm_intercept *= -1
 
         # return a 1d array if a single instance is given
         if X_feature.shape[0] == 1:
@@ -169,13 +203,18 @@ class TreeExplainer:
 
         # assemble items to be returned
         impact_tuple = (svm.support_, impact)
+
         if similarity:
             sim = self.similarity(X)
             if X_feature.shape[0] == 1:
                 sim = sim.flatten()
             impact_tuple += (sim[svm.support_],)
+
         if weight:
             impact_tuple += (dual_weight,)
+
+        if intercept:
+            impact_tuple += (svm_intercept,)
 
         if self.timeit:
             print('computing impact from train instances took {}s'.format(time.time() - start))
@@ -217,15 +256,16 @@ class TreeExplainer:
 
         return sim
 
-    def get_svm(self):
-        """Return a copy of the learned svm model."""
+    # # TODO: remove, no longer needed
+    # def get_svm(self):
+    #     """Return a copy of the learned svm model."""
 
-        if self.n_classes_ > 2:
-            return copy.deepcopy(self.ovr_)
-        else:
-            svm_model = copy.deepcopy(self.svm_)
+    #     if self.n_classes_ > 2:
+    #         return copy.deepcopy(self.ovr_)
+    #     else:
+    #         svm_model = copy.deepcopy(self.svm_)
 
-        return svm_model
+    #     return svm_model
 
     def decision_function(self, X, pred_svm=False):
         """
@@ -252,7 +292,7 @@ class TreeExplainer:
             pred_label = svm.predict(X_feature)
             decision = svm.decision_function(X_feature)
 
-            # flip distance to separator if binary class and the predicted label is 0
+            # flip distance to separator if binary class and the predicted label is the negative class
             flip_ndx = np.where(pred_label == 0)[0]
             decision[flip_ndx] = decision[flip_ndx] * -1
 
@@ -261,14 +301,19 @@ class TreeExplainer:
             if len(pred_label) == 1:
                 pred_label = int(pred_label[0])
 
+        if hasattr(pred_label, 'shape'):
+            pred_class = self.le_.inverse_transform(pred_label)
+        else:
+            pred_class = int(self.classes_[pred_label])
+
         result = decision
         if pred_svm:
-            result = decision, pred_label
+            result = decision, pred_class
 
         return result
 
     def predict(self, X):
-        """Return prediction label for each x in X."""
+        """Return prediction label for each x in X using the trained SVM."""
 
         if X.ndim == 1:
             X = X.reshape(1, -1)
@@ -279,11 +324,16 @@ class TreeExplainer:
         assert X_feature.shape[1] == self.train_feature_.shape[1], 'num features do not match!'
 
         if self.n_classes_ > 2:
-            result = self.ovr_.predict(X_feature)
+            pred_label = self.ovr_.predict(X_feature)
         else:
-            result = self.svm_.predict(X_feature)
+            pred_label = self.svm_.predict(X_feature)
 
-        return result
+        if hasattr(pred_label, 'shape'):
+            pred_class = self.le_.inverse_transform(pred_label)
+        else:
+            pred_class = self.classes_[pred_label]
+
+        return pred_class
 
     def get_train_weight(self, sort=True):
         """
@@ -348,7 +398,7 @@ class TreeExplainer:
 
         # check to make sure this decomposition is valid
         svm_decision = svm.decision_function(X_feature)
-        assert np.allclose(prediction, svm_decision), 'decomposition do not match svm decision!'
+        assert np.allclose(prediction, svm_decision), 'decomposition does not match svm decision!'
 
         return weighted_prod
 
@@ -361,3 +411,4 @@ class TreeExplainer:
         self.n_feats_ = X.shape[1]
         self.classes_ = np.unique(y)
         self.n_classes_ = len(self.classes_)
+        self.labels_ = dict(zip(self.classes_, np.arange(self.n_classes_)))

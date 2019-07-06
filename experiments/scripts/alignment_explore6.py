@@ -68,20 +68,21 @@ def _open_image(image_name, to_rgb=False, transparent_white=False):
     return img
 
 
-def _display_image(image_id, image_ref, ax=None, alpha=0.6, pred=None, actual=None, impact=None, data_dir='data'):
+def _display_image(image_id, image_ref, ax=None, alpha=0.6, pred=None, actual=None, impact=None,
+                   dataset_dir='data'):
 
     if ax is None:
         fig, ax = plt.subplots()
 
     image_info = image_ref[image_ref['image_id'] == image_id]
     probe_fn = image_info['ProbeFileName'].values[0].split('/')[-1]
-    probe_img = _open_image(os.path.join(data_dir, 'MFC18_EvalPart1', 'probe', probe_fn))
+    probe_img = _open_image(os.path.join(dataset_dir, 'probe', probe_fn))
     ax.imshow(probe_img)
 
     mask_fn = image_info['ProbeMaskFileName'].values[0]
     if isinstance(mask_fn, str):
         mask_fn = str(mask_fn).split('/')[-1]
-        mask_img = _open_image(os.path.join(data_dir, 'MFC18_EvalPart1', 'manipulation_mask', mask_fn),
+        mask_img = _open_image(os.path.join(dataset_dir, 'manipulation_mask', mask_fn),
                                to_rgb=True, transparent_white=True)
         mask_img = _white_to_transparency(mask_img)
         ax.imshow(mask_img, alpha=alpha)
@@ -102,17 +103,18 @@ def _display_image(image_id, image_ref, ax=None, alpha=0.6, pred=None, actual=No
 
 
 def prediction_explanation(model='lgb', encoding='tree_path', dataset='medifor1b', n_estimators=100, random_state=69,
-                           topk_train=5, test_size=0.1, alpha=0.5, show_performance=True, data_dir='data'):
+                           topk_train=5, test_size=0.1, alpha=0.5, show_performance=True, true_label=False,
+                           data_dir='data'):
 
     # get model and data
     clf = model_util.get_classifier(model, n_estimators=n_estimators, random_state=random_state)
     data = data_util.get_data(dataset, random_state=random_state, data_dir=data_dir, return_image_id=True,
                               test_size=test_size)
-    X_train, X_test, y_train, y_test, id_train, id_test, label = data
+    X_train, X_test, y_train, y_test, label, id_train, id_test = data
 
     # fit a tree ensemble and an explainer for that tree ensemble
     tree = clone(clf).fit(X_train, y_train)
-    explainer = sexee.TreeExplainer(tree, X_train, y_train, encoding=encoding)
+    explainer = sexee.TreeExplainer(tree, X_train, y_train, encoding=encoding, use_predicted_labels=not true_label)
 
     if show_performance:
         model_util.performance(tree, X_train, y_train, X_test, y_test)
@@ -122,7 +124,7 @@ def prediction_explanation(model='lgb', encoding='tree_path', dataset='medifor1b
     np.random.seed(random_state)
     test_ndx = np.random.choice(y_test_manip)
     x_test = X_test[test_ndx]
-    test_pred = label[tree.predict(x_test.reshape(1, -1))[0]]
+    test_pred = label[int(tree.predict(x_test.reshape(1, -1))[0])]
     test_actual = label[y_test[test_ndx]]
 
     sv_ndx, impact = explainer.train_impact(x_test)
@@ -140,10 +142,12 @@ def prediction_explanation(model='lgb', encoding='tree_path', dataset='medifor1b
     # image_ref = pd.read_csv('data/MFC18_EvalPart1/image_ref.csv')
 
     # TODO: put this into the data_utils module
-    image_ref = pd.read_csv(os.path.join(data_dir, 'MFC18_EvalPart1/image_ref.csv'))
+    dataset_dir = os.path.join(data_dir, dataset)
+    image_ref = pd.read_csv(os.path.join(data_dir, dataset, 'image_ref.csv'))
 
     # show the test image
-    _display_image(id_test[test_ndx], image_ref, alpha=alpha, pred=test_pred, actual=test_actual, data_dir=data_dir)
+    _display_image(id_test[test_ndx], image_ref, alpha=alpha, pred=test_pred, actual=test_actual,
+                   dataset_dir=dataset_dir)
     plt.show()
 
     # show positive train images
@@ -151,7 +155,7 @@ def prediction_explanation(model='lgb', encoding='tree_path', dataset='medifor1b
     axs = axs.flatten()
     for i, (train_ndx, train_impact) in enumerate(pos_impact_list[:topk_train]):
         _display_image(id_train[train_ndx], image_ref, alpha=alpha, ax=axs[i], actual=label[y_train[train_ndx]],
-                       data_dir=data_dir, impact=train_impact)
+                       dataset_dir=dataset_dir, impact=train_impact)
     plt.tight_layout()
     plt.show()
 
@@ -160,7 +164,7 @@ def prediction_explanation(model='lgb', encoding='tree_path', dataset='medifor1b
     axs = axs.flatten()
     for i, (train_ndx, train_impact) in enumerate(neg_impact_list[:topk_train]):
         _display_image(id_train[train_ndx], image_ref, alpha=alpha, ax=axs[i], actual=label[y_train[train_ndx]],
-                       data_dir=data_dir, impact=train_impact)
+                       dataset_dir=dataset_dir, impact=train_impact)
     plt.tight_layout()
     plt.show()
 

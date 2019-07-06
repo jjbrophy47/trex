@@ -55,12 +55,13 @@ def test_binaryclass_single_instance_impact_output():
     X_train, X_test, y_train, y_test, label = data_util.get_data(dataset='breast')
     tree = lightgbm.LGBMClassifier().fit(X_train, y_train)
     explainer = sexee.TreeExplainer(tree, X_train, y_train)
-    impact = explainer.train_impact(X_test[0], similarity=True, weight=True)
-    train_ndx, impact_vals, sim, weight = impact
+    impact = explainer.train_impact(X_test[0], similarity=True, weight=True, intercept=True)
+    train_ndx, impact_vals, sim, weight, intercept = impact
     assert train_ndx.ndim == 1
     assert impact_vals.ndim == 1
     assert sim.ndim == 1
     assert weight.ndim == 1
+    assert isinstance(intercept, float)
     assert len(train_ndx) == len(impact_vals) == len(sim) == len(weight)
     print('test_binaryclass_single_instance_impact_output: pass')
 
@@ -69,12 +70,13 @@ def test_multiclass_single_instance_impact_output():
     X_train, X_test, y_train, y_test, label = data_util.get_data(dataset='iris')
     tree = lightgbm.LGBMClassifier().fit(X_train, y_train)
     explainer = sexee.TreeExplainer(tree, X_train, y_train)
-    impact = explainer.train_impact(X_test[0], similarity=True, weight=True)
-    train_ndx, impact_vals, sim, weight = impact
+    impact = explainer.train_impact(X_test[0], similarity=True, weight=True, intercept=True)
+    train_ndx, impact_vals, sim, weight, intercept = impact
     assert train_ndx.ndim == 1
     assert impact_vals.ndim == 1
     assert sim.ndim == 1
     assert weight.ndim == 1
+    assert isinstance(intercept, float)
     assert len(train_ndx) == len(impact_vals) == len(sim) == len(weight)
     print('test_multiclass_single_instance_impact_output: pass')
 
@@ -84,12 +86,13 @@ def test_binaryclass_multi_instance_impact_output():
     n_test = 11
     tree = lightgbm.LGBMClassifier().fit(X_train, y_train)
     explainer = sexee.TreeExplainer(tree, X_train, y_train)
-    impact = explainer.train_impact(X_test[:n_test], similarity=True, weight=True)
-    train_ndx, impact_vals, sim, weight = impact
+    impact = explainer.train_impact(X_test[:n_test], similarity=True, weight=True, intercept=True)
+    train_ndx, impact_vals, sim, weight, intercept = impact
     assert train_ndx.ndim == 1
     assert impact_vals.shape[1] == n_test
     assert sim.shape[1] == n_test
     assert weight.shape[1] == n_test
+    assert isinstance(intercept, float)
     print('test_binaryclass_multi_instance_impact_output: pass')
 
 # testing decision_function outputs under different conditions
@@ -101,6 +104,7 @@ def test_binaryclass_single_instance_decision_function_output():
     explainer = sexee.TreeExplainer(tree, X_train, y_train)
     decision, pred_svm = explainer.decision_function(X_test[0], pred_svm=True)
     assert isinstance(decision, float)
+    print(pred_svm, type(pred_svm))
     assert isinstance(pred_svm, int)
     print('test_binaryclass_single_instance_decision_function_output: pass')
 
@@ -136,17 +140,17 @@ def test_multiclass_multi_instance_decision_function_output(n_test=11):
 
 
 def test_binaryclass_multi_instance_impact_equals_iterative_single_instance_impact(n_test=2):
-    X_train, X_test, y_train, y_test, label = data_util.get_data(dataset='medifor')
+    X_train, X_test, y_train, y_test, label = data_util.get_data(dataset='nc17_mfc18')
     tree = lightgbm.LGBMClassifier().fit(X_train, y_train)
     explainer = sexee.TreeExplainer(tree, X_train, y_train)
 
-    impact_1 = explainer.train_impact(X_test[:n_test], similarity=True, weight=True)
-    impact_2a = explainer.train_impact(X_test[0], similarity=True, weight=True)
-    impact_2b = explainer.train_impact(X_test[1], similarity=True, weight=True)
+    impact_1 = explainer.train_impact(X_test[:n_test], similarity=True, weight=True, intercept=True)
+    impact_2a = explainer.train_impact(X_test[0], similarity=True, weight=True, intercept=True)
+    impact_2b = explainer.train_impact(X_test[1], similarity=True, weight=True, intercept=True)
 
-    ndx1, vals1, sim1, weight1 = impact_1
-    ndx2a, vals2a, sim2a, weight2a = impact_2a
-    ndx2b, vals2b, sim2b, weight2b = impact_2b
+    ndx1, vals1, sim1, weight1, intercept1 = impact_1
+    ndx2a, vals2a, sim2a, weight2a, intercept2a = impact_2a
+    ndx2b, vals2b, sim2b, weight2b, intercept2b = impact_2b
 
     assert np.all(ndx1 == ndx2a)
     assert np.all(ndx1 == ndx2b)
@@ -156,13 +160,14 @@ def test_binaryclass_multi_instance_impact_equals_iterative_single_instance_impa
     assert np.all(sim1[:, 1] == sim2b)
     assert np.all(weight1[:, 0] == weight2a)
     assert np.all(weight1[:, 1] == weight2b)
+    assert intercept1 == intercept2a == intercept2b
     print('test_binaryclass_multi_instance_impact_equals_iterative_single_instance_impact: pass')
 
 
 # integration tests
 
 def test_model(model='lgb', encodings=['tree_path', 'tree_output'],
-               datasets=['iris', 'breast', 'wine', 'medifor']):
+               datasets=['iris', 'breast', 'wine', 'nc17_mfc18']):
 
     for encoding in encodings:
         for dataset in datasets:

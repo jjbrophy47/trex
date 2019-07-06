@@ -21,6 +21,7 @@ def example(model='lgb', encoding='tree_path', dataset='iris', n_estimators=100,
 
     # train an svm on learned representations from the tree ensemble
     explainer = TreeExplainer(model, X_train, y_train, encoding=encoding, random_state=random_state, timeit=timeit)
+    print(explainer)
     test_feature = explainer.extractor_.transform(X_test)
     svm_yhat = model_util.performance(explainer.get_svm(), explainer.train_feature_, y_train, test_feature, y_test)
 
@@ -46,12 +47,13 @@ def example(model='lgb', encoding='tree_path', dataset='iris', n_estimators=100,
     # show explanations for missed instances
     for test_ndx in both_missed_test[:topk_test]:
         x_test = X_test[test_ndx]
-        train_ndx, impact, sim, weight = explainer.train_impact(x_test, similarity=True, weight=True)
+        train_ndx, impact, sim, weight, intercept = explainer.train_impact(x_test, similarity=True, weight=True,
+                                                                           intercept=True)
         impact_list = zip(train_ndx, impact, sim, weight)
         impact_list = sorted(impact_list, key=lambda tup: abs(tup[1]), reverse=True)
         svm_pred, pred_label = explainer.decision_function(x_test, pred_svm=True)
         print_util.show_test_instance(test_ndx, svm_pred, pred_label, y_test=y_test, label=label)
-        print_util.show_train_instances(impact_list, y_train, k=topk_train, label=label)
+        print_util.show_train_instances(impact_list, y_train, k=topk_train, label=label, intercept=intercept)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Feature representation extractions for tree ensembles',
