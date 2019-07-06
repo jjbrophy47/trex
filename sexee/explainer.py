@@ -3,7 +3,6 @@ Explainer for a tree ensemble using an SVM.
 Currently supports: sklearn's RandomForestClassifier, GBMClassifier, lightgbm, xgboost, and catboost.
 """
 import time
-import copy
 
 import numpy as np
 from sklearn.base import clone
@@ -105,7 +104,7 @@ class TreeExplainer:
             print('fitting svm took {}s'.format(time.time() - start))
 
     def __str__(self):
-        s = '\nSEXEE Tree Explainer:'
+        s = '\nTree Explainer:'
         s += '\ntrain shape: {}'.format(self.X_train.shape)
         s += '\nclasses: {}'.format(self.le_.classes_)
         s += '\nencoding: {}'.format(self.encoding)
@@ -143,7 +142,6 @@ class TreeExplainer:
             <weight> is added if `weight` is True.
             <intercept> is added if `intercept` is True.
         """
-        start = time.time()
 
         # error checking
         assert self.train_feature_ is not None, 'train_feature_ is not fitted!'
@@ -162,7 +160,6 @@ class TreeExplainer:
             assert self.ovr_ is not None, 'ovr_ is not fitted!'
             assert self.svm_ is None, 'svm_ already fitted!'
             pred_label = int(self.ovr_.predict(X_feature)[0])
-            svm = self.ovr_.estimators_[self.labels_[pred_label]]
             svm = self.ovr_.estimators_[pred_label]
         else:
             assert self.svm_ is not None, 'svm_ is not fitted!'
@@ -190,11 +187,6 @@ class TreeExplainer:
             dual_weight = dual_weight.T
             impact[:, pred_ndx] *= -1
             svm_intercept *= -1
-        else:
-            if pred_label == 0:
-                impact *= -1
-                dual_weight *= -1
-                svm_intercept *= -1
 
         # return a 1d array if a single instance is given
         if X_feature.shape[0] == 1:
@@ -215,9 +207,6 @@ class TreeExplainer:
 
         if intercept:
             impact_tuple += (svm_intercept,)
-
-        if self.timeit:
-            print('computing impact from train instances took {}s'.format(time.time() - start))
 
         return impact_tuple
 

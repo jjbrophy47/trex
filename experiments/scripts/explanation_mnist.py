@@ -3,6 +3,8 @@ Exploration: Examine the raw image data from the most impactful train instances 
     Overlay the binary or manipulation mask over the original probe image.
 """
 import argparse
+import warnings
+warnings.simplefilter(action='ignore', category=UserWarning)  # lgb compiler warning
 
 import sexee
 import numpy as np
@@ -19,7 +21,8 @@ def _sort_impact(sv_ndx, impact):
     if impact.ndim == 2:
         impact = np.sum(impact, axis=1)
     impact_list = zip(sv_ndx, impact)
-    impact_list = sorted(impact_list, key=lambda tup: abs(tup[1]), reverse=True)
+    # impact_list = sorted(impact_list, key=lambda tup: abs(tup[1]), reverse=True)
+    impact_list = sorted(sorted(impact_list, key=lambda x: x[0]), key=lambda x: abs(x[1]), reverse=True)
 
     sv_ndx, impact = zip(*impact_list)
     sv_ndx = np.array(sv_ndx)
@@ -64,15 +67,15 @@ def prediction_explanation(model='lgb', encoding='tree_path', dataset='MFC18_Eva
 
     if pca_components is not None:
         print('reducing dimensionality from {} to {} using PCA...'.format(X_train.shape[1], pca_components))
-        pca = PCA(pca_components).fit(X_train)
+        pca = PCA(pca_components, random_state=random_state).fit(X_train)
         X_train_pca = pca.transform(X_train)
         X_test_pca = pca.transform(X_test)
 
     # fit a tree ensemble and an explainer for that tree ensemble
-    print('fitting an {} model...'.format(model))
+    print('fitting {} model...'.format(model))
     tree = clone(clf).fit(X_train_pca, y_train)
 
-    print('fitting sexee explainer...')
+    print('fitting tree explainer...')
     explainer = sexee.TreeExplainer(tree, X_train_pca, y_train, encoding=encoding, timeit=True,
                                     use_predicted_labels=not true_label, random_state=random_state)
     print(explainer)

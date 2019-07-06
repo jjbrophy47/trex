@@ -114,7 +114,6 @@ class TreeExtractor:
 
         self.num_trees_ = len(leaves_per_tree)
 
-        # TODO: don't really need to return fitted encoder anymore now that categories is in place
         if one_hot_enc is None:
             categories = [np.arange(n_leaves) for n_leaves in leaves_per_tree]
             one_hot_enc = OneHotEncoder(categories=categories).fit(leaves)
