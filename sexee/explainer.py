@@ -245,17 +245,6 @@ class TreeExplainer:
 
         return sim
 
-    # # TODO: remove, no longer needed
-    # def get_svm(self):
-    #     """Return a copy of the learned svm model."""
-
-    #     if self.n_classes_ > 2:
-    #         return copy.deepcopy(self.ovr_)
-    #     else:
-    #         svm_model = copy.deepcopy(self.svm_)
-
-    #     return svm_model
-
     def decision_function(self, X, pred_svm=False):
         """
         Return decision function values from learned SVM.
