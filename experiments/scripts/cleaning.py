@@ -177,7 +177,7 @@ def influence_method(explainer, noisy_ndx, X_train, y_train, y_train_noisy, inte
 
 
 def noise_detection(model_type='lgb', encoding='tree_path', dataset='iris', n_estimators=100, random_state=69,
-                    timeit=False, inf_k=None, svm_loss=False, data_dir='data', flip_frac=0.4, true_label=False,
+                    timeit=False, svm_loss=False, inf_k=None, data_dir='data', flip_frac=0.4, true_label=False,
                     sexee2=False, out_dir='output/cleaning', save_plot=False):
     """
     Main method that trains a tree ensemble, flips a percentage of train labels, prioritizes train
