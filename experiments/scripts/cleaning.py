@@ -178,7 +178,7 @@ def influence_method(explainer, noisy_ndx, X_train, y_train, y_train_noisy, inte
 
 def noise_detection(model_type='lgb', encoding='tree_path', dataset='iris', n_estimators=100, random_state=69,
                     timeit=False, inf_k=None, svm_loss=False, data_dir='data', flip_frac=0.4, true_label=False,
-                    sexee2=False):
+                    sexee2=False, out_dir='output/cleaning', save_plot=False):
     """
     Main method that trains a tree ensemble, flips a percentage of train labels, prioritizes train
     instances using various methods, and computes how effective each method is at cleaning the data.
@@ -290,6 +290,13 @@ def noise_detection(model_type='lgb', encoding='tree_path', dataset='iris', n_es
         axs[1].plot(influence_check_pct, influence_fix_pct, marker='+', color='m', label='leafinfluence')
     axs[0].legend()
     axs[1].legend()
+
+    if save_plot:
+        plot_name = os.path.join(out_dir, dataset + '.pdf')
+        print('saving to {}...'.format(plot_name))
+        os.makedirs(out_dir, exist_ok=True)
+        plt.savefig(plot_name, format='pdf', bbox_inches='tight')
+
     plt.show()
 
 

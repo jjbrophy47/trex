@@ -184,7 +184,7 @@ def _load_medifor(data_dir='data', test_size=0.2, random_state=69, return_featur
 
         if return_manipulation:
             manipulation = pd.read_csv(os.path.join(data_dir, dataset, 'manipulations.csv'))
-            manip_label = np.array(manipulation.columns)
+            manip_label = np.array(manipulation.columns)[2:]
             manipulation = manipulation.to_numpy()[:, 2:]
             manip_train, manip_test = manipulation[train_ndx], manipulation[test_ndx]
             result += (manip_train, manip_test, manip_label)
@@ -206,7 +206,7 @@ def _load_medifor(data_dir='data', test_size=0.2, random_state=69, return_featur
 
         if return_manipulation:
             manipulation = pd.read_csv(os.path.join(data_dir, dataset, 'manipulations.csv'))
-            manip_label = np.array(manipulation.columns)
+            manip_label = np.array(manipulation.columns)[2:]
             manipulation = manipulation.to_numpy()[:, 2:]
             result += (manipulation, manip_label)
 
