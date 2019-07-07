@@ -178,7 +178,7 @@ def influence_method(explainer, noisy_ndx, X_train, y_train, y_train_noisy, inte
 
 def noise_detection(model_type='lgb', encoding='tree_path', dataset='iris', n_estimators=100, random_state=69,
                     timeit=False, svm_loss=False, inf_k=None, data_dir='data', flip_frac=0.4, true_label=False,
-                    sexee2=False, out_dir='output/cleaning', save_plot=False):
+                    ours2=False, out_dir='output/cleaning', save_plot=False):
     """
     Main method that trains a tree ensemble, flips a percentage of train labels, prioritizes train
     instances using various methods, and computes how effective each method is at cleaning the data.
@@ -211,17 +211,18 @@ def noise_detection(model_type='lgb', encoding='tree_path', dataset='iris', n_es
     acc_test_clean = accuracy_score(y_test, model.predict(X_test))
     acc_test_noisy = accuracy_score(y_test, model_noisy.predict(X_test))
 
-    # sexee method
+    # our method
     explainer = sexee.TreeExplainer(model_noisy, X_train, y_train_noisy, encoding=encoding,
                                     random_state=random_state, timeit=timeit, use_predicted_labels=not true_label)
     ckpt_ndx, fix_ndx, interval, n_check = sexee_method(explainer, noisy_ndx, y_train)
     sexee_results = interval_performance(ckpt_ndx, fix_ndx, noisy_ndx, clf, data, acc_test_noisy)
 
-    # sexee method 2
-    explainer = sexee.TreeExplainer(model_noisy, X_train, y_train_noisy, encoding=encoding,
-                                    random_state=random_state, timeit=timeit, use_predicted_labels=not true_label)
-    ckpt_ndx, fix_ndx, interval, n_check = sexee_method2(explainer, noisy_ndx, X_train, y_train)
-    sexee2_results = interval_performance(ckpt_ndx, fix_ndx, noisy_ndx, clf, data, acc_test_noisy)
+    # our method 2
+    if ours2:
+        explainer = sexee.TreeExplainer(model_noisy, X_train, y_train_noisy, encoding=encoding,
+                                        random_state=random_state, timeit=timeit, use_predicted_labels=not true_label)
+        ckpt_ndx, fix_ndx, interval, n_check = sexee_method2(explainer, noisy_ndx, X_train, y_train)
+        ours2_results = interval_performance(ckpt_ndx, fix_ndx, noisy_ndx, clf, data, acc_test_noisy)
 
     # random method
     ckpt_ndx, fix_ndx = random_method(noisy_ndx, y_train, interval, to_check=n_check, random_state=random_state)
@@ -276,18 +277,20 @@ def noise_detection(model_type='lgb', encoding='tree_path', dataset='iris', n_es
     axs[1].plot(tree_loss_check_pct, tree_loss_fix_pct, marker='p', color='c', label='tree_loss')
     axs[1].set_xlabel('fraction of train data checked')
     axs[1].set_ylabel('fraction of flips fixed')
-    if sexee2:
-        sexee2_check_pct, sexee2_acc, sexee2_fix_pct = sexee2_results
-        axs[0].plot(sexee2_check_pct, sexee2_acc, marker='<', color='orange', label='sexee2')
-        axs[1].plot(sexee2_check_pct, sexee2_fix_pct, marker='<', color='orange', label='sexee2')
+    if ours2:
+        ours2_check_pct, ours2_acc, ours2_fix_pct = ours2_results
+        axs[0].plot(ours2_check_pct, ours2_acc, marker='<', color='orange', label='ours2')
+        axs[1].plot(ours2_check_pct, ours2_fix_pct, marker='<', color='orange', label='ours2')
     if svm_loss:
         svm_loss_check_pct, svm_loss_acc, svm_loss_fix_pct = svm_loss_results
         axs[0].plot(svm_loss_check_pct, svm_loss_acc, marker='*', color='y', label='svm_loss')
         axs[1].plot(svm_loss_check_pct, svm_loss_fix_pct, marker='*', color='y', label='svm_loss')
     if model_type == 'cb' and inf_k is not None:
         influence_check_pct, influence_acc, influence_fix_pct = influence_results
-        axs[0].plot(influence_check_pct, influence_acc, marker='+', color='m', label='leafinfluence')
-        axs[1].plot(influence_check_pct, influence_fix_pct, marker='+', color='m', label='leafinfluence')
+        axs[0].plot(influence_check_pct, influence_acc, marker='+', color='m',
+                    label='leaf_inf (top_{})'.format(inf_k))
+        axs[1].plot(influence_check_pct, influence_fix_pct, marker='+', color='m',
+                    label='leaf_inf (top_{})'.format(inf_k))
     axs[0].legend()
     axs[1].legend()
 
