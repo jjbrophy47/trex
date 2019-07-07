@@ -310,6 +310,10 @@ if __name__ == '__main__':
     parser.add_argument('--rs', metavar='RANDOM_STATE', type=int, default=69, help='for reproducibility.')
     parser.add_argument('--timeit', action='store_true', default=False, help='Show timing info for explainer.')
     parser.add_argument('--svm_loss', action='store_true', default=False, help='Include svm loss in results.')
+    parser.add_argument('--save_plot', action='store_true', default=False, help='Save plot results.')
+    parser.add_argument('--flip_frac', type=float, default=0.4, help='Fraction of train labels to flip.')
+    parser.add_argument('--inf_k', type=int, default=None, help='Number of leaves to use for leafinfluence.')
     args = parser.parse_args()
     print(args)
-    noise_detection(args.model, args.encoding, args.dataset, args.n_estimators, args.rs, args.timeit, args.svm_loss)
+    noise_detection(args.model, args.encoding, args.dataset, args.n_estimators, args.rs, args.timeit, args.svm_loss,
+                    save_plot=args.save_plot, flip_frac=args.flip_frac, inf_k=args.inf_k)
