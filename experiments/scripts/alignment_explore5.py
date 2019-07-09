@@ -42,8 +42,8 @@ def _tsne(X_feature, explainer, encoding='tree_output', pca_components=50, rando
 
 
 def misclassification(model='lgb', encoding='tree_path', dataset='medifor', n_estimators=100, random_state=69,
-                      plot_loss=False, plot_all_sv=False, test_subset=None, train_subset=None, data_dir='data',
-                      n_features=5, pca_components=50, verbose=0, alpha=0.75, show_performance=False):
+                      plot_loss=False, plot_all_sv=False, test_subset=None, train_subset=None, test_type=None,
+                      data_dir='data', pca_components=50, verbose=0, alpha=0.75, show_performance=False):
 
     # get model and data
     clf = model_util.get_classifier(model, n_estimators=n_estimators, random_state=random_state)
@@ -71,10 +71,23 @@ def misclassification(model='lgb', encoding='tree_path', dataset='medifor', n_es
         ax.set_xlabel('test instances sorted by loss')
         plt.show()
 
+    # filter only test instances with a specific label
+    if test_type == 'manip':
+        type_ndx = np.where(y_test_miss == 1)[0]
+        X_test_miss = X_test_miss[type_ndx]
+        y_test_miss = y_test_miss[type_ndx]
+    if test_type == 'non_manip':
+        type_ndx = np.where(y_test_miss == 0)[0]
+        X_test_miss = X_test_miss[type_ndx]
+        y_test_miss = y_test_miss[type_ndx]
+
     # compute most impactful train instances on the test instances
     explainer = sexee.TreeExplainer(tree, X_train, y_train, encoding=encoding)
     sv_ndx, impact = explainer.train_impact(X_test_miss)
     sv_ndx, impact = _sort_impact(sv_ndx, impact)
+
+    if show_performance:
+        print(explainer)
 
     # get indices for each class
     test0 = np.where(y_test_miss == 0)[0]
@@ -160,7 +173,8 @@ if __name__ == '__main__':
     parser.add_argument('--plot_all_sv', action='store_true', default=False, help='plots all support vectors.')
     parser.add_argument('--test_subset', default=100, type=int, help='num test instances to analyze.')
     parser.add_argument('--train_subset', default=10, type=int, help='train subset to use.')
+    parser.add_argument('--test_type', default=None, type=str, help='type of test instances to inspect.')
     args = parser.parse_args()
     print(args)
     misclassification(args.model, args.encoding, args.dataset, args.n_estimators, args.rs, args.plot_loss,
-                      args.plot_all_sv, args.test_subset, args.train_subset)
+                      args.plot_all_sv, args.test_subset, args.train_subset, args.test_type)
