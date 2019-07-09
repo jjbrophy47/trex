@@ -148,9 +148,9 @@ class TreeExtractor:
             encoding = scipy.sparse.hstack([t.decision_path(X) for est in self.model.estimators_ for t in est])
 
         elif self.model_type_ == 'LGBMClassifier':
-            # leaves = self.model.predict_proba(X, pred_leaf=True)
-            # leaves_per_tree = np.array([tree['num_leaves'] for tree in self.model.booster_.dump_model()['tree_info']])
-            pass
+            lgb_model = LGBModel(self.model.booster_.dump_model())
+            encoding = lgb_model.decision_path(X, sparse=self.sparse)
+            print(encoding)
 
         elif self.model_type_ == 'CatBoostClassifier':
             # leaves = self.model.calc_leaf_indexes(catboost.Pool(X))
@@ -244,13 +244,13 @@ class TreeExtractor:
         return encoding
 
 
-class lgb_model:
+class LGBModel:
     """
-    Creates a data structure from a dictionary representation of an LightGBM mdoel.
+    Creates a data structure from a dictionary representation of a LightGBM mdoel.
     """
 
     def __init__(self, model_dump):
-        self.trees_ = [lgb_tree(tree_dict) for tree_dict in model_dump['tree_info']]
+        self.trees_ = [LGBTree(tree_dict) for tree_dict in model_dump['tree_info']]
 
     def __str__(self):
         s = ''
@@ -259,14 +259,81 @@ class lgb_model:
             s += tree.__str__()
         return s
 
+    def decision_path(self, X, sparse=False):
+        """
+        X : 2d array-like
+            Input with shape (n_samples, n_features)
+        sparse : bool (default=False)
+            If True, returns a sparse matrix of the result.
+        Returns
+        -------
+        2d array-like of encoding paths of each instance through all trees
+        with shape (n_samples, n_nodes) where n_nodes is the total number of
+        nodes in all trees.
+        """
+        assert X.ndim == 2, 'X is not 2d!'
+        tree_encodings = [tree.decision_path(X) for tree in self.trees_]
+        model_encoding = np.hstack(tree_encodings)
+        if sparse:
+            model_encoding = scipy.sparse.csr_matrix(model_encoding)
+        return model_encoding
 
-class lgb_tree:
+
+class LGBTree:
+    """
+    Creates a data structure from a dictionary representation of a LightGBM tree.
+    """
 
     def __init__(self, tree_dump):
-        self.root_ = self._parse_tree(tree_dump['tree_structure'])
+        self.root_, self.n_nodes_ = self._parse_tree(tree_dump['tree_structure'])
+
+    def decision_path(self, X):
+        """
+        X : 2d array-like
+            Input with shape (n_samples, n_features)
+        Returns
+        -------
+        2d array-like of encoding paths of each instance through the tree
+        with shape (n_samples, n_nodes) where n_nodes is the number of nodes in the tree.
+        """
+        assert X.ndim == 2, 'X is not 2d!'
+        node_ndx = 0
+        encoding = np.zeros((len(X), self.n_nodes_))
+        encoding[:, node_ndx] = 1  # all instances go through the root node
+
+        if self.root_.node_type == 'leaf':
+            return encoding
+
+        left_indices, right_indices = self._node_indices(X, self.root_)
+        traverse = [(self.root_.right, right_indices), (self.root_.left, left_indices)]
+
+        while len(traverse) > 0:
+            node_ndx += 1
+            node, indices = traverse.pop()
+            encoding[indices, node_ndx] = 1
+
+            if node.node_type == 'leaf':
+                continue
+
+            # split indices based on threshold
+            # TODO: could be more efficient if X were indexed
+            left_indices, right_indices = self._node_indices(X, node)
+            left_indices = np.intersect1d(left_indices, indices)
+            right_indices = np.intersect1d(right_indices, indices)
+            traverse.append((node.right, right_indices))
+            traverse.append((node.left, left_indices))
+
+        return encoding
+
+    def _node_indices(self, X, node):
+        indices = np.arange(len(X))
+        left_indices = np.where(node.op(X[:, node.feature], node.threshold))[0]
+        right_indices = np.setxor1d(indices, left_indices)
+        return left_indices, right_indices
 
     def _parse_tree(self, structure):
         root = self._get_node(structure)
+        n_nodes = 1
 
         # tree does not have any splits
         if root.node_type == 'leaf':
@@ -275,6 +342,7 @@ class lgb_tree:
         traverse = [(root, structure['right_child'], 'right'), (root, structure['left_child'], 'left')]
 
         while len(traverse) > 0:
+            n_nodes += 1
             parent_node, child_structure, child_position = traverse.pop()
             child_node = self._get_node(child_structure)
             parent_node.set_child(child_node, child_position)
@@ -283,7 +351,7 @@ class lgb_tree:
                 traverse.append((child_node, child_structure['right_child'], 'right'))
                 traverse.append((child_node, child_structure['left_child'], 'left'))
 
-        return root
+        return root, n_nodes
 
     def __str__(self):
 
