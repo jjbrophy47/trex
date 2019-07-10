@@ -2,33 +2,34 @@
 Feature representation extractor for different tree ensemble models.
 """
 import time
-import operator
+import json
 
 import scipy
 import catboost
 import numpy as np
 from sklearn.preprocessing import OneHotEncoder
 
-from . import util
+from . import util, tree_model
 
 
 class TreeExtractor:
 
-    def __init__(self, model, encoding='tree_path', sparse=False):
+    def __init__(self, model, encoding='leaf_path', sparse=False):
         """
         Extracts model-specific feature representations for data instances from a trained tree ensemble.
 
         Parameters
         ----------
         model: object
-            Trained tree ensemble. Supported: RandomForestClassifier, LightGBM. Unsupported: XGBoost, CatBoost.
-        encoding: str, {'tree_path', 'tree_output'}, (default='tree_path')
+            Trained tree ensemble. Supported: RandomForestClassifier, GradientBoostingClassifier,
+            LightGBM, XGBoost, CatBoost.
+        encoding: str, {'leaf_path', 'feature_path', 'leaf_output'}, (default='leaf_path')
             Type of feature representation to extract from the tree ensemble.
         sparse: bool (default=False)
             If True, feature representations are returned in a sparse format if possible.
         """
         self.model_type_ = util.validate_model(model)
-        assert encoding in ['tree_path', 'tree_output'], '{} encoding not supported!'.format(encoding)
+        assert encoding in ['leaf_path', 'feature_path', 'leaf_output'], '{} not supported!'.format(encoding)
 
         self.model = model
         self.encoding = encoding
@@ -46,15 +47,15 @@ class TreeExtractor:
         Returns
         -------
         Feature representation of X with the same number of rows as X.
-        If encoding='tree_path', also returns the fitted one_hot_encoder.
+        If encoding='leaf_path', also returns the fitted one_hot_encoder.
         """
         assert X.ndim == 2, 'X is not 2d!'
 
-        if self.encoding == 'tree_path':
-            X_feature, self.path_enc_ = self._tree_path_encoding(X)
+        if self.encoding == 'leaf_path':
+            X_feature, self.path_enc_ = self._leaf_path_encoding(X)
 
-        elif self.encoding == 'tree_output':
-            X_feature = self._tree_output_encoding(X)
+        elif self.encoding == 'leaf_output':
+            X_feature = self._leaf_output_encoding(X)
 
         return X_feature
 
@@ -73,16 +74,19 @@ class TreeExtractor:
         """
         assert X.ndim == 2, 'X is not 2d!'
 
-        if self.encoding == 'tree_path':
+        if self.encoding == 'leaf_path':
             assert self.path_enc_ is not None, 'path_enc_ is not fitted!'
-            X_feature, _ = self._tree_path_encoding(X, one_hot_enc=self.path_enc_)
+            X_feature, _ = self._leaf_path_encoding(X, one_hot_enc=self.path_enc_)
+
+        elif self.encoding == 'feature_path':
+            X_feature = self._feature_path_encoding(X)
 
         elif self.encoding == 'tree_output':
-            X_feature = self._tree_output_encoding(X)
+            X_feature = self._leaf_output_encoding(X)
 
         return X_feature
 
-    def _tree_path_encoding(self, X, one_hot_enc=None, timeit=False):
+    def _leaf_path_encoding(self, X, one_hot_enc=None, timeit=False):
         """
         Encodes each x in X as a binary vector whose length is equal to the number of
         leaves or nodes in the ensemble, with 1's representing the instance ending at that leaf,
@@ -124,7 +128,7 @@ class TreeExtractor:
             encoding = np.array(encoding.todense())
 
         if timeit:
-            print('leaf_path encoding time: {:.3f}'.format(time.time() - start))
+            print('leaf path encoding time: {:.3f}'.format(time.time() - start))
 
         return encoding, one_hot_enc
 
@@ -148,36 +152,25 @@ class TreeExtractor:
             encoding = scipy.sparse.hstack([t.decision_path(X) for est in self.model.estimators_ for t in est])
 
         elif self.model_type_ == 'LGBMClassifier':
-            lgb_model = LGBModel(self.model.booster_.dump_model())
+            lgb_model = tree_model.LGBModel(self.model.booster_.dump_model())
             encoding = lgb_model.decision_path(X, sparse=self.sparse)
-            print(encoding)
 
         elif self.model_type_ == 'CatBoostClassifier':
-            # leaves = self.model.calc_leaf_indexes(catboost.Pool(X))
-            # leaves_per_tree = self.model.get_tree_leaf_counts()
-            pass
+            self.model.save_model('.cb.json')
+            cb_dump = json.load(open('.cb.json', 'r'))
+            cb_model = tree_model.CBModel(cb_dump)
+            encoding = cb_model.decision_path(X)
 
         elif self.model_type_ == 'XGBClassifier':
-            # leaves = self.model.apply(X)
-            # leaves_per_tree = [len(t.strip().replace('\t', '').split('\n')) for t in self.model._Booster.get_dump()]
-            pass
+            xgb_model = tree_model.XGBModel(self.model._Booster.get_dump())
+            encoding = xgb_model.decision_path(X, sparse=self.sparse)
 
-        # self.num_trees_ = len(leaves_per_tree)
+        if timeit:
+            print('feature path encoding time: {:.3f}'.format(time.time() - start))
 
-        # if one_hot_enc is None:
-        #     categories = [np.arange(n_leaves) for n_leaves in leaves_per_tree]
-        #     one_hot_enc = OneHotEncoder(categories=categories).fit(leaves)
+        return encoding
 
-        # encoding = one_hot_enc.transform(leaves)
-        # if not self.sparse:
-        #     encoding = np.array(encoding.todense())
-
-        # if timeit:
-        #     print('feature_path encoding time: {:.3f}'.format(time.time() - start))
-
-        # return encoding, one_hot_enc
-
-    def _tree_output_encoding(self, X, timeit=False):
+    def _leaf_output_encoding(self, X, timeit=False):
         """
         Encodes each x in X as a concatenation of one-hot encodings, one for each tree.
         Each one-hot encoding represents the class or output at the leaf x traversed to.
@@ -233,7 +226,7 @@ class TreeExtractor:
                     encoding[i][j] = leaf_values[j][leaves[i][j]]
 
         else:
-            exit('tree output encoding not supported for {}'.format(self.model_type_))
+            exit('leaf output encoding not supported for {}'.format(self.model_type_))
 
         if self.model_type_ == 'RandomForestClassifier' and self.sparse:
             encoding = scipy.sparse.csr_matrix(encoding)
@@ -242,185 +235,3 @@ class TreeExtractor:
             print('output encoding time: {:.3f}'.format(time.time() - start))
 
         return encoding
-
-
-class LGBModel:
-    """
-    Creates a data structure from a dictionary representation of a LightGBM mdoel.
-    """
-
-    def __init__(self, model_dump):
-        self.trees_ = [LGBTree(tree_dict) for tree_dict in model_dump['tree_info']]
-
-    def __str__(self):
-        s = ''
-        for i, tree in enumerate(self.trees_):
-            s += '\n\n\nTree ({})'.format(i)
-            s += tree.__str__()
-        return s
-
-    def decision_path(self, X, sparse=False):
-        """
-        X : 2d array-like
-            Input with shape (n_samples, n_features)
-        sparse : bool (default=False)
-            If True, returns a sparse matrix of the result.
-        Returns
-        -------
-        2d array-like of encoding paths of each instance through all trees
-        with shape (n_samples, n_nodes) where n_nodes is the total number of
-        nodes in all trees.
-        """
-        assert X.ndim == 2, 'X is not 2d!'
-        tree_encodings = [tree.decision_path(X) for tree in self.trees_]
-        model_encoding = np.hstack(tree_encodings)
-        if sparse:
-            model_encoding = scipy.sparse.csr_matrix(model_encoding)
-        return model_encoding
-
-
-class LGBTree:
-    """
-    Creates a data structure from a dictionary representation of a LightGBM tree.
-    """
-
-    def __init__(self, tree_dump):
-        self.root_, self.n_nodes_ = self._parse_tree(tree_dump['tree_structure'])
-
-    def decision_path(self, X):
-        """
-        X : 2d array-like
-            Input with shape (n_samples, n_features)
-        Returns
-        -------
-        2d array-like of encoding paths of each instance through the tree
-        with shape (n_samples, n_nodes) where n_nodes is the number of nodes in the tree.
-        """
-        assert X.ndim == 2, 'X is not 2d!'
-        node_ndx = 0
-        encoding = np.zeros((len(X), self.n_nodes_))
-        encoding[:, node_ndx] = 1  # all instances go through the root node
-
-        if self.root_.node_type == 'leaf':
-            return encoding
-
-        left_indices, right_indices = self._node_indices(X, self.root_)
-        traverse = [(self.root_.right, right_indices), (self.root_.left, left_indices)]
-
-        while len(traverse) > 0:
-            node_ndx += 1
-            node, indices = traverse.pop()
-            encoding[indices, node_ndx] = 1
-
-            if node.node_type == 'leaf':
-                continue
-
-            # split indices based on threshold
-            # TODO: could be more efficient if X were indexed
-            left_indices, right_indices = self._node_indices(X, node)
-            left_indices = np.intersect1d(left_indices, indices)
-            right_indices = np.intersect1d(right_indices, indices)
-            traverse.append((node.right, right_indices))
-            traverse.append((node.left, left_indices))
-
-        return encoding
-
-    def _node_indices(self, X, node):
-        indices = np.arange(len(X))
-        left_indices = np.where(node.op(X[:, node.feature], node.threshold))[0]
-        right_indices = np.setxor1d(indices, left_indices)
-        return left_indices, right_indices
-
-    def _parse_tree(self, structure):
-        root = self._get_node(structure)
-        n_nodes = 1
-
-        # tree does not have any splits
-        if root.node_type == 'leaf':
-            return root
-
-        traverse = [(root, structure['right_child'], 'right'), (root, structure['left_child'], 'left')]
-
-        while len(traverse) > 0:
-            n_nodes += 1
-            parent_node, child_structure, child_position = traverse.pop()
-            child_node = self._get_node(child_structure)
-            parent_node.set_child(child_node, child_position)
-
-            if child_node.node_type == 'split':
-                traverse.append((child_node, child_structure['right_child'], 'right'))
-                traverse.append((child_node, child_structure['left_child'], 'left'))
-
-        return root, n_nodes
-
-    def __str__(self):
-
-        node_ndx = 0
-        s = '\n\nRoot ({})'.format(node_ndx)
-        s += self.root_.__str__()
-
-        if self.root_.node_type == 'split':
-            traverse = [(self.root_.right, 'right'), (self.root_.left, 'left')]
-            while len(traverse) > 0:
-                child_node, child_position = traverse.pop()
-                node_ndx += 1
-                s += '\n\nNode ({}, {})'.format(child_position, node_ndx)
-                s += child_node.__str__()
-
-                if child_node.node_type == 'split':
-                    traverse.append((child_node.right, 'right'))
-                    traverse.append((child_node.left, 'left'))
-
-        return s
-
-    def _get_node(self, structure):
-
-        if 'split_index' in structure:
-            feature = int(structure['split_feature'])
-            threshold = float(structure['threshold'])
-            decision_type = self._get_operator(structure['decision_type'])
-            node = Node(node_type='split', feature=feature, threshold=threshold, decision_type=decision_type)
-
-        elif 'leaf_index' in structure:
-            node = Node(node_type='leaf')
-
-        else:
-            assert 'leaf_value' in structure
-            node = Node(node_type='leaf')
-
-        return node
-
-    def _get_operator(self, decision_type):
-
-        if decision_type == '<=':
-            result = operator.le
-        else:
-            exit('unknown decision_type: {}'.format(decision_type))
-
-        return result
-
-
-class Node:
-
-    def __init__(self, node_type, feature=None, threshold=None, decision_type=None):
-        self.node_type = node_type
-        self.feature = feature
-        self.threshold = threshold
-        self.op = decision_type
-
-    def __str__(self):
-        s = '\ntype: {}'.format(self.node_type)
-        if self.node_type == 'split':
-            s += '\nsplit feature: {}'.format(self.feature)
-            s += '\nthrehsold: {}'.format(self.threshold)
-            s += '\noperator: {}'.format(self.op)
-        return s
-
-    def set_child(self, child_node, child_position):
-
-        if child_position == 'left':
-            self.left = child_node
-        elif child_position == 'right':
-            self.right = child_node
-        else:
-            exit('unrecognized position: {}'.format(child_position))
