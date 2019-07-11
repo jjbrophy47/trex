@@ -2,6 +2,8 @@
 Simple integration tests to make sure the tree explainer works for all models, encodings, and binary / multi-class
 datasets. These do NOT test correctness of the values returned by the tree explainer.
 """
+import argparse
+
 import lightgbm
 import numpy as np
 
@@ -102,10 +104,9 @@ def test_binaryclass_single_instance_decision_function_output():
     X_train, X_test, y_train, y_test, label = data_util.get_data(dataset='breast')
     tree = lightgbm.LGBMClassifier().fit(X_train, y_train)
     explainer = sexee.TreeExplainer(tree, X_train, y_train)
-    decision, pred_svm = explainer.decision_function(X_test[0], pred_svm=True)
-    assert isinstance(decision, float)
-    print(pred_svm, type(pred_svm))
-    assert isinstance(pred_svm, int)
+    decision, pred_label = explainer.decision_function(X_test[0], pred_label=True)
+    assert len(decision) == 1
+    assert len(pred_label) == 1
     print('test_binaryclass_single_instance_decision_function_output: pass')
 
 
@@ -113,8 +114,8 @@ def test_binaryclass_multi_instance_decision_function_output(n_test=11):
     X_train, X_test, y_train, y_test, label = data_util.get_data(dataset='breast')
     tree = lightgbm.LGBMClassifier().fit(X_train, y_train)
     explainer = sexee.TreeExplainer(tree, X_train, y_train)
-    decision, pred_svm = explainer.decision_function(X_test[:n_test], pred_svm=True)
-    assert len(decision) == len(pred_svm)
+    decision, pred_label = explainer.decision_function(X_test[:n_test], pred_label=True)
+    assert len(decision) == len(pred_label)
     print('test_binaryclass_single_instance_decision_function_output: pass')
 
 
@@ -122,9 +123,9 @@ def test_multiclass_single_instance_decision_function_output():
     X_train, X_test, y_train, y_test, label = data_util.get_data(dataset='breast')
     tree = lightgbm.LGBMClassifier().fit(X_train, y_train)
     explainer = sexee.TreeExplainer(tree, X_train, y_train)
-    decision, pred_svm = explainer.decision_function(X_test[0], pred_svm=True)
-    assert isinstance(decision, float)
-    assert isinstance(pred_svm, int)
+    decision, pred_label = explainer.decision_function(X_test[0], pred_label=True)
+    assert len(decision) == 1
+    assert len(pred_label) == 1
     print('test_multiclass_single_instance_decision_function_output: pass')
 
 
@@ -134,7 +135,7 @@ def test_multiclass_multi_instance_decision_function_output(n_test=11):
         X_train, X_test, y_train, y_test, label = data_util.get_data(dataset='breast')
         tree = lightgbm.LGBMClassifier().fit(X_train, y_train)
         explainer = sexee.TreeExplainer(tree, X_train, y_train)
-        decision, pred_svm = explainer.decision_function(X_test[:n_test], pred_svm=True)
+        decision, pred_label = explainer.decision_function(X_test[:n_test], pred_label=True)
     except AssertionError:
         print('test_multiclass_multi_instance_decision_function_output: pass')
 
@@ -154,19 +155,19 @@ def test_binaryclass_multi_instance_impact_equals_iterative_single_instance_impa
 
     assert np.all(ndx1 == ndx2a)
     assert np.all(ndx1 == ndx2b)
-    assert np.all(vals1[:, 0] == vals2a)
-    assert np.all(vals1[:, 1] == vals2b)
-    assert np.all(sim1[:, 0] == sim2a)
-    assert np.all(sim1[:, 1] == sim2b)
-    assert np.all(weight1[:, 0] == weight2a)
-    assert np.all(weight1[:, 1] == weight2b)
+    assert np.allclose(vals1[:, 0], vals2a)
+    assert np.allclose(vals1[:, 1], vals2b)
+    assert np.allclose(sim1[:, 0], sim2a)
+    assert np.allclose(sim1[:, 1], sim2b)
+    assert np.allclose(weight1[:, 0], weight2a)
+    assert np.allclose(weight1[:, 1], weight2b)
     assert intercept1 == intercept2a == intercept2b
     print('test_binaryclass_multi_instance_impact_equals_iterative_single_instance_impact: pass')
 
 
 # integration tests
 
-def test_model(model='lgb', encodings=['tree_path', 'tree_output'],
+def test_model(model='lgb', encodings=['leaf_path', 'leaf_output'],
                datasets=['iris', 'breast', 'wine', 'nc17_mfc18']):
 
     for encoding in encodings:
@@ -175,7 +176,7 @@ def test_model(model='lgb', encodings=['tree_path', 'tree_output'],
             example(model=model, encoding=encoding, dataset=dataset, timeit=True)
 
 
-def main():
+def main(integration=False):
 
     # test execution flow for different conditions
     test_multiclass_one_test_instance()
@@ -196,12 +197,18 @@ def main():
 
     test_binaryclass_multi_instance_impact_equals_iterative_single_instance_impact()
 
-    test_model(model='rf')
-    test_model(model='gbm')
-    test_model(model='lgb')
-    test_model(model='cb')
-    test_model(model='xgb')
+    if integration:
+        test_model(model='rf')
+        test_model(model='gbm')
+        test_model(model='lgb')
+        test_model(model='cb')
+        test_model(model='xgb')
 
 
 if __name__ == '__main__':
-    main()
+    parser = argparse.ArgumentParser(description='Feature representation extractions for tree ensembles',
+                                     formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    parser.add_argument('--integration', action='store_true', help='run integration tests.')
+    args = parser.parse_args()
+    print(args)
+    main(integration=args.integration)

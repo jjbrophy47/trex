@@ -1,6 +1,9 @@
 """
 Utility methods to make life easier.
 """
+import warnings
+warnings.simplefilter(action='ignore', category=UserWarning)  # lgb compiler warning
+
 import numpy as np
 import catboost
 import lightgbm

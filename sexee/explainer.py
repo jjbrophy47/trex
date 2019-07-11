@@ -18,7 +18,7 @@ from .extractor import TreeExtractor
 
 class TreeExplainer:
 
-    def __init__(self, model, X_train, y_train, encoding='tree_path', C=0.1, gamma='scale',
+    def __init__(self, model, X_train, y_train, encoding='leaf_output', C=0.1, gamma='scale',
                  use_predicted_labels=True, random_state=None, timeit=False):
         """
         Trains an svm on feature representations from a learned tree ensemble.
@@ -145,21 +145,12 @@ class TreeExplainer:
 
         # error checking
         assert self.train_feature_ is not None, 'train_feature_ is not fitted!'
-        if X.ndim == 1:
-            X = X.reshape(1, -1)
-            assert X.shape[0] == 1, 'x must be a single instance!'
-
-        # make a copy to avoid modifying the original
-        X = X.copy()
-
-        # get test instance feature representation
-        X_feature = self.extractor_.transform(X)
+        X_feature = self.transform(X)
 
         # if multiclass, get svm of whose class is predicted
         if self.n_classes_ > 2:
-            assert self.ovr_ is not None, 'ovr_ is not fitted!'
-            assert self.svm_ is None, 'svm_ already fitted!'
-            pred_label = int(self.ovr_.predict(X_feature)[0])
+            decision, pred_label = self.decision_function(X, pred_label=True)
+            pred_label = int(pred_label[0])
             svm = self.ovr_.estimators_[pred_label]
         else:
             assert self.svm_ is not None, 'svm_ is not fitted!'
@@ -215,16 +206,13 @@ class TreeExplainer:
 
         # error checking
         assert self.train_feature_ is not None, 'train_feature_ is not fitted!'
-        if X.ndim == 1:
-            X = X.reshape(1, -1)
-        X_feature = self.extractor_.transform(X.copy())
-        assert X_feature.shape[1] == self.train_feature_.shape[1], 'num features do not match!'
+        X_feature = self.transform(X)
 
         # if multiclass, get svm of whose class is predicted
         if self.n_classes_ > 2:
-            assert X.shape[0] == 1, 'must be 1 instance if n_classes_ > 2!'
-            assert self.ovr_ is not None, 'ovr_ is not fitted!'
-            pred_label = int(self.ovr_.predict(X_feature)[0])
+            assert X_feature.shape[0] == 1, 'must be 1 instance if n_classes_ > 2!'
+            decision, pred_label = self.decision_function(X, pred_label=True)
+            pred_label = int(pred_label[0])
             svm = self.ovr_.estimators_[pred_label]
         else:
             assert self.svm_ is not None, 'svm_ is not fitted!'
@@ -247,103 +235,36 @@ class TreeExplainer:
 
     def decision_function(self, X, pred_label=False):
         """
+        Parameters
+        ----------
+        X : 2d array-like
+            Instances to make predictions on.
+        pred_label : bool (default=False)
+            If True, returns prediction class label in addition to its decision.
         Returns decision function values from learned SVM.
         If multiclass, returns a flattened array of distances from each SVM.
         """
-        if X.ndim == 1:
-            X = X.reshape(1, -1)
-            assert X.shape[0] == 1, 'x must be a single instance!'
-        assert X.shape[1] == self.n_feats_, 'num features do not match!'
-        X_feature = self.extractor_.transform(X)
-        assert X_feature.shape[1] == self.train_feature_.shape[1], 'num features do not match!'
+        X_feature = self.transform(X)
 
         if self.n_classes_ == 2:
             decision = self.svm_.decision_function(X_feature)
+            pred = np.where(decision < 0, 0, 1)
         else:
             decision = self.ovr_.decision_function(X_feature)
+            pred = np.argmax(decision, axis=1)
 
         if pred_label:
-            pred = self.le_.inverse_transform(np.argmax(decision, axis=1))
-            result = decision, pred
+            pred_class = self.le_.inverse_transform(pred)
+            result = decision, pred_class
         else:
             result = decision
 
         return result
 
-    def _decision_function(self, X, pred_svm=False):
-        """
-        Return decision function values from learned SVM.
-        If multiclass, only supports a single instance.
-        """
-
-        if X.ndim == 1:
-            X = X.reshape(1, -1)
-            assert X.shape[0] == 1, 'x must be a single instance!'
-        assert X.shape[1] == self.n_feats_, 'num features do not match!'
-
-        X_feature = self.extractor_.transform(X)
-        assert X_feature.shape[1] == self.train_feature_.shape[1], 'num features do not match!'
-
-        if self.n_classes_ > 2:
-            # assert X.shape[0] == 1, 'x must be a single instance if n_classes_ > 2!'
-            assert self.ovr_ is not None, 'ovr_ is not fitted!'
-
-            decision = self.ovr_.decision_function(X_feature)
-            # decision = np.max(decisions, axis=1)
-            pred_label = np.argmax(decision, axis=1)
-
-            # print(decision)
-
-            # pred_label = int(self.ovr_.predict(X_feature)[0])
-            # svm = self.ovr_.estimators_[pred_label]
-            # decision = svm.decision_function(X_feature)[0]
-        else:
-            svm = self.svm_
-            pred_label = svm.predict(X_feature)
-            decision = svm.decision_function(X_feature)
-
-            # flip distance to separator if binary class and the predicted label is the negative class
-            flip_ndx = np.where(pred_label == 0)[0]
-            decision[flip_ndx] = decision[flip_ndx] * -1
-
-            if len(decision) == 1:
-                decision = float(decision[0])
-            if len(pred_label) == 1:
-                pred_label = int(pred_label[0])
-
-        if hasattr(pred_label, 'shape'):
-            pred_class = self.le_.inverse_transform(pred_label)
-        else:
-            pred_class = int(self.classes_[pred_label])
-
-        result = decision
-        if pred_svm:
-            result = decision, pred_class
-
-        return result
-
     def predict(self, X):
         """Return prediction label for each x in X using the trained SVM."""
-
-        if X.ndim == 1:
-            X = X.reshape(1, -1)
-            assert X.shape[0] == 1, 'x must be a single instance!'
-        assert X.shape[1] == self.n_feats_, 'num features do not match!'
-
-        X_feature = self.extractor_.transform(X)
-        assert X_feature.shape[1] == self.train_feature_.shape[1], 'num features do not match!'
-
-        if self.n_classes_ > 2:
-            pred_label = self.ovr_.predict(X_feature)
-        else:
-            pred_label = self.svm_.predict(X_feature)
-
-        if hasattr(pred_label, 'shape'):
-            pred_class = self.le_.inverse_transform(pred_label)
-        else:
-            pred_class = self.classes_[pred_label]
-
-        return pred_class
+        decision, pred_label = self.decision_function(X, pred_label=True)
+        return pred_label
 
     def get_train_weight(self, sort=True):
         """
