@@ -242,7 +242,7 @@ class Tree:
         n_nodes = 2 ** (len(splits) + 1) - 1
 
         assert root.node_type == 'split', 'root node is not a split node!'
-        if n_nodes == 2:
+        if n_nodes == 3:
             root.set_child(Node(node_type='leaf'), 'left')
             root.set_child(Node(node_type='leaf'), 'right')
             return root, n_nodes

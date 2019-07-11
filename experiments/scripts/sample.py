@@ -8,7 +8,7 @@ from sexee.explainer import TreeExplainer
 from util import model_util, data_util, print_util, exp_util
 
 
-def example(model='lgb', encoding='tree_path', dataset='iris', n_estimators=100, random_state=69, timeit=False,
+def example(model='lgb', encoding='leaf_path', dataset='iris', n_estimators=100, random_state=69, timeit=False,
             topk_train=5, topk_test=1):
 
     # get model and data
@@ -22,26 +22,14 @@ def example(model='lgb', encoding='tree_path', dataset='iris', n_estimators=100,
     # train an svm on learned representations from the tree ensemble
     explainer = TreeExplainer(model, X_train, y_train, encoding=encoding, random_state=random_state, timeit=timeit)
     print(explainer)
-    test_feature = explainer.extractor_.transform(X_test)
-    svm_yhat = model_util.performance(explainer.get_svm(), explainer.train_feature_, y_train, test_feature, y_test)
 
     # extract predictions
     tree_yhat_train, tree_yhat_test = tree_yhat
-    svm_yhat_train, svm_yhat_test = svm_yhat
-
-    # test fidelity on train and test predictions
-    both_train, diff_train = model_util.fidelity(tree_yhat_train, svm_yhat_train, return_difference=True)
-    both_test, diff_test = model_util.fidelity(tree_yhat_test, svm_yhat_test, return_difference=True)
-    print_util.show_fidelity(both_train, diff_train, y_train, both_test, diff_test, y_test)
-
-    # test instances that tree and svm models missed
-    both_missed_test = model_util.missed_instances(tree_yhat_test, svm_yhat_test, y_test)
 
     # get worst missed test indices
     test_dist = exp_util.instance_loss(model.predict_proba(X_test), y_test)
     test_dist_ndx = np.argsort(test_dist)[::-1]
     test_dist = test_dist[test_dist_ndx]
-    X_test_miss = X_test[test_dist_ndx]
     both_missed_test = test_dist_ndx
 
     # show explanations for missed instances
@@ -51,8 +39,9 @@ def example(model='lgb', encoding='tree_path', dataset='iris', n_estimators=100,
                                                                            intercept=True)
         impact_list = zip(train_ndx, impact, sim, weight)
         impact_list = sorted(impact_list, key=lambda tup: abs(tup[1]), reverse=True)
-        svm_pred, pred_label = explainer.decision_function(x_test, pred_svm=True)
-        print_util.show_test_instance(test_ndx, svm_pred, pred_label, y_test=y_test, label=label)
+        decision, pred_label = explainer.decision_function(x_test, pred_label=True)
+        pred_label = int(pred_label[0])
+        print_util.show_test_instance(test_ndx, decision[0][pred_label], pred_label, y_test=y_test, label=label)
         print_util.show_train_instances(impact_list, y_train, k=topk_train, label=label, intercept=intercept)
 
 if __name__ == '__main__':
@@ -60,7 +49,7 @@ if __name__ == '__main__':
                                      formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument('--dataset', type=str, default='iris', help='dataset to explain.')
     parser.add_argument('--model', type=str, default='lgb', help='model to use.')
-    parser.add_argument('--encoding', type=str, default='tree_path', help='type of encoding.')
+    parser.add_argument('--encoding', type=str, default='leaf_path', help='type of encoding.')
     parser.add_argument('--n_estimators', metavar='N', type=int, default=20, help='number of trees in random forest.')
     parser.add_argument('--rs', metavar='RANDOM_STATE', type=int, default=69, help='for reproducibility.')
     parser.add_argument('--topk_train', metavar='NUM', type=int, default=5, help='Train instances to show.')

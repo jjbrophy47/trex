@@ -286,11 +286,12 @@ def noise_detection(model_type='lgb', encoding='tree_path', dataset='iris', n_es
         axs[0].plot(svm_loss_check_pct, svm_loss_acc, marker='*', color='y', label='svm_loss')
         axs[1].plot(svm_loss_check_pct, svm_loss_fix_pct, marker='*', color='y', label='svm_loss')
     if model_type == 'cb' and inf_k is not None:
+        inf_label = 'all' if inf_k == -1 else 'topk_{}'.format(inf_k)
         influence_check_pct, influence_acc, influence_fix_pct = influence_results
         axs[0].plot(influence_check_pct, influence_acc, marker='+', color='m',
-                    label='leaf_inf (top_{})'.format(inf_k))
+                    label='leaf_inf ({})'.format(inf_label))
         axs[1].plot(influence_check_pct, influence_fix_pct, marker='+', color='m',
-                    label='leaf_inf (top_{})'.format(inf_k))
+                    label='leaf_inf ({})'.format(inf_label))
     axs[0].legend()
     axs[1].legend()
 

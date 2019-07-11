@@ -1,6 +1,7 @@
 """
 Feature representation extractor for different tree ensemble models.
 """
+import os
 import time
 import json
 
@@ -54,6 +55,9 @@ class TreeExtractor:
         if self.encoding == 'leaf_path':
             X_feature, self.path_enc_ = self._leaf_path_encoding(X)
 
+        elif self.encoding == 'feature_path':
+            X_feature = self._feature_path_encoding(X)
+
         elif self.encoding == 'leaf_output':
             X_feature = self._leaf_output_encoding(X)
 
@@ -81,7 +85,7 @@ class TreeExtractor:
         elif self.encoding == 'feature_path':
             X_feature = self._feature_path_encoding(X)
 
-        elif self.encoding == 'tree_output':
+        elif self.encoding == 'leaf_output':
             X_feature = self._leaf_output_encoding(X)
 
         return X_feature
@@ -156,10 +160,11 @@ class TreeExtractor:
             encoding = lgb_model.decision_path(X, sparse=self.sparse)
 
         elif self.model_type_ == 'CatBoostClassifier':
-            self.model.save_model('.cb.json')
+            self.model.save_model('.cb.json', format='json')
             cb_dump = json.load(open('.cb.json', 'r'))
             cb_model = tree_model.CBModel(cb_dump)
-            encoding = cb_model.decision_path(X)
+            encoding = cb_model.decision_path(X, sparse=self.sparse)
+            os.system('rm .cb.json')
 
         elif self.model_type_ == 'XGBClassifier':
             xgb_model = tree_model.XGBModel(self.model._Booster.get_dump())

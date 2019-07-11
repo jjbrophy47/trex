@@ -32,7 +32,7 @@ class TreeExplainer:
             Train instances in original feature space.
         y_train : 1d array-like (default=None)
             Ground-truth train labels.
-        encoding : str (default='tree_path')
+        encoding : str (default='leaf_path')
             Feature representation to extract from the tree ensemble.
         C : float (default=0.1)
             Hyperparameter for the SVM.
@@ -47,7 +47,7 @@ class TreeExplainer:
         # error checking
         self.model_type_ = util.validate_model(model)
         self._validate_data(X_train, y_train)
-        assert encoding in ['tree_path', 'tree_output'], '{} encoding unsupported!'.format(encoding)
+        assert encoding in ['leaf_path', 'feature_path', 'leaf_output'], '{} unsupported!'.format(encoding)
 
         self.model = model
         self.X_train = X_train
@@ -60,11 +60,11 @@ class TreeExplainer:
         self.timeit = timeit
 
         # set kernel for svm
-        if self.encoding == 'tree_path':
+        if self.encoding == 'leaf_path' or self.encoding == 'feature_path':
             self.kernel_ = 'linear'
             self.sparse_ = True
 
-        elif self.encoding == 'tree_output':
+        elif self.encoding == 'leaf_output':
 
             if self.model_type_ == 'RandomForestClassifier':
                 self.kernel_ = 'linear'
@@ -85,7 +85,7 @@ class TreeExplainer:
 
         # choose ground truth or predicted labels to train the svm
         if use_predicted_labels:
-            train_label = self.model.predict(X_train)
+            train_label = self.model.predict(X_train).flatten()
         else:
             train_label = self.y_train
 
@@ -245,10 +245,35 @@ class TreeExplainer:
 
         return sim
 
-    def decision_function(self, X, pred_svm=False):
+    def decision_function(self, X, pred_label=False):
+        """
+        Returns decision function values from learned SVM.
+        If multiclass, returns a flattened array of distances from each SVM.
+        """
+        if X.ndim == 1:
+            X = X.reshape(1, -1)
+            assert X.shape[0] == 1, 'x must be a single instance!'
+        assert X.shape[1] == self.n_feats_, 'num features do not match!'
+        X_feature = self.extractor_.transform(X)
+        assert X_feature.shape[1] == self.train_feature_.shape[1], 'num features do not match!'
+
+        if self.n_classes_ == 2:
+            decision = self.svm_.decision_function(X_feature)
+        else:
+            decision = self.ovr_.decision_function(X_feature)
+
+        if pred_label:
+            pred = self.le_.inverse_transform(np.argmax(decision, axis=1))
+            result = decision, pred
+        else:
+            result = decision
+
+        return result
+
+    def _decision_function(self, X, pred_svm=False):
         """
         Return decision function values from learned SVM.
-        If multiclass, only supports  a single instance.
+        If multiclass, only supports a single instance.
         """
 
         if X.ndim == 1:
@@ -260,11 +285,18 @@ class TreeExplainer:
         assert X_feature.shape[1] == self.train_feature_.shape[1], 'num features do not match!'
 
         if self.n_classes_ > 2:
-            assert X.shape[0] == 1, 'x must be a single instance if n_classes_ > 2!'
+            # assert X.shape[0] == 1, 'x must be a single instance if n_classes_ > 2!'
             assert self.ovr_ is not None, 'ovr_ is not fitted!'
-            pred_label = int(self.ovr_.predict(X_feature)[0])
-            svm = self.ovr_.estimators_[pred_label]
-            decision = svm.decision_function(X_feature)[0]
+
+            decision = self.ovr_.decision_function(X_feature)
+            # decision = np.max(decisions, axis=1)
+            pred_label = np.argmax(decision, axis=1)
+
+            # print(decision)
+
+            # pred_label = int(self.ovr_.predict(X_feature)[0])
+            # svm = self.ovr_.estimators_[pred_label]
+            # decision = svm.decision_function(X_feature)[0]
         else:
             svm = self.svm_
             pred_label = svm.predict(X_feature)
