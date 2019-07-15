@@ -13,6 +13,20 @@ from influence_boosting.influence.leaf_influence import CBLeafInfluenceEnsemble
 from . import model_util
 
 
+def sort_impact(sv_ndx, impact, ascending=False):
+    """Sorts support vectors by absolute impact values in descending order."""
+
+    if impact.ndim == 2:
+        impact = np.sum(impact, axis=1)
+    impact_list = zip(sv_ndx, impact)
+    impact_list = sorted(impact_list, key=lambda tup: abs(tup[1]), reverse=not ascending)
+
+    sv_ndx, impact = zip(*impact_list)
+    sv_ndx = np.array(sv_ndx)
+    return sv_ndx, impact
+
+
+# TODO: not really needed anymore
 def avg_impact(explainer, X_test, test_indices=None, progress=False):
     """
     Returns avg impacts of train instances over a given set of test instances.

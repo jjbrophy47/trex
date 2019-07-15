@@ -8,40 +8,58 @@ from sklearn.datasets import load_iris, load_breast_cancer, load_wine
 from sklearn.model_selection import train_test_split
 
 
-def _load_iris(test_size=0.2, random_state=69):
+def _load_iris(test_size=0.2, random_state=69, return_feature=False):
     data = load_iris()
     X, y, label = data['data'], data['target'], data['target_names']
+    feature_names = data['feature_names']
 
     if test_size is not None:
         X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=test_size,
                                                             random_state=random_state, stratify=y)
-        return X_train, X_test, y_train, y_test, label
+        result = (X_train, X_test, y_train, y_test, label)
     else:
-        return X, y, label
+        result = (X, y, label)
+
+    if return_feature:
+        result += (feature_names,)
+
+    return result
 
 
-def _load_breast(test_size=0.2, random_state=69):
+def _load_breast(test_size=0.2, random_state=69, return_feature=False):
     data = load_breast_cancer()
     X, y, label = data['data'], data['target'], data['target_names']
+    feature_names = data['feature_names']
 
     if test_size is not None:
         X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=test_size,
                                                             random_state=random_state, stratify=y)
-        return X_train, X_test, y_train, y_test, label
+        result = (X_train, X_test, y_train, y_test, label)
     else:
-        return X, y, label
+        result = (X, y, label)
+
+    if return_feature:
+        result += (feature_names,)
+
+    return result
 
 
-def _load_wine(test_size=0.2, random_state=69):
+def _load_wine(test_size=0.2, random_state=69, return_feature=False):
     data = load_wine()
     X, y, label = data['data'], data['target'], data['target_names']
+    feature_names = data['feature_names']
 
     if test_size is not None:
         X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=test_size,
                                                             random_state=random_state, stratify=y)
-        return X_train, X_test, y_train, y_test, label
+        result = (X_train, X_test, y_train, y_test, label)
     else:
-        return X, y, label
+        result = (X, y, label)
+
+    if return_feature:
+        result += (feature_names,)
+
+    return result
 
 
 def _load_adult(data_dir='data'):
@@ -134,7 +152,7 @@ def _load_nc17_mfc18(data_dir='data', feature=False, switch=False):
         X_test, y_test = X_temp, y_temp
 
     if feature:
-        feature = np.load(os.path.join(data_dir, 'nc17_mfc18/feature.npy'))
+        feature = np.load(os.path.join(data_dir, 'nc17_mfc18/feature.npy'))[:-1]
         return X_train, X_test, y_train, y_test, label, feature
     else:
         return X_train, X_test, y_train, y_test, label
@@ -258,11 +276,11 @@ def get_data(dataset, test_size=0.2, random_state=69, data_dir='data', return_fe
 
     # load dataset
     if dataset == 'iris':
-        return _load_iris()
+        return _load_iris(test_size=test_size, random_state=random_state, return_feature=return_feature)
     elif dataset == 'breast':
-        return _load_breast()
+        return _load_breast(test_size=test_size, random_state=random_state, return_feature=return_feature)
     elif dataset == 'wine':
-        return _load_wine()
+        return _load_wine(test_size=test_size, random_state=random_state, return_feature=return_feature)
     elif dataset == 'adult':
         return _load_adult(data_dir=data_dir)
     elif dataset == 'amazon':

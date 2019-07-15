@@ -11,6 +11,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.base import clone
 from sklearn.metrics import roc_auc_score
+from sklearn.preprocessing import minmax_scale
 
 from util import model_util, data_util, exp_util
 
@@ -126,100 +127,307 @@ def remove_feature(model='lgb', encoding='tree_path', dataset='medifor', n_estim
     plt.show()
 
 
-def relabel(model='lgb', encoding='tree_path', dataset='medifor', n_estimators=100,
-            random_state=69, timeit=False, iterations=5, data_dir='data'):
+def _identify_instances(impact_sum, negative=False, threshold=0):
+    """Idenitfies the support vectors that have a net positive / negative impact."""
+
+    # get train instances that positively / negatively impact the predictions
+    if negative:
+        target_ndx = np.where(impact_sum < threshold)[0]
+    else:
+        target_ndx = np.where(impact_sum > threshold)[0]
+
+    return target_ndx
+
+
+def relabel(model='lgb', encoding='leaf_path', dataset='nc17_mfc18', n_estimators=100,
+            random_state=69, test_size=0.2, iterations=1, n_points=50, data_dir='data',
+            negative=False, threshold=0):
 
     # get model and data
     clf = model_util.get_classifier(model, n_estimators=n_estimators, random_state=random_state)
-    X_train, X_test, y_train, y_test, label = data_util.get_data(dataset, random_state=random_state, data_dir=data_dir)
+    X_train, X_test, y_train, y_test, label = data_util.get_data(dataset, random_state=random_state, data_dir=data_dir,
+                                                                 test_size=test_size)
 
     # train a tree ensemble and explainer
     tree = clone(clf).fit(X_train, y_train)
     model_util.performance(tree, X_train, y_train, X_test, y_test)
-    explainer = sexee.TreeExplainer(tree, X_train, y_train, encoding=encoding)
 
-    # compute impact of train instances on test instances
-    train_ndx, impact = explainer.train_impact(X_test)
-    impact = np.mean(impact, axis=1)
-
-    abs_ndx = np.argsort(np.abs(impact))[::-1][:200]
-    abs_train_ndx = train_ndx[abs_ndx]
-
-    print(impact[abs_ndx])
-
-    new_X_train = np.delete(X_train, abs_train_ndx, axis=0)
-    new_y_train = np.delete(y_train, abs_train_ndx)
-
-    new_tree = clone(clf).fit(new_X_train, new_y_train)
-    model_util.performance(new_tree, new_X_train, new_y_train, X_test, y_test)
-
-
-def reweight(model='lgb', encoding='tree_path', dataset='medifor', n_estimators=100,
-             random_state=69, timeit=False, iterations=5, data_dir='data'):
-
-    # get model and data
-    clf = model_util.get_classifier(model, n_estimators=n_estimators, random_state=random_state)
-    X_train, X_test, y_train, y_test, label = data_util.get_data(dataset, random_state=random_state, data_dir=data_dir)
-
-    # train a tree ensemble and explainer
-    tree = clone(clf).fit(X_train, y_train)
-    model_util.performance(tree, X_train, y_train, X_test, y_test)
+    original_auroc = roc_auc_score(y_test, tree.predict_proba(X_test)[:, 1])
 
     new_X_train = X_train.copy()
     new_y_train = y_train.copy()
 
+    if iterations > 1:
+        auroc, n_iterations = [], []
+
+        for i in tqdm.tqdm(range(iterations)):
+
+            explainer = sexee.TreeExplainer(tree, new_X_train, new_y_train, encoding=encoding,
+                                            random_state=random_state)
+
+            # compute total impact of train instances on test instances
+            sv_ndx, sv_impact, weight = explainer.train_impact(X_test, weight=True)
+            impact_sum = np.sum(sv_impact, axis=1)
+
+            # get impactful train instances
+            target_ndx = _identify_instances(impact_sum, negative=negative, threshold=threshold)
+            flip_ndx = sv_ndx[target_ndx]
+
+            # flip the label of these train instances
+            new_y_train = data_util.flip_labels_with_indices(new_y_train, flip_ndx)
+
+            tree = clone(clf).fit(new_X_train, new_y_train)
+            auroc.append(roc_auc_score(y_test, tree.predict_proba(X_test)[:, 1]))
+            n_iterations.append(i + 1)
+
+        n_iterations.insert(0, 0)
+        auroc.insert(0, original_auroc)
+
+        fig, ax = plt.subplots()
+        ax.plot(n_iterations, auroc, color='green', marker='.')
+        ax.axhline(original_auroc, linestyle='--', color='k')
+        ax.set_xlabel('iteration')
+        ax.set_ylabel('test auroc')
+        plt.show()
+
+    else:
+
+        explainer = sexee.TreeExplainer(tree, new_X_train, new_y_train, encoding=encoding,
+                                        random_state=random_state)
+
+        # compute total impact of train instances on test instances
+        sv_ndx, sv_impact, weight = explainer.train_impact(X_test, weight=True)
+        impact_sum = np.sum(sv_impact, axis=1)
+
+        # get impactful train instances
+        target_ndx = _identify_instances(impact_sum, negative=negative, threshold=threshold)
+        flip_ndx = sv_ndx[target_ndx]
+        target_impact = impact_sum[target_ndx]
+        remove_ndx, pos_impact = exp_util.sort_impact(target_ndx, target_impact, ascending=False)
+
+        # remove offending train instances in segments and measure performance
+        step_size = int(len(flip_ndx) / n_points)
+        auroc, n_flipped = [], []
+
+        for i in tqdm.tqdm(range(step_size, len(flip_ndx) + step_size, step_size)):
+
+            # remove these instances from the train data
+            new_y_train = data_util.flip_labels_with_indices(y_train, flip_ndx[:i])
+
+            tree = clone(clf).fit(new_X_train, new_y_train)
+            auroc.append(roc_auc_score(y_test, tree.predict_proba(X_test)[:, 1]))
+            n_flipped.append(i)
+
+        n_flipped.insert(0, 0)
+        auroc.insert(0, original_auroc)
+
+        fig, ax = plt.subplots()
+        ax.plot(n_flipped, auroc, color='green', marker='.')
+        ax.axhline(original_auroc, linestyle='--', color='k')
+        ax.set_xlabel('train instances flipped')
+        ax.set_ylabel('test auroc')
+        plt.show()
+
+
+def remove_data(model='lgb', encoding='leaf_path', dataset='nc17_mfc18', n_estimators=100,
+                random_state=69, test_size=0.2, iterations=1, n_points=150, data_dir='data',
+                verbose=0, negative=False, threshold=0):
+
+    # get model and data
+    clf = model_util.get_classifier(model, n_estimators=n_estimators, random_state=random_state)
+    X_train, X_test, y_train, y_test, label = data_util.get_data(dataset, random_state=random_state, data_dir=data_dir,
+                                                                 test_size=test_size)
+
+    # train a tree ensemble and explainer
+    tree = clone(clf).fit(X_train, y_train)
+    model_util.performance(tree, X_train, y_train, X_test, y_test)
+    original_auroc = roc_auc_score(y_test, tree.predict_proba(X_test)[:, 1])
+
+    new_X_train = X_train.copy()
+    new_y_train = y_train.copy()
+
+    if iterations > 1:
+        auroc, n_iter = [], []
+
+        for i in tqdm.tqdm(range(iterations)):
+            explainer = sexee.TreeExplainer(tree, new_X_train, new_y_train, encoding=encoding,
+                                            random_state=random_state)
+            if verbose > 0:
+                print(explainer)
+
+            # compute total impact of train instances on test instances
+            sv_ndx, sv_impact, weight = explainer.train_impact(X_test, weight=True)
+            impact_sum = np.sum(sv_impact, axis=1)
+
+            # get train instances that impact the predictions
+            target_ndx = _identify_instances(impact_sum, negative=negative, threshold=threshold)
+            remove_ndx = sv_ndx[target_ndx]
+
+            # remove these instances from the train data
+            new_X_train = np.delete(new_X_train, remove_ndx, axis=0)
+            new_y_train = np.delete(new_y_train, remove_ndx)
+
+            tree = clone(clf).fit(new_X_train, new_y_train)
+            auroc.append(roc_auc_score(y_test, tree.predict_proba(X_test)[:, 1]))
+            n_iter.append(i + 1)
+
+        n_iter.insert(0, 0)
+        auroc.insert(0, original_auroc)
+
+        fig, ax = plt.subplots()
+        ax.plot(n_iter, auroc, color='green', marker='.')
+        ax.axhline(original_auroc, linestyle='--', color='k')
+        ax.set_xlabel('iteration')
+        ax.set_ylabel('test auroc')
+        plt.show()
+
+    else:
+        explainer = sexee.TreeExplainer(tree, new_X_train, new_y_train, encoding=encoding,
+                                        random_state=random_state)
+        if verbose > 0:
+            print(explainer)
+
+        # compute total impact of train instances on test instances
+        sv_ndx, sv_impact, weight = explainer.train_impact(X_test, weight=True)
+        impact_sum = np.sum(sv_impact, axis=1)
+
+        # get train instances that impact the predictions
+        target_ndx = _identify_instances(impact_sum, negative=negative, threshold=threshold)
+        remove_ndx = sv_ndx[target_ndx]
+        target_impact = impact_sum[target_ndx]
+        remove_ndx, pos_impact = exp_util.sort_impact(remove_ndx, target_impact, ascending=False)
+
+        # remove offending train instances in segments and measure performance
+        step_size = int(len(remove_ndx) / n_points)
+        auroc, n_removed = [], []
+
+        for i in tqdm.tqdm(range(step_size, len(remove_ndx) + step_size, step_size)):
+
+            # remove these instances from the train data
+            delete_ndx = remove_ndx[:i]
+            new_X_train = np.delete(X_train, delete_ndx, axis=0)
+            new_y_train = np.delete(y_train, delete_ndx)
+
+            tree = clone(clf).fit(new_X_train, new_y_train)
+            auroc.append(roc_auc_score(y_test, tree.predict_proba(X_test)[:, 1]))
+            n_removed.append(i)
+
+        n_removed.insert(0, 0)
+        auroc.insert(0, original_auroc)
+
+        fig, ax = plt.subplots()
+        ax.plot(n_removed, auroc, color='green', marker='.')
+        ax.axhline(original_auroc, linestyle='--', color='k')
+        ax.set_xlabel('train instances removed')
+        ax.set_ylabel('test auroc')
+        plt.show()
+
+
+def _scale(sample_weight, impact_sum, sv_ndx, together=False, scale_max=0.5,
+           negative=False, threshold=0):
+
+    # reweight support vectors, positive impacts get lower weight, negative impacts get higher weight
+    if together:
+        impact_sum_scaled = minmax_scale(impact_sum, feature_range=(-scale_max, scale_max))
+        sample_weight[sv_ndx] -= impact_sum_scaled
+
+    else:
+
+        # downweight positively impactful train instances if negative is False
+        pos_sv_ndx = _identify_instances(impact_sum, negative=False, threshold=threshold)
+        pos_ndx = sv_ndx[pos_sv_ndx]
+        pos_impact = minmax_scale(impact_sum[pos_sv_ndx], feature_range=(0, scale_max))
+
+        # upweight negatively impactful train instances if negative is False
+        neg_sv_ndx = _identify_instances(impact_sum, negative=True, threshold=threshold)
+        neg_ndx = sv_ndx[neg_sv_ndx]
+        neg_impact = minmax_scale(impact_sum[neg_sv_ndx], feature_range=(-scale_max, 0))
+
+        if negative:
+            sample_weight[pos_ndx] += pos_impact
+            sample_weight[neg_ndx] += neg_impact
+        else:
+            sample_weight[pos_ndx] -= pos_impact
+            sample_weight[neg_ndx] -= neg_impact
+
+    return sample_weight
+
+
+def reweight(model='lgb', encoding='leaf_output', dataset='nc17_mfc18', n_estimators=100,
+             random_state=69, test_size=0.2, iterations=1, data_dir='data', scale_max=0.5,
+             scale_together=False, negative=False):
+
+    # get model and data
+    clf = model_util.get_classifier(model, n_estimators=n_estimators, random_state=random_state)
+    X_train, X_test, y_train, y_test, label = data_util.get_data(dataset, random_state=random_state, data_dir=data_dir,
+                                                                 test_size=test_size)
+
+    # train a tree ensemble and explainer
+    tree = clone(clf).fit(X_train, y_train)
+    model_util.performance(tree, X_train, y_train, X_test, y_test)
+
+    original_auroc = roc_auc_score(y_test, tree.predict_proba(X_test)[:, 1])
+
+    new_X_train = X_train.copy()
+    new_y_train = y_train.copy()
     sample_weight = np.ones(len(new_y_train))
 
-    missed_indices = np.where(tree.predict(X_test) != y_test)[0]
+    auroc, n_iter = [], []
+    for i in tqdm.tqdm(range(iterations)):
 
-    for i in range(iterations):
+        # get impact of train instances on test instances
+        explainer = sexee.TreeExplainer(tree, new_X_train, new_y_train, encoding=encoding,
+                                        random_state=random_state)
 
-        # get impact from incorrectly predicted test instances
-        # a positive impact means the train instances contributed towards the model's prediction
-        # a negative impact means the train instances contributed away from the model's prediction
-        explainer = sexee.TreeExplainer(tree, new_X_train, new_y_train)
-        # missed_indices = np.where(tree.predict(X_test) != y_test)[0]
-        impact_incorrect = exp_util.avg_impact(explainer, missed_indices[:1000], X_test, progress=True)
-        harmful_train = [impact for impact in impact_incorrect.items() if impact[1] > 0]
-        helpful_train = [impact for impact in impact_incorrect.items() if impact[1] < 0]
+        # compute total impact of train instances on test instances
+        sv_ndx, sv_impact, weight = explainer.train_impact(X_test, weight=True)
+        impact_sum = np.sum(sv_impact, axis=1)
 
-        mult = 10
+        sample_weight = _scale(sample_weight, impact_sum, sv_ndx, together=scale_together,
+                               scale_max=scale_max, negative=negative)
 
-        # reweight impactful training samples
-        for train_ndx, impact_val in harmful_train:
-            sample_weight[train_ndx] -= (impact_val * mult)
-
-        for train_ndx, impact_val in helpful_train:
-            sample_weight[train_ndx] -= (impact_val * mult)
-
-        # print(harmful_train, len(harmful_train))
-        # print()
-
-        # print(helpful_train, len(helpful_train))
-        # print()
-
-        # exit(0)
-
-        # # remove potentially harmful train instances
-        # new_X_train = np.delete(new_X_train, harmful_ndx, axis=0)
-        # new_y_train = np.delete(new_y_train, harmful_ndx)
-
-        # train new model on cleaned data
+        # train new model on reweighted data
         tree = clone(clf).fit(new_X_train, new_y_train, sample_weight=sample_weight)
-        model_util.performance(tree, X_train, y_train, X_test, y_test)
+        auroc.append(roc_auc_score(y_test, tree.predict_proba(X_test)[:, 1]))
+        n_iter.append(i + 1)
+
+    n_iter.insert(0, 0)
+    auroc.insert(0, original_auroc)
+
+    fig, ax = plt.subplots()
+    ax.plot(n_iter, auroc, color='green', marker='.')
+    ax.axhline(original_auroc, linestyle='--', color='k')
+    ax.set_xlabel('iteration')
+    ax.set_ylabel('test auroc')
+    plt.show()
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Feature representation extractions for tree ensembles',
                                      formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    parser.add_argument('--dataset', type=str, default='medifor', help='dataset to explain.')
+    parser.add_argument('--dataset', type=str, default='nc17_mfc18', help='dataset to explain.')
     parser.add_argument('--model', type=str, default='lgb', help='model to use.')
-    parser.add_argument('--encoding', type=str, default='tree_path', help='type of encoding.')
+    parser.add_argument('--encoding', type=str, default='leaf_output', help='type of encoding.')
     parser.add_argument('--n_estimators', metavar='N', type=int, default=100, help='number of trees for ensemble.')
     parser.add_argument('--rs', metavar='RANDOM_STATE', type=int, default=69, help='for reproducibility.')
     parser.add_argument('--timeit', action='store_true', default=False, help='Show timing info for explainer.')
-    parser.add_argument('--iterations', metavar='NUM', type=int, default=5, help='Number of reweighting rounds.')
+    parser.add_argument('--iterations', metavar='NUM', type=int, default=1, help='Number of rounds.')
+    parser.add_argument('--test_size', type=float, default=0.2, help='Size of the test set.')
+    parser.add_argument('--negative', action='store_true', help='Remove / Relabel negative impact instances.')
+    parser.add_argument('--experiment', default='relabel', help='feature_remove, data_remove, relabel, or reweight.')
     args = parser.parse_args()
     print(args)
-    # alignment(args.model, args.encoding, args.dataset, args.n_estimators, args.rs, args.timeit, args.iterations)
-    # remove_feature(args.model, args.encoding, args.dataset, args.n_estimators, args.rs)
-    relabel(args.model, args.encoding, args.dataset, args.n_estimators, args.rs)
+
+    if args.experiment == 'remove_feature':
+        remove_feature(args.model, args.encoding, args.dataset, args.n_estimators, args.rs)
+    elif args.experiment == 'relabel':
+        relabel(args.model, args.encoding, args.dataset, args.n_estimators, args.rs, args.test_size,
+                args.iterations, negative=args.negative)
+    elif args.experiment == 'remove_data':
+        remove_data(args.model, args.encoding, args.dataset, args.n_estimators, args.rs, args.test_size,
+                    args.iterations, negative=args.negative)
+    elif args.experiment == 'reweight':
+        reweight(args.model, args.encoding, args.dataset, args.n_estimators, args.rs, args.test_size,
+                 args.iterations, negative=args.negative)
+    else:
+        exit('experiment {} unrecognized'.format(args.experiment))
