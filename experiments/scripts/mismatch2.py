@@ -56,7 +56,7 @@ def _influence(explainer, train_indices, test_indices, X_test, y_test):
     buf = deepcopy(explainer)
 
     for i, test_ndx in enumerate(tqdm.tqdm(test_indices)):
-        for j, train_ndx in enumerate(tqdm.tqdm(train_indices)):
+        for j, train_ndx in enumerate(train_indices):
             explainer.fit(removed_point_idx=train_ndx, destination_model=buf)
             influence_scores[i][j] = buf.loss_derivative(X_test[[test_ndx]], y_test[[test_ndx]])[0]
 
@@ -64,9 +64,9 @@ def _influence(explainer, train_indices, test_indices, X_test, y_test):
     return influence_scores
 
 
-def mismatch(model='lgb', encoding='leaf_output', dataset='hospital', n_estimators=100,
-             random_state=69, plot=False, data_dir='data', age_ndx=21, topk_train=5,
-             verbose=0, inf_k=None, n_subset=50):
+def mismatch(model='lgb', encoding='leaf_output', dataset='hospital2', n_estimators=100,
+             random_state=69, plot=False, data_dir='data', age_ndx=21,
+             verbose=0, inf_k=None, n_subset=50, true_label=False):
 
     # get model and data
     clf = model_util.get_classifier(model, n_estimators=n_estimators, random_state=random_state)
@@ -102,7 +102,7 @@ def mismatch(model='lgb', encoding='leaf_output', dataset='hospital', n_estimato
 
     # compute the most impactful train instances on the chosen test instances
     explainer = sexee.TreeExplainer(tree_mod, X_train_mod, y_train_mod, encoding=encoding, random_state=random_state,
-                                    use_predicted_labels=True)
+                                    use_predicted_labels=not true_label)
     sv_ndx, sv_impact = explainer.train_impact(X_test[test_target_ndx])
     sv_ndx, sv_impact = exp_util.sort_impact(sv_ndx, sv_impact)
     sv_impact = np.array(sv_impact)
@@ -114,7 +114,7 @@ def mismatch(model='lgb', encoding='leaf_output', dataset='hospital', n_estimato
     train_sv_4_ndx, _, sv_4_ndx = np.intersect1d(train_noage_noreadmit_ndx, sv_ndx, return_indices=True)
 
     if verbose > 0:
-        print('total support vectors: {}'.format(len(sv_ndx)))
+        print('\ntotal support vectors: {}'.format(len(sv_ndx)))
         print('age, readmit support vectors: {}'.format(len(sv_1_ndx)))
         print('age, no readmit support vectors: {}'.format(len(sv_2_ndx)))
         print('no age, readmit support vectors: {}'.format(len(sv_3_ndx)))
@@ -178,17 +178,16 @@ def mismatch(model='lgb', encoding='leaf_output', dataset='hospital', n_estimato
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Feature representation extractions for tree ensembles',
                                      formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    parser.add_argument('--dataset', type=str, default='hospital', help='dataset to explain.')
-    parser.add_argument('--model', type=str, default='lgb', help='model to use.')
+    parser.add_argument('--dataset', type=str, default='hospital2', help='dataset to explain.')
+    parser.add_argument('--model', type=str, default='cb', help='model to use.')
     parser.add_argument('--encoding', type=str, default='leaf_output', help='type of encoding.')
     parser.add_argument('--n_estimators', metavar='N', type=int, default=100, help='number of trees for ensemble.')
     parser.add_argument('--rs', metavar='RANDOM_STATE', type=int, default=69, help='for reproducibility.')
-    parser.add_argument('--timeit', action='store_true', default=False, help='Show timing info for explainer.')
     parser.add_argument('--inf_k', type=int, default=None, help='Number of leaves to use for leafinfluence.')
-    parser.add_argument('--topk_train', type=int, default=5, help='Number of train instances to inspect.')
     parser.add_argument('--verbose', type=int, default=0, help='Amount of output.')
     parser.add_argument('--n_subset', type=int, default=5, help='Number of train instances to inspect.')
+    parser.add_argument('--true_label', action='store_true', help='Train explainer on true labels.')
     args = parser.parse_args()
     print(args)
-    mismatch(args.model, args.encoding, args.dataset, args.n_estimators, args.rs, topk_train=args.topk_train,
+    mismatch(args.model, args.encoding, args.dataset, args.n_estimators, args.rs, true_label=args.true_label,
              inf_k=args.inf_k, verbose=args.verbose, n_subset=args.n_subset)
