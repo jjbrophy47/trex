@@ -1,8 +1,11 @@
 """
 Experiment: Replicate domain mismatch experiment from Sharchilev et al.
 """
+import os
 import time
 import argparse
+import sys
+sys.path.insert(0, os.getcwd())  # for influence_boosting
 from copy import deepcopy
 
 import tqdm
