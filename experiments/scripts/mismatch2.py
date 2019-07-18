@@ -94,7 +94,7 @@ def mismatch(model='lgb', encoding='leaf_output', dataset='hospital', n_estimato
     train_noage_noreadmit_ndx = np.where((X_train_mod[:, age_ndx] != 1) & (y_train_mod != 1))[0]
 
     # get test instances of interest
-    test_target_ndx = test_age_readmit_ndx
+    test_target_ndx = test_age_ndx
     # test_age_noreadmitted_ndx = np.where((X_test[:, age_ndx] == 1) & (y_test != 1))[0]
 
     # compute the most impactful train instances on the chosen test instances
