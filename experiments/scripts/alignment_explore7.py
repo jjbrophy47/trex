@@ -62,18 +62,26 @@ def manipulations(model='lgb', encoding='tree_path', dataset='NC17_EvalPart1', n
     manip_test_ndx = np.random.choice(manip_test_ndx, size=n_test_sample, replace=False)
     X_test_manip = X_test[manip_test_ndx]
 
+    # compute overall impact of support vectors on the chosen test instances
     sv_ndx, impact = explainer.train_impact(X_test_manip)
     sv_ndx, impact = _sort_impact(sv_ndx, impact)
 
+    # filter out negatively impactful support vectors
     impact_list = zip(sv_ndx, impact)
     pos_impact_list = [impact_item for impact_item in impact_list if impact_item[1] > 0]
+    print('total sv: {}'.format(len(sv_ndx)))
+    print('positively impactful sv: {}'.format(len(pos_impact_list)))
+
+    # extract top support vector indices and impact values
     pos_sv_ndx, pos_impact = zip(*pos_impact_list)
     topk_pos_sv_ndx = np.array(pos_sv_ndx[:topk_train])
     topk_pos_impact = np.array(pos_impact[:topk_train])
 
+    # get target manipulation overlap in support vectors
     manip_train_overlap = set(manip_train_ndx).intersection(set(sv_ndx))
     print('{} in support vectors: {}'.format(manip_type, len(manip_train_overlap)))
 
+    # get target manipulation overlap in top support vectors
     overlap = set(topk_pos_sv_ndx).intersection(set(manip_train_ndx))
     print('{} in top {} support vectors: {}'.format(manip_type, topk_train, len(overlap)))
 
@@ -84,10 +92,10 @@ def manipulations(model='lgb', encoding='tree_path', dataset='NC17_EvalPart1', n
     topk_sv_mean = np.divide(topk_sv_sum, topk_sv_count, where=topk_sv_count != 0, out=np.zeros_like(topk_sv_sum))
     manip_test_count = np.sum(manip_test[manip_test_ndx], axis=0)
 
+    # plot distributions
     height = 6 if plot_impact else 4
     n_plots = 3 if plot_impact else 2
 
-    # plot distributions
     fig, axs = plt.subplots(n_plots, 1, figsize=(18, height), sharex=True)
     axs = axs.flatten()
     axs[0].bar(np.arange(manip_test.shape[1]), manip_test_count, label='test', color='magenta')

@@ -126,7 +126,7 @@ def _load_heart(data_dir='data', test_size=0.2, random_state=69):
         return X, y, label
 
 
-def _load_hospital(data_dir='data'):
+def _load_hospital(data_dir='data', feature=False):
     train = np.load(os.path.join(data_dir, 'hospital/train.npy'))
     test = np.load(os.path.join(data_dir, 'hospital/test.npy'))
     label = ['not readmitted', 'readmitted']
@@ -134,7 +134,12 @@ def _load_hospital(data_dir='data'):
     y_train = train[:, -1].astype(np.int32)
     X_test = test[:, :-1]
     y_test = test[:, -1].astype(np.int32)
-    return X_train, X_test, y_train, y_test, label
+
+    if feature:
+        feature = np.load(os.path.join(data_dir, 'hospital/feature.npy'), allow_pickle=True)
+        return X_train, X_test, y_train, y_test, label, feature
+    else:
+        return X_train, X_test, y_train, y_test, label
 
 
 def _load_nc17_mfc18(data_dir='data', feature=False, switch=False):
@@ -292,7 +297,7 @@ def get_data(dataset, test_size=0.2, random_state=69, data_dir='data', return_fe
     elif dataset == 'heart':
         return _load_heart(data_dir=data_dir, test_size=test_size, random_state=random_state)
     elif dataset == 'hospital':
-        return _load_hospital(data_dir=data_dir)
+        return _load_hospital(data_dir=data_dir, feature=return_feature)
     elif dataset == 'nc17_mfc18':
         return _load_nc17_mfc18(data_dir=data_dir, feature=return_feature)
     elif dataset == 'nc17_mfc18_switch':

@@ -231,7 +231,7 @@ def relabel(model='lgb', encoding='leaf_path', dataset='nc17_mfc18', n_estimator
 
 def remove_data(model='lgb', encoding='leaf_path', dataset='nc17_mfc18', n_estimators=100,
                 random_state=69, test_size=0.2, iterations=1, n_points=150, data_dir='data',
-                verbose=0, negative=False, threshold=0):
+                verbose=0, negative=False, threshold=0, absolute=False):
 
     # get model and data
     clf = model_util.get_classifier(model, n_estimators=n_estimators, random_state=random_state)
@@ -292,10 +292,15 @@ def remove_data(model='lgb', encoding='leaf_path', dataset='nc17_mfc18', n_estim
         impact_sum = np.sum(sv_impact, axis=1)
 
         # get train instances that impact the predictions
-        target_ndx = _identify_instances(impact_sum, negative=negative, threshold=threshold)
-        remove_ndx = sv_ndx[target_ndx]
-        target_impact = impact_sum[target_ndx]
-        remove_ndx, pos_impact = exp_util.sort_impact(remove_ndx, target_impact, ascending=False)
+        if absolute:
+            remove_ndx, pos_impact = exp_util.sort_impact(sv_ndx, sv_impact, ascending=False)
+            print(remove_ndx)
+            print(pos_impact)
+        else:
+            target_ndx = _identify_instances(impact_sum, negative=negative, threshold=threshold)
+            remove_ndx = sv_ndx[target_ndx]
+            target_impact = impact_sum[target_ndx]
+            remove_ndx, pos_impact = exp_util.sort_impact(remove_ndx, target_impact, ascending=False)
 
         # remove offending train instances in segments and measure performance
         step_size = int(len(remove_ndx) / n_points)
@@ -414,7 +419,9 @@ if __name__ == '__main__':
     parser.add_argument('--iterations', metavar='NUM', type=int, default=1, help='Number of rounds.')
     parser.add_argument('--test_size', type=float, default=0.2, help='Size of the test set.')
     parser.add_argument('--negative', action='store_true', help='Remove / Relabel negative impact instances.')
+    parser.add_argument('--absolute', action='store_true', help='Sort train instances by absolute value.')
     parser.add_argument('--experiment', default='relabel', help='feature_remove, data_remove, relabel, or reweight.')
+    parser.add_argument('--n_points', default=50, help='Number of points to plot.')
     args = parser.parse_args()
     print(args)
 
@@ -425,7 +432,7 @@ if __name__ == '__main__':
                 args.iterations, negative=args.negative)
     elif args.experiment == 'remove_data':
         remove_data(args.model, args.encoding, args.dataset, args.n_estimators, args.rs, args.test_size,
-                    args.iterations, negative=args.negative)
+                    args.iterations, negative=args.negative, absolute=args.absolute, n_points=args.n_points)
     elif args.experiment == 'reweight':
         reweight(args.model, args.encoding, args.dataset, args.n_estimators, args.rs, args.test_size,
                  args.iterations, negative=args.negative)
