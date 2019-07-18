@@ -9,12 +9,13 @@ sys.path.insert(0, os.getcwd())  # for influence_boosting
 
 import numpy as np
 from sklearn.base import clone
+from maple import MAPLE
 
 import sexee
 from util import model_util, data_util, exp_util
 
 
-def sexee_method(test_ndx, X_test, model, X_train, y_train, encoding, random_state=69):
+def _sexee_method(test_ndx, X_test, model, X_train, y_train, encoding, random_state=69):
     """Explains the predictions of each test instance."""
 
     start = time.time()
@@ -28,7 +29,7 @@ def sexee_method(test_ndx, X_test, model, X_train, y_train, encoding, random_sta
     return fine_tune, test_time
 
 
-def influence_method(model, test_ndx, X_train, y_train, X_test, y_test, inf_k):
+def _influence_method(model, test_ndx, X_train, y_train, X_test, y_test, inf_k):
     """
     Computes the influence on each test instance if train instance i were upweighted/removed.
     This uses the fastleafinfluence method by Sharchilev et al.
@@ -45,8 +46,24 @@ def influence_method(model, test_ndx, X_train, y_train, X_test, y_test, inf_k):
     return fine_tune, test_time
 
 
+def _maple_method(model, test_ndx, X_train, y_train, X_test, y_test):
+    """
+    Produces a train weight distribution for a single test instance.
+    """
+
+    start = time.time()
+    maple = MAPLE.MAPLE(X_train, y_train, X_train, y_train)
+    fine_tune = time.time() - start
+
+    start = time.time()
+    maple.explain(X_test[test_ndx])
+    test_time = time.time() - start
+
+    return fine_tune, test_time
+
+
 def runtime(model_type='lgb', encoding='tree_path', dataset='iris', n_estimators=100, random_state=69,
-            inf_k=None, repeats=10):
+            inf_k=None, repeats=10, true_label=False):
     """
     Main method that trains a tree ensemble, then compares the runtime of different methods to explain
     a random subset of test instances.
@@ -54,6 +71,7 @@ def runtime(model_type='lgb', encoding='tree_path', dataset='iris', n_estimators
 
     sexee_fine_tune, sexee_test_time = [], []
     inf_fine_tune, inf_test_time = [], []
+    maple_fine_tune, maple_test_time = [], []
 
     for i in range(repeats):
         print('\nrun {}'.format(i))
@@ -74,9 +92,12 @@ def runtime(model_type='lgb', encoding='tree_path', dataset='iris', n_estimators
         np.random.seed(random_state)
         test_ndx = np.random.choice(len(y_test), size=1, replace=False)
 
+        # train on predicted labels (sexee and maple methods only)
+        train_label = y_train if true_label else model.predict(X_train)
+
         # sexee method
         print('sexee...')
-        fine_tune, test_time = sexee_method(test_ndx, X_test, model, X_train, y_train, encoding, random_state)
+        fine_tune, test_time = _sexee_method(test_ndx, X_test, model, X_train, train_label, encoding, random_state)
         print('fine tune: {:.3f}s'.format(fine_tune))
         print('test time: {:.3f}s'.format(test_time))
         sexee_fine_tune.append(fine_tune)
@@ -85,12 +106,20 @@ def runtime(model_type='lgb', encoding='tree_path', dataset='iris', n_estimators
         # influence method
         if model_type == 'cb' and inf_k is not None:
             print('leafinfluence...')
-            fine_tune, test_time = influence_method(model, test_ndx, X_train, y_train, X_test, y_test, inf_k)
+            fine_tune, test_time = _influence_method(model, test_ndx, X_train, y_train, X_test, y_test, inf_k)
             print('fine tune: {:.3f}s'.format(fine_tune))
             print('test time: {:.3f}s'.format(test_time))
             inf_fine_tune.append(fine_tune)
             inf_test_time.append(test_time)
 
+        print('maple...')
+        fine_tune, test_time = _maple_method(model, test_ndx, X_train, train_label, X_test, y_test)
+        print('fine tune: {:.3f}s'.format(fine_tune))
+        print('test time: {:.3f}s'.format(test_time))
+        maple_fine_tune.append(fine_tune)
+        maple_test_time.append(test_time)
+
+    # display results
     sexee_fine_tune = np.array(sexee_fine_tune)
     sexee_test_time = np.array(sexee_test_time)
     print('\nsexee')
@@ -104,17 +133,24 @@ def runtime(model_type='lgb', encoding='tree_path', dataset='iris', n_estimators
         print('fine tuning: {:.3f}s +/- {:.3f}s'.format(inf_fine_tune.mean(), inf_fine_tune.std()))
         print('test time: {:.3f}s +/- {:.3f}s'.format(inf_test_time.mean(), inf_test_time.std()))
 
+    maple_fine_tune = np.array(maple_fine_tune)
+    maple_test_time = np.array(maple_test_time)
+    print('\nmaple')
+    print('fine tuning: {:.3f}s +/- {:.3f}s'.format(maple_fine_tune.mean(), maple_fine_tune.std()))
+    print('test time: {:.3f}s +/- {:.3f}s'.format(maple_test_time.mean(), maple_test_time.std()))
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Feature representation extractions for tree ensembles',
                                      formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument('--dataset', type=str, default='adult', help='dataset to explain.')
-    parser.add_argument('--model', type=str, default='lgb', help='model to use.')
-    parser.add_argument('--encoding', type=str, default='tree_path', help='type of encoding.')
+    parser.add_argument('--model', type=str, default='cb', help='model to use.')
+    parser.add_argument('--encoding', type=str, default='leaf_output', help='type of encoding.')
     parser.add_argument('--n_estimators', metavar='N', type=int, default=100, help='number of trees in random forest.')
     parser.add_argument('--rs', metavar='RANDOM_STATE', type=int, default=69, help='for reproducibility.')
     parser.add_argument('--inf_k', default=None, type=int, help='Number of leaves for leafinfluence.')
     parser.add_argument('--repeats', default=10, type=int, help='Number of times to repeat the experiment.')
+    parser.add_argument('--true_label', action='store_true', help='Train explainers on true labels.')
     args = parser.parse_args()
     print(args)
     runtime(args.model, args.encoding, args.dataset, args.n_estimators, args.rs, args.inf_k, args.repeats)
