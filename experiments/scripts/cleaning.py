@@ -20,7 +20,7 @@ from util import model_util, data_util, exp_util
 from influence_boosting.influence.leaf_influence import CBLeafInfluenceEnsemble
 
 
-def interval_performance(ckpt_ndx, fix_ndx, noisy_ndx, clf, data, acc_test_noisy):
+def _interval_performance(ckpt_ndx, fix_ndx, noisy_ndx, clf, data, acc_test_noisy):
     """
     Retrains the tree ensemble for each ckeckpoint, where a checkpoint represents
     which flipped labels have been fixed.
@@ -48,7 +48,7 @@ def interval_performance(ckpt_ndx, fix_ndx, noisy_ndx, clf, data, acc_test_noisy
     return checked_pct, accs, fix_pct
 
 
-def record_fixes(train_order, noisy_ndx, train_len, interval):
+def _record_fixes(train_order, noisy_ndx, train_len, interval):
     """
     Returns the number of train instances checked and which train instances were
     fixed for each checkpoint.
@@ -72,19 +72,19 @@ def record_fixes(train_order, noisy_ndx, train_len, interval):
     return ckpt_ndx, fix_ndx
 
 
-def sexee_method(explainer, noisy_ndx, y_train, points=10):
+def _sexee_method(explainer, noisy_ndx, y_train, points=10):
     """Sorts train instances by largest weight support vectors."""
 
     train_weight = explainer.get_train_weight()
     n_check = len(train_weight)
     train_order = [train_ndx for train_ndx, weight in train_weight]
     interval = (n_check / len(y_train)) / points
-    ckpt_ndx, fix_ndx = record_fixes(train_order, noisy_ndx, len(y_train), interval)
+    ckpt_ndx, fix_ndx = _record_fixes(train_order, noisy_ndx, len(y_train), interval)
 
     return ckpt_ndx, fix_ndx, interval, n_check
 
 
-def sexee_method2(explainer, noisy_ndx, X_train, y_train, points=10):
+def _sexee_method2(explainer, noisy_ndx, X_train, y_train, points=10):
     """Sorts train instances by largest total absolute impact on the train set."""
 
     train_ndx, impact = explainer.train_impact(X_train)
@@ -97,12 +97,12 @@ def sexee_method2(explainer, noisy_ndx, X_train, y_train, points=10):
 
     n_check = len(train_order)
     interval = (n_check / len(y_train)) / points
-    ckpt_ndx, fix_ndx = record_fixes(train_order, noisy_ndx, len(y_train), interval)
+    ckpt_ndx, fix_ndx = _record_fixes(train_order, noisy_ndx, len(y_train), interval)
 
     return ckpt_ndx, fix_ndx, interval, n_check
 
 
-def random_method(noisy_ndx, y_train, interval, to_check=1, random_state=69):
+def _random_method(noisy_ndx, y_train, interval, to_check=1, random_state=69):
     """Randomly picks train instances from the train data."""
 
     n_train = len(y_train)
@@ -115,11 +115,11 @@ def random_method(noisy_ndx, y_train, interval, to_check=1, random_state=69):
 
     np.random.seed(random_state + 1)  # +1 to avoid choosing the same indices as the noisy labels
     train_order = np.random.choice(n_train, size=n_check, replace=False)
-    ckpt_ndx, fix_ndx = record_fixes(train_order, noisy_ndx, n_train, interval)
+    ckpt_ndx, fix_ndx = _record_fixes(train_order, noisy_ndx, n_train, interval)
     return ckpt_ndx, fix_ndx
 
 
-def loss_method(noisy_ndx, y_train_proba, y_train, interval, to_check=1, logloss=False):
+def _loss_method(noisy_ndx, y_train_proba, y_train, interval, to_check=1, logloss=False):
     """Sorts train instances by largest train loss."""
 
     n_train = len(y_train)
@@ -145,11 +145,11 @@ def loss_method(noisy_ndx, y_train_proba, y_train, interval, to_check=1, logloss
     else:
         train_order = np.argsort(y_loss)[::-1][:n_check]  # descending order, most positive first
 
-    ckpt_ndx, fix_ndx = record_fixes(train_order, noisy_ndx, len(y_train), interval)
+    ckpt_ndx, fix_ndx = _record_fixes(train_order, noisy_ndx, len(y_train), interval)
     return ckpt_ndx, fix_ndx
 
 
-def influence_method(explainer, noisy_ndx, X_train, y_train, y_train_noisy, interval, to_check=1):
+def _influence_method(explainer, noisy_ndx, X_train, y_train, y_train_noisy, interval, to_check=1):
     """
     Computes the influence on train instance i if train instance i were upweighted/removed.
     This uses the fastleafinfluence method by Sharchilev et al.
@@ -172,13 +172,13 @@ def influence_method(explainer, noisy_ndx, X_train, y_train, y_train_noisy, inte
 
     # sort by absolute value
     train_order = np.argsort(np.abs(influence_scores))[::-1][:n_check]
-    ckpt_ndx, fix_ndx = record_fixes(train_order, noisy_ndx, n_train, interval)
+    ckpt_ndx, fix_ndx = _record_fixes(train_order, noisy_ndx, n_train, interval)
     return ckpt_ndx, fix_ndx
 
 
 def noise_detection(model_type='lgb', encoding='tree_path', dataset='iris', n_estimators=100, random_state=69,
                     timeit=False, svm_loss=False, inf_k=None, data_dir='data', flip_frac=0.4, true_label=False,
-                    ours2=False, out_dir='output/cleaning', save_plot=False):
+                    ours2=False, out_dir='output/cleaning', save_plot=False, save_results=False):
     """
     Main method that trains a tree ensemble, flips a percentage of train labels, prioritizes train
     instances using various methods, and computes how effective each method is at cleaning the data.
@@ -214,24 +214,24 @@ def noise_detection(model_type='lgb', encoding='tree_path', dataset='iris', n_es
     # our method
     explainer = sexee.TreeExplainer(model_noisy, X_train, y_train_noisy, encoding=encoding,
                                     random_state=random_state, timeit=timeit, use_predicted_labels=not true_label)
-    ckpt_ndx, fix_ndx, interval, n_check = sexee_method(explainer, noisy_ndx, y_train)
-    sexee_results = interval_performance(ckpt_ndx, fix_ndx, noisy_ndx, clf, data, acc_test_noisy)
+    ckpt_ndx, fix_ndx, interval, n_check = _sexee_method(explainer, noisy_ndx, y_train)
+    sexee_results = _interval_performance(ckpt_ndx, fix_ndx, noisy_ndx, clf, data, acc_test_noisy)
 
     # our method 2
     if ours2:
         explainer = sexee.TreeExplainer(model_noisy, X_train, y_train_noisy, encoding=encoding,
                                         random_state=random_state, timeit=timeit, use_predicted_labels=not true_label)
-        ckpt_ndx, fix_ndx, interval, n_check = sexee_method2(explainer, noisy_ndx, X_train, y_train)
-        ours2_results = interval_performance(ckpt_ndx, fix_ndx, noisy_ndx, clf, data, acc_test_noisy)
+        ckpt_ndx, fix_ndx, interval, n_check = _sexee_method2(explainer, noisy_ndx, X_train, y_train)
+        ours2_results = _interval_performance(ckpt_ndx, fix_ndx, noisy_ndx, clf, data, acc_test_noisy)
 
     # random method
-    ckpt_ndx, fix_ndx = random_method(noisy_ndx, y_train, interval, to_check=n_check, random_state=random_state)
-    random_results = interval_performance(ckpt_ndx, fix_ndx, noisy_ndx, clf, data, acc_test_noisy)
+    ckpt_ndx, fix_ndx = _random_method(noisy_ndx, y_train, interval, to_check=n_check, random_state=random_state)
+    random_results = _interval_performance(ckpt_ndx, fix_ndx, noisy_ndx, clf, data, acc_test_noisy)
 
     # tree loss method
     y_train_proba = model_noisy.predict_proba(X_train)
-    ckpt_ndx, fix_ndx = loss_method(noisy_ndx, y_train_proba, y_train_noisy, interval, to_check=n_check)
-    tree_loss_results = interval_performance(ckpt_ndx, fix_ndx, noisy_ndx, clf, data, acc_test_noisy)
+    ckpt_ndx, fix_ndx = _loss_method(noisy_ndx, y_train_proba, y_train_noisy, interval, to_check=n_check)
+    tree_loss_results = _interval_performance(ckpt_ndx, fix_ndx, noisy_ndx, clf, data, acc_test_noisy)
 
     # svm loss method - squish svm decision values to between 0 and 1
     if svm_loss:
@@ -239,8 +239,8 @@ def noise_detection(model_type='lgb', encoding='tree_path', dataset='iris', n_es
         if y_train_proba.ndim == 1:
             y_train_proba = exp_util.make_multiclass(y_train_proba)
         y_train_proba = minmax_scale(y_train_proba)
-        ckpt_ndx, fix_ndx = loss_method(noisy_ndx, y_train_proba, y_train, interval, to_check=n_check)
-        svm_loss_results = interval_performance(ckpt_ndx, fix_ndx, noisy_ndx, clf, data, acc_test_noisy)
+        ckpt_ndx, fix_ndx = _loss_method(noisy_ndx, y_train_proba, y_train, interval, to_check=n_check)
+        svm_loss_results = _interval_performance(ckpt_ndx, fix_ndx, noisy_ndx, clf, data, acc_test_noisy)
 
     # influence method
     if model_type == 'cb' and inf_k is not None:
@@ -256,9 +256,9 @@ def noise_detection(model_type='lgb', encoding='tree_path', dataset='iris', n_es
 
         leaf_influence = CBLeafInfluenceEnsemble(model_path, X_train, y_train_noisy,
                                                  learning_rate=model.learning_rate_, update_set=update_set, k=inf_k)
-        ckpt_ndx, fix_ndx = influence_method(leaf_influence, noisy_ndx, X_train, y_train, y_train_noisy, interval,
-                                             to_check=n_check)
-        influence_results = interval_performance(ckpt_ndx, fix_ndx, noisy_ndx, clf, data, acc_test_noisy)
+        ckpt_ndx, fix_ndx = _influence_method(leaf_influence, noisy_ndx, X_train, y_train, y_train_noisy, interval,
+                                              to_check=n_check)
+        influence_results = _interval_performance(ckpt_ndx, fix_ndx, noisy_ndx, clf, data, acc_test_noisy)
 
     # plot results
     sexee_check_pct, sexee_acc, sexee_fix_pct = sexee_results
@@ -296,28 +296,72 @@ def noise_detection(model_type='lgb', encoding='tree_path', dataset='iris', n_es
     axs[1].legend()
 
     if save_plot:
-        plot_name = os.path.join(out_dir, dataset + '.pdf')
+        plot_name = os.path.join(out_dir, dataset, 'cleaning.pdf')
         print('saving to {}...'.format(plot_name))
-        os.makedirs(out_dir, exist_ok=True)
+        os.makedirs(os.path.join(out_dir, dataset), exist_ok=True)
         plt.savefig(plot_name, format='pdf', bbox_inches='tight')
 
     plt.show()
+
+    if save_results:
+        efficiency_dir = os.path.join(out_dir, dataset, 'efficiency')
+        effectiveness_dir = os.path.join(out_dir, dataset, 'effectiveness')
+        os.makedirs(efficiency_dir, exist_ok=True)
+        os.makedirs(effectiveness_dir, exist_ok=True)
+
+        # ours
+        np.save(os.path.join(efficiency_dir, 'sexee_check_pct.npy'), sexee_check_pct)
+        np.save(os.path.join(efficiency_dir, 'sexee_fix_pct.npy'), sexee_fix_pct)
+        np.save(os.path.join(effectiveness_dir, 'sexee_check_pct.npy'), sexee_check_pct)
+        np.save(os.path.join(effectiveness_dir, 'sexee_acc.npy'), sexee_acc)
+
+        # random
+        np.save(os.path.join(efficiency_dir, 'rand_check_pct.npy'), rand_check_pct)
+        np.save(os.path.join(efficiency_dir, 'rand_fix_pct.npy'), rand_fix_pct)
+        np.save(os.path.join(effectiveness_dir, 'rand_check_pct.npy'), rand_check_pct)
+        np.save(os.path.join(effectiveness_dir, 'rand_acc.npy'), rand_acc)
+
+        # tree loss
+        np.save(os.path.join(efficiency_dir, 'tree_loss_check_pct.npy'), tree_loss_check_pct)
+        np.save(os.path.join(efficiency_dir, 'tree_loss_fix_pct.npy'), tree_loss_fix_pct)
+        np.save(os.path.join(effectiveness_dir, 'tree_loss_check_pct.npy'), tree_loss_check_pct)
+        np.save(os.path.join(effectiveness_dir, 'tree_loss_acc.npy'), tree_loss_acc)
+
+        if ours2:
+            np.save(os.path.join(efficiency_dir, 'ours2_check_pct.npy'), ours2_check_pct)
+            np.save(os.path.join(efficiency_dir, 'ours2_fix_pct.npy'), ours2_fix_pct)
+            np.save(os.path.join(effectiveness_dir, 'ours2_check_pct.npy'), ours2_check_pct)
+            np.save(os.path.join(effectiveness_dir, 'ours2_acc.npy'), ours2_acc)
+
+        if svm_loss:
+            np.save(os.path.join(efficiency_dir, 'svm_loss_check_pct.npy'), svm_loss_check_pct)
+            np.save(os.path.join(efficiency_dir, 'svm_loss_fix_pct.npy'), svm_loss_fix_pct)
+            np.save(os.path.join(effectiveness_dir, 'svm_loss_check_pct.npy'), svm_loss_check_pct)
+            np.save(os.path.join(effectiveness_dir, 'svm_loss_acc.npy'), svm_loss_acc)
+
+        if model_type == 'cb' and inf_k is not None:
+            np.save(os.path.join(efficiency_dir, 'influence_check_pct.npy'), influence_check_pct)
+            np.save(os.path.join(efficiency_dir, 'influence_fix_pct.npy'), influence_fix_pct)
+            np.save(os.path.join(effectiveness_dir, 'influence_check_pct.npy'), influence_check_pct)
+            np.save(os.path.join(effectiveness_dir, 'influence_acc.npy'), influence_acc)
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Feature representation extractions for tree ensembles',
                                      formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument('--dataset', type=str, default='adult', help='dataset to explain.')
-    parser.add_argument('--model', type=str, default='lgb', help='model to use.')
-    parser.add_argument('--encoding', type=str, default='tree_path', help='type of encoding.')
+    parser.add_argument('--model', type=str, default='cb', help='model to use.')
+    parser.add_argument('--encoding', type=str, default='leaf_output', help='type of encoding.')
     parser.add_argument('--n_estimators', metavar='N', type=int, default=100, help='number of trees in random forest.')
     parser.add_argument('--rs', metavar='RANDOM_STATE', type=int, default=69, help='for reproducibility.')
     parser.add_argument('--timeit', action='store_true', default=False, help='Show timing info for explainer.')
     parser.add_argument('--svm_loss', action='store_true', default=False, help='Include svm loss in results.')
     parser.add_argument('--save_plot', action='store_true', default=False, help='Save plot results.')
+    parser.add_argument('--save_results', action='store_true', default=False, help='Save cleaning results.')
     parser.add_argument('--flip_frac', type=float, default=0.4, help='Fraction of train labels to flip.')
     parser.add_argument('--inf_k', type=int, default=None, help='Number of leaves to use for leafinfluence.')
     args = parser.parse_args()
     print(args)
     noise_detection(args.model, args.encoding, args.dataset, args.n_estimators, args.rs, args.timeit, args.svm_loss,
-                    save_plot=args.save_plot, flip_frac=args.flip_frac, inf_k=args.inf_k)
+                    save_plot=args.save_plot, flip_frac=args.flip_frac, inf_k=args.inf_k,
+                    save_results=args.save_results)

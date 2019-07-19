@@ -58,7 +58,7 @@ def _influence(explainer, train_indices, test_indices, X_test, y_test):
     for i, test_ndx in enumerate(tqdm.tqdm(test_indices)):
         for j, train_ndx in enumerate(train_indices):
             explainer.fit(removed_point_idx=train_ndx, destination_model=buf)
-            influence_scores[i][j] = buf.loss_derivative(X_test[[test_ndx]], y_test[[test_ndx]])[0]
+            influence_scores[i][j] = buf.loss_derivative(X_test[test_ndx], y_test[test_ndx])[0]
 
     # shape=(n_test, n_train)
     return influence_scores
@@ -83,6 +83,10 @@ def mismatch(model='lgb', encoding='leaf_output', dataset='hospital2', n_estimat
     tree_mod = clone(clf).fit(X_train_mod, y_train_mod)
     if verbose > 0:
         model_util.performance(tree_mod, X_train, y_train, X_test, y_test)
+
+    # # TODO: remove
+    # X_train_mod = X_train
+    # y_train_mod = y_train
 
     test_n_readmitted = len(np.where(y_test == 1)[0])
     test_age_ndx = np.where(X_test[:, age_ndx] == 1)[0]
@@ -156,23 +160,19 @@ def mismatch(model='lgb', encoding='leaf_output', dataset='hospital2', n_estimat
 
         start = time.time()
         age_readmit_scores = _influence(leaf_influence, train_sv_1_ndx, test_target_ndx, X_test, y_test)
-        age_readmit_mean = np.sum(age_readmit_scores, axis=0).mean()
-        print('age, readmit: {}, time: {:.3f}'.format(age_readmit_mean, time.time() - start))
+        print('age, readmit: {}, time: {:.3f}'.format(age_readmit_scores.mean(), time.time() - start))
 
         start = time.time()
         age_noreadmit_scores = _influence(leaf_influence, train_sv_2_ndx, test_target_ndx, X_test, y_test)
-        age_noreadmit_mean = np.sum(age_noreadmit_scores, axis=0).mean()
-        print('age, no readmit: {}, time: {:.3f}'.format(age_noreadmit_mean, time.time() - start))
+        print('age, no readmit: {}, time: {:.3f}'.format(age_noreadmit_scores.mean(), time.time() - start))
 
         start = time.time()
         noage_readmit_scores = _influence(leaf_influence, train_sv_3_ndx, test_target_ndx, X_test, y_test)
-        noage_readmit_mean = np.sum(noage_readmit_scores, axis=0).mean()
-        print('no age, readmit: {}, time: {:.3f}'.format(noage_readmit_mean, time.time() - start))
+        print('no age, readmit: {}, time: {:.3f}'.format(noage_readmit_scores.mean(), time.time() - start))
 
         start = time.time()
         noage_noreadmit_scores = _influence(leaf_influence, train_sv_4_ndx, test_target_ndx, X_test, y_test)
-        noage_noreadmit_mean = np.sum(noage_noreadmit_scores, axis=0).mean()
-        print('no age, no readmit: {}, time: {:.3f}'.format(noage_noreadmit_mean, time.time() - start))
+        print('no age, no readmit: {}, time: {:.3f}'.format(noage_noreadmit_scores.mean(), time.time() - start))
 
 
 if __name__ == '__main__':
