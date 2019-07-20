@@ -152,6 +152,7 @@ class TreeExplainer:
 
         # if multiclass, get svm of whose class is predicted
         if self.n_classes_ > 2:
+            # TODO: implement true label for multiclass
             decision, pred_label = self.decision_function(X, pred_label=True)
             pred_label = int(pred_label[0])
             svm = self.ovr_.estimators_[pred_label]
