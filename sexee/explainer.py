@@ -117,7 +117,7 @@ class TreeExplainer:
         s += '\n'
         return s
 
-    def train_impact(self, X, similarity=False, weight=False, intercept=False):
+    def train_impact(self, X, similarity=False, weight=False, intercept=False, y=None):
         """
         Compute the impact of each support vector on one or multiple test instances.
         Currently multiple test instances only supports binary classification problems.
@@ -126,18 +126,21 @@ class TreeExplainer:
         ----------
         X: 1d or 2d array-like
             Instance to explain in terms of the train instance impact.
-        similarity: bool
+        y: 1d array-like (default=None)
+            Ground-truth labels of instances being explained; impact scores now represent
+            the contribution towrds the ground-truth label, instead of the predicted label.
+        similarity: bool (default=False)
             If True, returns the similarity of each support vector to `x`.
-        weight: bool
+        weight: bool (default=False)
             If True, returns the weight of each support vector.
-        intercept: bool
+        intercept: bool (default=False)
             If True, returns the intercept of the svm.
 
         Returns
         -------
         impact_list: tuple of (<train_ndx>, <impact>, <sim>, <weight>, <intercept>).
             A positive impact score means the support vector contributed towards the predicted label, while a
-            negative score means it contributed against the predicted label.
+            negative score means it contributed against the predicted (or true) label.
             <sim> is addded if `similarity` is True.
             <weight> is added if `weight` is True.
             <intercept> is added if `intercept` is True.
@@ -156,6 +159,10 @@ class TreeExplainer:
             assert self.svm_ is not None, 'svm_ is not fitted!'
             svm = self.svm_
             pred_label = svm.predict(X_feature)
+
+            if y is not None:
+                assert len(y) == len(X)
+                pred_label = self.le_.transform(y)
 
         # decompose instance predictions into weighted sums of the train instances
         impact = self._decomposition(X_feature, svm=svm)

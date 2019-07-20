@@ -132,8 +132,10 @@ def _load_hospital(data_dir='data', feature=False):
     label = ['not readmitted', 'readmitted']
     X_train = train[:, :-1]
     y_train = train[:, -1].astype(np.int32)
+    y_train[np.where(y_train == -1)] = 0
     X_test = test[:, :-1]
     y_test = test[:, -1].astype(np.int32)
+    y_test[np.where(y_test == -1)] = 0
 
     if feature:
         feature = np.load(os.path.join(data_dir, 'hospital/feature.npy'), allow_pickle=True)
@@ -148,8 +150,10 @@ def _load_hospital2(data_dir='data', feature=False):
     label = ['not readmitted', 'readmitted']
     X_train = train[:, :-1]
     y_train = train[:, -1].astype(np.int32)
+    y_train[np.where(y_train == -1)] = 0
     X_test = test[:, :-1]
     y_test = test[:, -1].astype(np.int32)
+    y_test[np.where(y_test == -1)] = 0
 
     if feature:
         feature = np.load(os.path.join(data_dir, 'hospital2/feature.npy'), allow_pickle=True)
