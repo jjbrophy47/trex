@@ -57,10 +57,31 @@ def _influence(explainer, train_indices, test_indices, X_test, y_test):
     influence_scores = np.zeros((len(test_indices), len(train_indices)))
     buf = deepcopy(explainer)
 
-    for i, test_ndx in enumerate(tqdm.tqdm(test_indices)):
-        for j, train_ndx in enumerate(train_indices):
+    for i, test_ndx in enumerate(tqdm.tqdm(test_indices[:5])):
+        for j, train_ndx in enumerate(train_indices[:5]):
             explainer.fit(removed_point_idx=train_ndx, destination_model=buf)
-            influence_scores[i][j] = buf.loss_derivative(X_test[test_ndx], y_test[test_ndx])[0]
+            influence_scores[i][j] = buf.loss_derivative(X_test[[test_ndx]], y_test[[test_ndx]])[0]
+
+    # shape=(n_test, n_train)
+    return influence_scores
+
+
+def _retrain(clf, tree, train_indices, test_indices, X_train, y_train, X_test, y_test):
+
+    influence_scores = np.zeros((len(test_indices), len(train_indices)))
+
+    for i, test_ndx in enumerate(tqdm.tqdm(test_indices[:5])):
+        x_test = X_test[test_ndx]
+        ref_loss = np.abs(y_test[test_ndx] - tree.predict_proba(x_test)[1])
+
+        for j, train_ndx in enumerate(train_indices[:2]):
+            new_X_train = np.delete(X_train, train_ndx, axis=0)
+            new_y_train = np.delete(y_train, train_ndx)
+            new_tree = clone(clf).fit(new_X_train, new_y_train)
+            query_loss = np.abs(y_test[test_ndx] - new_tree.predict_proba(x_test)[1])
+            influence_scores[i][j] = query_loss - ref_loss
+
+        print(influence_scores[i].mean())
 
     # shape=(n_test, n_train)
     return influence_scores
@@ -68,8 +89,9 @@ def _influence(explainer, train_indices, test_indices, X_test, y_test):
 
 def mismatch(model='lgb', encoding='leaf_output', dataset='hospital2', n_estimators=100,
              random_state=69, plot=False, data_dir='data', age_ndx=21, sv_only=False,
-             verbose=0, inf_k=None, n_subset=50, modify=True, aggregation='mean',
-             train_true_label=False, impact_true_label=True):
+             verbose=0, inf_k=None, n_subset=None, modify=True, aggregation='mean',
+             train_true_label=False, impact_true_label=True, retrain=False, save_results=False,
+             out_dir='output/mismatch/'):
 
     # get model and data
     clf = model_util.get_classifier(model, n_estimators=n_estimators, random_state=random_state)
@@ -170,6 +192,51 @@ def mismatch(model='lgb', encoding='leaf_output', dataset='hospital2', n_estimat
     print('no age, readmit: {}'.format(impact_3))
     print('no age, no readmit: {}'.format(impact_4))
 
+    if retrain:
+        if sv_only:
+            train_1_ndx = train_sv_1_ndx
+            train_2_ndx = train_sv_2_ndx
+            train_3_ndx = train_sv_3_ndx
+            train_4_ndx = train_sv_4_ndx
+
+        else:
+            train_1_ndx = train_age_readmit_ndx
+            train_2_ndx = train_age_noreadmit_ndx
+            train_3_ndx = train_noage_readmit_ndx
+            train_4_ndx = train_noage_noreadmit_ndx
+
+        if save_results:
+            retrain_dir = os.path.join(out_dir, 'retrain')
+            os.makedirs(retrain_dir, exist_ok=True)
+
+        start = time.time()
+        age_readmit_scores = _retrain(clf, tree, train_1_ndx, test_target_ndx, X_train, y_train, X_test, y_test)
+        print('age, readmit: {}, time: {:.3f}'.format(age_readmit_scores.mean(), time.time() - start))
+
+        if save_results:
+            np.save(os.path.join(retrain_dir, 'age_readmit.npy'), age_readmit_scores)
+
+        start = time.time()
+        age_noreadmit_scores = _retrain(clf, tree, train_2_ndx, test_target_ndx, X_train, y_train, X_test, y_test)
+        print('age, no readmit: {}, time: {:.3f}'.format(age_noreadmit_scores.mean(), time.time() - start))
+
+        if save_results:
+            np.save(os.path.join(retrain_dir, 'age_noreadmit.npy'), age_noreadmit_scores)
+
+        start = time.time()
+        noage_readmit_scores = _retrain(clf, tree, train_3_ndx, test_target_ndx, X_train, y_train, X_test, y_test)
+        print('no age, readmit: {}, time: {:.3f}'.format(noage_readmit_scores.mean(), time.time() - start))
+
+        if save_results:
+            np.save(os.path.join(retrain_dir, 'noage_readmit.npy'), noage_readmit_scores)
+
+        start = time.time()
+        noage_noreadmit_scores = _retrain(clf, tree, train_4_ndx, test_target_ndx, X_train, y_train, X_test, y_test)
+        print('no age, no readmit: {}, time: {:.3f}'.format(noage_noreadmit_scores.mean(), time.time() - start))
+
+        if save_results:
+            np.save(os.path.join(retrain_dir, 'noage_noreadmit.npy'), noage_noreadmit_scores)
+
     # influence method
     if model == 'cb' and inf_k is not None:
         model_path = '.model.json'
@@ -194,6 +261,10 @@ def mismatch(model='lgb', encoding='leaf_output', dataset='hospital2', n_estimat
             train_3_ndx = train_noage_readmit_ndx
             train_4_ndx = train_noage_noreadmit_ndx
 
+        if save_results:
+            inf_dir = os.path.join(out_dir, 'influence')
+            os.makedirs(inf_dir, exist_ok=True)
+
         print('\nleaf_influence:')
         leaf_influence = CBLeafInfluenceEnsemble(model_path, X_train, y_train, k=inf_k, update_set=update_set,
                                                  learning_rate=tree.learning_rate_)
@@ -202,17 +273,29 @@ def mismatch(model='lgb', encoding='leaf_output', dataset='hospital2', n_estimat
         age_readmit_scores = _influence(leaf_influence, train_1_ndx, test_target_ndx, X_test, y_test)
         print('age, readmit: {}, time: {:.3f}'.format(age_readmit_scores.mean(), time.time() - start))
 
+        if save_results:
+            np.save(os.path.join(inf_dir, 'age_readmit.npy'), age_readmit_scores)
+
         start = time.time()
         age_noreadmit_scores = _influence(leaf_influence, train_2_ndx, test_target_ndx, X_test, y_test)
         print('age, no readmit: {}, time: {:.3f}'.format(age_noreadmit_scores.mean(), time.time() - start))
+
+        if save_results:
+            np.save(os.path.join(inf_dir, 'age_noreadmit.npy'), age_noreadmit_scores)
 
         start = time.time()
         noage_readmit_scores = _influence(leaf_influence, train_3_ndx, test_target_ndx, X_test, y_test)
         print('no age, readmit: {}, time: {:.3f}'.format(noage_readmit_scores.mean(), time.time() - start))
 
+        if save_results:
+            np.save(os.path.join(inf_dir, 'noage_readmit.npy'), noage_readmit_scores)
+
         start = time.time()
         noage_noreadmit_scores = _influence(leaf_influence, train_4_ndx, test_target_ndx, X_test, y_test)
         print('no age, no readmit: {}, time: {:.3f}'.format(noage_noreadmit_scores.mean(), time.time() - start))
+
+        if save_results:
+            np.save(os.path.join(inf_dir, 'noage_noreadmit.npy'), noage_noreadmit_scores)
 
 
 if __name__ == '__main__':
@@ -230,9 +313,12 @@ if __name__ == '__main__':
     parser.add_argument('--impact_true_label', action='store_true', help='Compute impact on true labels.')
     parser.add_argument('--modify', action='store_true', help='Modify the train data to skew the distribution.')
     parser.add_argument('--sv_only', action='store_true', help='Only use the support vectors when computing impact.')
+    parser.add_argument('--retrain', action='store_true', help='Do leave-one-out retraining.')
     parser.add_argument('--aggregation', default='mean', help='Method to aggregate train impacts.')
+    parser.add_argument('--save_results', action='store_true', help='Save the data from each method.')
     args = parser.parse_args()
     print(args)
     mismatch(args.model, args.encoding, args.dataset, args.n_estimators, args.rs, inf_k=args.inf_k,
              verbose=args.verbose, n_subset=args.n_subset, aggregation=args.aggregation, modify=args.modify,
-             sv_only=args.sv_only, train_true_label=args.train_true_label, impact_true_label=args.impact_true_label)
+             sv_only=args.sv_only, train_true_label=args.train_true_label, impact_true_label=args.impact_true_label,
+             retrain=args.retrain, save_results=args.save_results)

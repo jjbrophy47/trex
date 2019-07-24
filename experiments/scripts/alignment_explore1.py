@@ -2,6 +2,7 @@
 Exploration: Look through a subet of test instances for medifor, find similar train instances through use of
 the tree ensemble feature representations and a similarity kernel.
 """
+import os
 import argparse
 
 import tqdm
@@ -112,8 +113,9 @@ def feature_similarity(model='lgb', encoding='tree_path', dataset='medifor', n_e
     plt.show()
 
 
-def feature_clustering(model='lgb', encoding='tree_path', dataset='medifor', n_estimators=100,
-                       random_state=69, verbose=0, data_dir='data', pca_components=50):
+def feature_clustering(model='lgb', encoding='leaf_output', dataset='nc17_mfc18', n_estimators=100,
+                       random_state=69, verbose=0, data_dir='data', pca_components=50,
+                       save_results=False, out_dir='output/feature_clustering/'):
 
     # get model and data
     clf = model_util.get_classifier(model, n_estimators=n_estimators, random_state=random_state)
@@ -133,21 +135,21 @@ def feature_clustering(model='lgb', encoding='tree_path', dataset='medifor', n_e
     print('concatenating X_train and X_test...')
     X_feature = np.concatenate([X_train, X_test])
 
-    if encoding in ['tree_output', 'tree_path']:
+    if encoding in ['leaf_output', 'leaf_path', 'feature_path']:
         print('exracting tree features...')
         explainer = sexee.TreeExplainer(tree, X_train, y_train, encoding=encoding, random_state=random_state)
         X_feature = explainer.transform(X_feature)
 
     if X_feature.shape[1] > pca_components:
-        if encoding == 'tree_path':
+        if encoding == 'leaf_path':
             print('reducing dimensions from {} to {} with TruncatedSVD...'.format(X_feature.shape[1], pca_components))
-            X_feature = TruncatedSVD(n_components=pca_components).fit_transform(X_feature)
+            X_feature = TruncatedSVD(n_components=pca_components, random_state=random_state).fit_transform(X_feature)
         else:
             print('reducing dimensions from {} to {} with PCA...'.format(X_feature.shape[1], pca_components))
-            X_feature = PCA(n_components=pca_components).fit_transform(X_feature)
+            X_feature = PCA(n_components=pca_components, random_state=random_state).fit_transform(X_feature)
 
     print('embedding with tsne...')
-    X_embed = TSNE(verbose=verbose).fit_transform(X_feature)
+    X_embed = TSNE(verbose=verbose, random_state=random_state).fit_transform(X_feature)
 
     # plot results
     n_train = len(y_train)
@@ -164,6 +166,24 @@ def feature_clustering(model='lgb', encoding='tree_path', dataset='medifor', n_e
     ax.set_xlabel('tsne 0')
     ax.set_ylabel('tsne 1')
     ax.legend()
+
+    if save_results:
+        train_negative = np.hstack([X_embed[:, 0][:n_train][train0], X_embed[:, 1][:n_train][train0]])
+        train_positive = np.hstack([X_embed[:, 0][:n_train][train1], X_embed[:, 1][:n_train][train1]])
+        test_negative = np.hstack([X_embed[:, 0][n_train:][test0], X_embed[:, 1][n_train:][test0]])
+        test_positive = np.hstack([X_embed[:, 0][n_train:][test1], X_embed[:, 1][n_train:][test1]])
+
+        plot_dir = os.path.join(out_dir, dataset + '_' + encoding)
+        os.makedirs(plot_dir, exist_ok=True)
+
+        print('saving data to {}...'.format(plot_dir))
+        np.save(os.path.join(plot_dir, 'train_negative'), train_negative)
+        np.save(os.path.join(plot_dir, 'train_positive'), train_positive)
+        np.save(os.path.join(plot_dir, 'test_negative'), test_negative)
+        np.save(os.path.join(plot_dir, 'test_positive'), test_positive)
+
+        plt.savefig(os.path.join(plot_dir, 'tsne_plot.pdf'), format='pdf', bbox_inches='tight')
+
     plt.show()
 
 if __name__ == '__main__':
@@ -171,15 +191,17 @@ if __name__ == '__main__':
                                      formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument('--dataset', type=str, default='medifor', help='dataset to explain.')
     parser.add_argument('--model', type=str, default='lgb', help='model to use.')
-    parser.add_argument('--encoding', type=str, default='tree_path', help='type of encoding.')
+    parser.add_argument('--encoding', type=str, default='leaf_output', help='type of encoding.')
     parser.add_argument('--n_estimators', metavar='N', type=int, default=100, help='number of trees in random forest.')
     parser.add_argument('--rs', metavar='RANDOM_STATE', type=int, default=69, help='for reproducibility.')
     parser.add_argument('--test_subset', metavar='N', default=1000, type=int, help='test points to sample.')
     parser.add_argument('--train_subset', metavar='N', default=None, type=int, help='train points to compare.')
     parser.add_argument('--agg_type', metavar='TYPE', default='mean', type=str, help='aggregate function to use.')
     parser.add_argument('--verbose', metavar='LEVEL', default=0, type=int, help='verbosity of tsne output.')
+    parser.add_argument('--save_results', action='store_true', help='Save plot and plot data.')
     args = parser.parse_args()
     print(args)
     # feature_similarity(args.model, args.encoding, args.dataset, args.n_estimators, args.rs, args.test_subset,
     #                    args.train_subset, args.agg_type)
-    feature_clustering(args.model, args.encoding, args.dataset, args.n_estimators, args.rs, args.verbose)
+    feature_clustering(args.model, args.encoding, args.dataset, args.n_estimators, args.rs, args.verbose,
+                       save_results=args.save_results)
