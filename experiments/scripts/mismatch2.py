@@ -57,8 +57,8 @@ def _influence(explainer, train_indices, test_indices, X_test, y_test):
     influence_scores = np.zeros((len(test_indices), len(train_indices)))
     buf = deepcopy(explainer)
 
-    for i, test_ndx in enumerate(tqdm.tqdm(test_indices[:5])):
-        for j, train_ndx in enumerate(train_indices[:5]):
+    for i, test_ndx in enumerate(tqdm.tqdm(test_indices)):
+        for j, train_ndx in enumerate(train_indices):
             explainer.fit(removed_point_idx=train_ndx, destination_model=buf)
             influence_scores[i][j] = buf.loss_derivative(X_test[[test_ndx]], y_test[[test_ndx]])[0]
 
@@ -70,11 +70,11 @@ def _retrain(clf, tree, train_indices, test_indices, X_train, y_train, X_test, y
 
     influence_scores = np.zeros((len(test_indices), len(train_indices)))
 
-    for i, test_ndx in enumerate(tqdm.tqdm(test_indices[:5])):
+    for i, test_ndx in enumerate(tqdm.tqdm(test_indices)):
         x_test = X_test[test_ndx]
         ref_loss = np.abs(y_test[test_ndx] - tree.predict_proba(x_test)[1])
 
-        for j, train_ndx in enumerate(train_indices[:2]):
+        for j, train_ndx in enumerate(train_indices):
             new_X_train = np.delete(X_train, train_ndx, axis=0)
             new_y_train = np.delete(y_train, train_ndx)
             new_tree = clone(clf).fit(new_X_train, new_y_train)
