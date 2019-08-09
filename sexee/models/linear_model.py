@@ -1,6 +1,5 @@
 """
-Simple implementations of binary logistic regression and kernel logistic regression
-with l2 regularization and stochastic gradient descent, and an intercept.
+SVM and kernel kernel logistic regression models.
 """
 import os
 import shutil
@@ -67,11 +66,32 @@ class SVM(BaseEstimator, ClassifierMixin):
 
     def get_weight(self):
         """
-        Return a sparse array of train instance weights.
+        Return a sparse matrix of train instance weights.
             If binary, the array has shape (1, n_train_samples).
             If multiclass, the array has shape (n_classes, n_train_samples).
         """
         return sps.vstack([estimator.get_weight() for estimator in self.ovr_.estimators_])
+
+    def explain(self, X, y=None):
+        """
+        Return a sparse matrix of train instance contributions to X. A positive score
+        means the training instance contributed towards the predicted label.
+
+        Parameters
+        ----------
+        X : 2d array-like
+            Instances to explain.
+        y : 1d array-like
+            If not None, a positive score means the training instance contributed
+            to the label in y. Must be the same length as X.
+
+        Returns a sparse matrix of shape (len(X), n_train_samples).
+        """
+        if y is not None:
+            y = self.predict(X)
+        assert len(y) == len(X)
+
+        return sps.vstack([self.ovr.estimators_[y[i]].explain(x.reshape(1, -1)) for i, x in enumerate(X)])
 
     def _create_kernel_callable(self):
         assert self.kernel in ['rbf', 'poly', 'sigmoid', 'linear']

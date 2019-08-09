@@ -112,7 +112,7 @@ class TreeExplainer:
 
     def decision_function(self, X):
         """
-        Computes the decision value for X using the SVM.
+        Computes the decision values for X using the SVM.
 
         Parameters
         ----------
@@ -137,11 +137,13 @@ class TreeExplainer:
         Returns a 2d array of probabilities of shape (len(X), n_classes).
         """
         assert X.ndim == 2, 'X is not 2d!'
-        assert self.linear_model == 'lr', 'decision_function only supports lr!'
+        assert self.linear_model == 'lr', 'predict_proba only supports lr!'
         return self.linear_model_.predict_proba(self.transform(X))
 
     def predict(self, X):
         """
+        Computes the predicted labels for X using the linear model.
+
         Parameters
         ----------
         X : 2d array-like
@@ -181,7 +183,7 @@ class TreeExplainer:
         weight = self.linear_model_.get_weight()
 
         if self.dense_output and self.linear_model == 'svm':
-            weight = np.array(weight.todense())
+            weight = weight.toarray()
 
         if self.n_classes_ == 2:
             assert weight.shape == (1, self.n_samples_)
@@ -189,6 +191,32 @@ class TreeExplainer:
             assert weight.shape == (self.n_classes_, self.n_samples_)
 
         return weight
+
+    def explain(self, X, y=None):
+        """
+        Computes the contribution of the training instances on X. A positive number means
+        the training instance contributed to the predicted label, and a negative number
+        means it contributed away from the predicted label.
+
+        Parameters
+        ----------
+        X: 2d array-like
+            Instances to explain in terms of the train instance impact.
+        y: 1d array-like (default=None)
+            Ground-truth labels of instances being explained; impact scores now represent
+            the contribution towards the ground-truth label, instead of the predicted label.
+            Must have the same length as X.
+
+        Returns a 2d array of contributions of shape (len(X), n_train_samples). A sparse
+            matrix is returned if linear_model=svm and dense_output=False.
+        """
+        contributions = self.linear_model_.explain(self.transform(X), y=y)
+        assert contributions.shape == (len(X), self.n_samples_)
+
+        if self.dense_output and self.linear_model == 'svm':
+            contributions = contributions.toarray()
+
+        return contributions
 
     def train_impact(self, X, similarity=False, weight=False, intercept=False, y=None):
         """
