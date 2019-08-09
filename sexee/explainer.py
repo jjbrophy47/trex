@@ -62,17 +62,20 @@ class TreeExplainer:
         self.tree = tree
         self.X_train = X_train
         self.y_train = y_train
+        self.linear_model = linear_model
         self.encoding = encoding
         self.C = C
+        self.kernel = kernel
         self.gamma = gamma
         self.coef0 = coef0
         self.degree = degree
+        self.dense_output = dense_output
         self.use_predicted_labels = use_predicted_labels
         self.random_state = random_state
         self._validate()
 
         # extract feature representations from the tree ensemble
-        self.extractor_ = TreeExtractor(self.model, encoding=self.encoding)
+        self.extractor_ = TreeExtractor(self.tree, encoding=self.encoding)
         self.train_feature_ = self.extractor_.fit_transform(self.X_train)
 
         # create a linear model to approximate the tree ensemble
@@ -99,13 +102,8 @@ class TreeExplainer:
         s = '\nTree Explainer:'
         s += '\ntrain shape: {}'.format(self.X_train.shape)
         s += '\nclasses: {}'.format(self.le_.classes_)
-        s += '\nlinear_model: {}'.format(self.linear_model)
+        s += '\nlinear_model: {}'.format(self.linear_model_)
         s += '\nencoding: {}'.format(self.encoding)
-        s += '\nkernel: {}'.format(self.kernel_)
-        s += '\ngamma: {}'.format(self.gamma)
-        s += '\ncoef0: {}'.format(self.coef0)
-        s += '\ndegree: {}'.format(self.degree)
-        s += '\nC: {}'.format(self.C)
         s += '\ndense_output: {}'.format(self.dense_output)
         s += '\nfit predicted labels: {}'.format(self.use_predicted_labels)
         s += '\nrandom state: {}'.format(self.random_state)
@@ -114,10 +112,14 @@ class TreeExplainer:
 
     def decision_function(self, X):
         """
+        Computes the decision value for X using the SVM.
+
         Parameters
         ----------
         X : 2d array-like
             Instances to make predictions on.
+
+        Returns a 1d array of decision vaues.
         """
         assert X.ndim == 2, 'X is not 2d!'
         assert self.linear_model == 'svm', 'decision_function only supports svm!'
@@ -125,10 +127,14 @@ class TreeExplainer:
 
     def predict_proba(self, X):
         """
+        Computes the probabilities for X using the logistic regression model.
+
         Parameters
         ----------
         X : 2d array-like
             Instances to make predictions on.
+
+        Returns a 2d array of probabilities of shape (len(X), n_classes).
         """
         assert X.ndim == 2, 'X is not 2d!'
         assert self.linear_model == 'lr', 'decision_function only supports lr!'
@@ -141,7 +147,7 @@ class TreeExplainer:
         X : 2d array-like
             Instances to make predictions on.
 
-        Return predicted label for each x in X using the linear model.
+        Return 1 1d array of predicted labels.
         """
         assert X.ndim == 2, 'X is not 2d!'
         return self.linear_model_.predict(self.transform(X))
@@ -162,9 +168,27 @@ class TreeExplainer:
         Returns an array of shape (len(X), n_train_samples).
         """
         assert X.ndim == 2, 'X is not 2d!'
-        X_feature = self.transform(X)
-        X_sim = self.linear_model_.compute_similarity(X_feature, train_indices=train_indices)
+        X_sim = self.linear_model_.similarity(self.transform(X), train_indices=train_indices)
         return X_sim
+
+    def get_weight(self):
+        """
+        Return an array of training instance weights. A sparse output is returned if an
+            svm is being used and dense_output=False.
+            If binary, returns an array of shape (1, n_train_samples).
+            If multiclass, returns an array of shape (n_classes, n_train_samples).
+        """
+        weight = self.linear_model_.get_weight()
+
+        if self.dense_output and self.linear_model == 'svm':
+            weight = np.array(weight.todense())
+
+        if self.n_classes_ == 2:
+            assert weight.shape == (1, self.n_samples_)
+        else:
+            assert weight.shape == (self.n_classes_, self.n_samples_)
+
+        return weight
 
     def train_impact(self, X, similarity=False, weight=False, intercept=False, y=None):
         """
@@ -323,27 +347,27 @@ class TreeExplainer:
     #     decision, pred_label = self.decision_function(X, pred_label=True)
     #     return pred_label
 
-    def get_train_weight(self, sort=True):
-        """
-        Return a list of (train_ndx, weight) tuples for all support vectors.
-        Currently only supports binary classification.
-        Parameters
-        ----------
-        sorted : bool (default=True)
-            If True, sorts support vectors by absolute weight value in descending order.
-        """
+    # def get_train_weight(self, sort=True):
+    #     """
+    #     Return a list of (train_ndx, weight) tuples for all support vectors.
+    #     Currently only supports binary classification.
+    #     Parameters
+    #     ----------
+    #     sorted : bool (default=True)
+    #         If True, sorts support vectors by absolute weight value in descending order.
+    #     """
 
-        assert self.n_classes_ == 2, 'n_classes_ is not 2!'
+    #     assert self.n_classes_ == 2, 'n_classes_ is not 2!'
 
-        if self.sparse_:
-            train_weight = list(zip(self.svm_.support_, np.array(self.svm_.dual_coef_.todense())[0]))
-        else:
-            train_weight = list(zip(self.svm_.support_, self.svm_.dual_coef_[0]))
+    #     if self.sparse_:
+    #         train_weight = list(zip(self.svm_.support_, np.array(self.svm_.dual_coef_.todense())[0]))
+    #     else:
+    #         train_weight = list(zip(self.svm_.support_, self.svm_.dual_coef_[0]))
 
-        if sort:
-            train_weight = sorted(train_weight, key=lambda tup: abs(tup[1]), reverse=True)
+    #     if sort:
+    #         train_weight = sorted(train_weight, key=lambda tup: abs(tup[1]), reverse=True)
 
-        return train_weight
+    #     return train_weight
 
     def transform(self, X):
         """
@@ -396,17 +420,18 @@ class TreeExplainer:
 
         return weighted_prod
 
-    def _validate(self, X, y):
+    def _validate(self):
         """
         Check model and data inputs.
         """
 
         # check data
-        check_X_y(X, y)
-        if y.dtype == np.float and not np.all(np.mod(y, 1) == 0):
+        check_X_y(self.X_train, self.y_train)
+        if self.y_train.dtype == np.float and not np.all(np.mod(self.y_train, 1) == 0):
             raise ValueError('Unknown label type: ')
-        self.n_feats_ = X.shape[1]
-        self.classes_ = np.unique(y)
+        self.n_samples_ = self.X_train.shape[0]
+        self.n_feats_ = self.X_train.shape[1]
+        self.classes_ = np.unique(self.y_train)
         self.n_classes_ = len(self.classes_)
         self.labels_ = dict(zip(self.classes_, np.arange(self.n_classes_)))
 
@@ -422,7 +447,7 @@ class TreeExplainer:
             self.tree_type_ = 'LGBMClassifier'
         elif 'CatBoostClassifier' in str(self.tree):
             self.tree_type_ = 'CatBoostClassifier'
-        elif 'XGBClassifier' in str(self.tree):
+        elif 'self.X_trainGBClassifier' in str(self.tree):
             self.tree_type_ = 'XGBClassifier'
         else:
             exit('{} self.tree not currently supported!'.format(str(self.tree)))

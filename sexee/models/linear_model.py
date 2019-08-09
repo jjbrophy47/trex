@@ -6,13 +6,14 @@ import os
 import shutil
 
 import numpy as np
+from scipy import sparse as sps
 from sklearn.base import BaseEstimator, ClassifierMixin
 from sklearn.multiclass import OneVsRestClassifier
 from sklearn.metrics.pairwise import linear_kernel, rbf_kernel
 from sklearn.metrics.pairwise import polynomial_kernel, sigmoid_kernel
 from sklearn.svm import SVC
 
-import liblinear_util
+from . import liblinear_util
 
 
 class SVM(BaseEstimator, ClassifierMixin):
@@ -47,6 +48,7 @@ class SVM(BaseEstimator, ClassifierMixin):
         self.random_state = random_state
 
     def fit(self, X, y):
+        self.X_train_ = X
         self.n_features_ = X.shape[1]
         self._create_kernel_callable()
         estimator = BinarySVM(kernel=self.kernel_func_, random_state=self.random_state)
@@ -58,6 +60,18 @@ class SVM(BaseEstimator, ClassifierMixin):
 
     def predict(self, X):
         return self.ovr_.predict(X)
+
+    def similarity(self, X, train_indices=None):
+        X_train = self.X_train_[train_indices] if train_indices is not None else self.X_train_
+        return self.kernel_func_(X, X_train)
+
+    def get_weight(self):
+        """
+        Return a sparse array of train instance weights.
+            If binary, the array has shape (1, n_train_samples).
+            If multiclass, the array has shape (n_classes, n_train_samples).
+        """
+        return sps.vstack([estimator.get_weight() for estimator in self.ovr_.estimators_])
 
     def _create_kernel_callable(self):
         assert self.kernel in ['rbf', 'poly', 'sigmoid', 'linear']
@@ -126,6 +140,15 @@ class BinarySVM(BaseEstimator, ClassifierMixin):
         pred_label = np.where(self.decision_function(X) >= 0, 1, 0)
         return pred_label
 
+    def get_weight(self):
+        """
+        Return a sparse array train instance weights with shape (1, n_train_samples).
+        """
+        data = self.coef_
+        indices = self.coef_indices_
+        indptr = np.array([0, len(data)])
+        return sps.csr_matrix((data, indices, indptr), shape=(1, len(self.X_train_)))
+
 
 class KernelLogisticRegression(BaseEstimator, ClassifierMixin):
     """
@@ -146,6 +169,7 @@ class KernelLogisticRegression(BaseEstimator, ClassifierMixin):
         self.C = C
 
     def fit(self, X, y):
+        self.X_train_ = X
         self.n_features_ = X.shape[1]
         estimator = BinaryKernelLogisticRegression(C=self.C)
         self.ovr_ = OneVsRestClassifier(estimator).fit(X, y)
@@ -157,6 +181,13 @@ class KernelLogisticRegression(BaseEstimator, ClassifierMixin):
 
     def predict(self, X):
         return self.ovr_.predict(X)
+
+    def similarity(self, X, train_indices=None):
+        X_train = self.X_train_[train_indices] if train_indices is not None else self.X_train_
+        return linear_kernel(X, X_train)
+
+    def get_weight(self):
+        return np.vstack([estimator.get_weight() for estimator in self.ovr_.estimators_])
 
 
 class BinaryKernelLogisticRegression(BaseEstimator, ClassifierMixin):
@@ -220,6 +251,12 @@ class BinaryKernelLogisticRegression(BaseEstimator, ClassifierMixin):
     def predict(self, X):
         pred_label = np.argmax(self.predict_proba(X), axis=1)
         return pred_label
+
+    def get_weight(self):
+        """
+        Return an array of train instance weights.
+        """
+        return self.coef_.copy()
 
     def _sigmoid(self, z):
         return 1 / (1 + np.exp(-z))
