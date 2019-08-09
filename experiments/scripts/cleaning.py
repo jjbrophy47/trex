@@ -81,7 +81,7 @@ def _sexee_method(explainer, noisy_ndx, y_train, points=10):
     interval = (n_check / len(y_train)) / points
     ckpt_ndx, fix_ndx = _record_fixes(train_order, noisy_ndx, len(y_train), interval)
 
-    return ckpt_ndx, fix_ndx, interval, n_check
+    return ckpt_ndx, fix_ndx, interval, n_check, train_weight
 
 
 def _sexee_method2(explainer, noisy_ndx, X_train, y_train, points=10):
@@ -146,7 +146,7 @@ def _loss_method(noisy_ndx, y_train_proba, y_train, interval, to_check=1, loglos
         train_order = np.argsort(y_loss)[::-1][:n_check]  # descending order, most positive first
 
     ckpt_ndx, fix_ndx = _record_fixes(train_order, noisy_ndx, len(y_train), interval)
-    return ckpt_ndx, fix_ndx
+    return ckpt_ndx, fix_ndx, y_loss, train_order
 
 
 def _influence_method(explainer, noisy_ndx, X_train, y_train, y_train_noisy, interval, to_check=1):
@@ -214,7 +214,7 @@ def noise_detection(model_type='lgb', encoding='tree_path', dataset='iris', n_es
     # our method
     explainer = sexee.TreeExplainer(model_noisy, X_train, y_train_noisy, encoding=encoding,
                                     random_state=random_state, timeit=timeit, use_predicted_labels=not true_label)
-    ckpt_ndx, fix_ndx, interval, n_check = _sexee_method(explainer, noisy_ndx, y_train)
+    ckpt_ndx, fix_ndx, interval, n_check, sexee_train_weight = _sexee_method(explainer, noisy_ndx, y_train)
     sexee_results = _interval_performance(ckpt_ndx, fix_ndx, noisy_ndx, clf, data, acc_test_noisy)
 
     # our method 2
@@ -230,7 +230,8 @@ def noise_detection(model_type='lgb', encoding='tree_path', dataset='iris', n_es
 
     # tree loss method
     y_train_proba = model_noisy.predict_proba(X_train)
-    ckpt_ndx, fix_ndx = _loss_method(noisy_ndx, y_train_proba, y_train_noisy, interval, to_check=n_check)
+    ckpt_ndx, fix_ndx, tree_loss, tree_ndx = _loss_method(noisy_ndx, y_train_proba, y_train_noisy, interval,
+                                                          to_check=n_check)
     tree_loss_results = _interval_performance(ckpt_ndx, fix_ndx, noisy_ndx, clf, data, acc_test_noisy)
 
     # svm loss method - squish svm decision values to between 0 and 1
@@ -239,7 +240,7 @@ def noise_detection(model_type='lgb', encoding='tree_path', dataset='iris', n_es
         if y_train_proba.ndim == 1:
             y_train_proba = exp_util.make_multiclass(y_train_proba)
         y_train_proba = minmax_scale(y_train_proba)
-        ckpt_ndx, fix_ndx = _loss_method(noisy_ndx, y_train_proba, y_train, interval, to_check=n_check)
+        ckpt_ndx, fix_ndx, s_loss, s_ndx = _loss_method(noisy_ndx, y_train_proba, y_train, interval, to_check=n_check)
         svm_loss_results = _interval_performance(ckpt_ndx, fix_ndx, noisy_ndx, clf, data, acc_test_noisy)
 
     # influence method
@@ -259,6 +260,41 @@ def noise_detection(model_type='lgb', encoding='tree_path', dataset='iris', n_es
         ckpt_ndx, fix_ndx = _influence_method(leaf_influence, noisy_ndx, X_train, y_train, y_train_noisy, interval,
                                               to_check=n_check)
         influence_results = _interval_performance(ckpt_ndx, fix_ndx, noisy_ndx, clf, data, acc_test_noisy)
+
+    sexee_sv_ndx, sexee_sv_vals = zip(*sexee_train_weight)
+    sexee_sv_ndx = np.array(sexee_sv_ndx)
+    sexee_sv_vals = np.array(sexee_sv_vals)
+
+    sexee_train_vals = np.zeros(len(X_train))
+    sexee_train_vals[sexee_sv_ndx] = sexee_sv_vals
+    print(sexee_train_vals, sexee_train_vals.shape)
+    print(tree_loss, tree_loss.shape)
+
+    instance_vals_dir = 'output/cleaning/{}/instance_values/'.format(dataset)
+    os.makedirs(instance_vals_dir, exist_ok=True)
+
+    fig, axs = plt.subplots(1, 3, figsize=(12, 6))
+    axs[0].scatter(sexee_train_vals, tree_loss)
+    axs[1].scatter(sexee_train_vals[sexee_sv_ndx], tree_loss[sexee_sv_ndx])
+    axs[2].scatter(sexee_train_vals[tree_ndx], tree_loss[tree_ndx])
+    axs[0].set_title('all train pts')
+    axs[1].set_title('ours checked pts')
+    axs[2].set_title('tree_loss checked pts')
+    axs[0].set_ylabel('svm loss')
+    axs[1].set_xlabel('ours (sv weights)')
+    plt.savefig(os.path.join(instance_vals_dir, 'tree_loss.pdf'), format='pdf', bbox_inches='tight')
+
+    fig, axs = plt.subplots(1, 3, figsize=(12, 6))
+    axs[0].scatter(sexee_train_vals, s_loss)
+    axs[1].scatter(sexee_train_vals[sexee_sv_ndx], s_loss[sexee_sv_ndx])
+    axs[2].scatter(sexee_train_vals[s_ndx], s_loss[s_ndx])
+    axs[0].set_title('all train pts')
+    axs[1].set_title('ours checked pts')
+    axs[2].set_title('svm_loss checked pts')
+    axs[0].set_ylabel('svm loss')
+    axs[1].set_xlabel('ours (sv weights)')
+    plt.tight_layout()
+    plt.savefig(os.path.join(instance_vals_dir, 'svm_loss.pdf'), format='pdf', bbox_inches='tight')
 
     # plot results
     sexee_check_pct, sexee_acc, sexee_fix_pct = sexee_results
@@ -308,6 +344,9 @@ def noise_detection(model_type='lgb', encoding='tree_path', dataset='iris', n_es
         effectiveness_dir = os.path.join(out_dir, dataset, 'effectiveness')
         os.makedirs(efficiency_dir, exist_ok=True)
         os.makedirs(effectiveness_dir, exist_ok=True)
+
+        # save reference line
+        np.save(os.path.join(effectiveness_dir, 'acc_test_clean.npy'), acc_test_clean)
 
         # ours
         np.save(os.path.join(efficiency_dir, 'sexee_check_pct.npy'), sexee_check_pct)
@@ -360,8 +399,9 @@ if __name__ == '__main__':
     parser.add_argument('--save_results', action='store_true', default=False, help='Save cleaning results.')
     parser.add_argument('--flip_frac', type=float, default=0.4, help='Fraction of train labels to flip.')
     parser.add_argument('--inf_k', type=int, default=None, help='Number of leaves to use for leafinfluence.')
+    parser.add_argument('--true_label', action='store_true', help='Train the SVM on the true labels.')
     args = parser.parse_args()
     print(args)
     noise_detection(args.model, args.encoding, args.dataset, args.n_estimators, args.rs, args.timeit, args.svm_loss,
                     save_plot=args.save_plot, flip_frac=args.flip_frac, inf_k=args.inf_k,
-                    save_results=args.save_results)
+                    save_results=args.save_results, true_label=args.true_label)

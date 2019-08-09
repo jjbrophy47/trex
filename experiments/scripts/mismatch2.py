@@ -13,7 +13,7 @@ import sexee
 import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.base import clone
-from sklearn.metrics import accuracy_score
+from sklearn.metrics import accuracy_score, roc_auc_score
 
 from util import model_util, data_util, exp_util
 from influence_boosting.influence.leaf_influence import CBLeafInfluenceEnsemble
@@ -122,6 +122,7 @@ def mismatch(model='lgb', encoding='leaf_output', dataset='hospital2', n_estimat
 
     # get test instances of interest
     test_age_ndx = np.where(X_test[:, age_ndx] == 1)[0]
+    test_age_readmit_ndx = np.where((X_test[:, age_ndx] == 1) & (y_test == 1))[0]
     test_target_ndx = test_age_ndx
 
     # show stats and prformance for these test instances
@@ -129,15 +130,17 @@ def mismatch(model='lgb', encoding='leaf_output', dataset='hospital2', n_estimat
         print('\nTarget test instances')
         _display_stats(X_test, y_test, tag='[Test]')
         test_age_acc = accuracy_score(y_test[test_age_ndx], tree.predict(X_test[test_age_ndx]))
+        test_age_auroc = roc_auc_score(y_test[test_age_ndx], tree.predict_proba(X_test[test_age_ndx])[:, 1])
         print('[Test] people aged 40-50 accuracy: {:.3f}'.format(test_age_acc))
+        print('[Test] people aged 40-50 auroc: {:.3f}'.format(test_age_auroc))
 
     # compute the most impactful train instances on the chosen test instances
     explainer = sexee.TreeExplainer(tree, X_train, y_train, encoding=encoding, random_state=random_state,
                                     use_predicted_labels=not train_true_label)
     y = None if not impact_true_label else y_test[test_target_ndx]
     sv_ndx, sv_impact = explainer.train_impact(X_test[test_target_ndx], y=y)
-    sv_ndx, sv_impact = exp_util.sort_impact(sv_ndx, sv_impact)
-    sv_impact = np.array(sv_impact)
+    # sv_ndx, sv_impact = exp_util.sort_impact(sv_ndx, sv_impact)
+    # sv_impact = np.array(sv_impact)
 
     # filter out train instances that don't overlap with support vectors
     train_sv_1_ndx, _, sv_1_ndx = np.intersect1d(train_age_readmit_ndx, sv_ndx, return_indices=True)
@@ -172,10 +175,21 @@ def mismatch(model='lgb', encoding='leaf_output', dataset='hospital2', n_estimat
             impact_4 = np.mean(sv_impact[sv_4_ndx], axis=0).mean()
 
         else:
-            impact_1 = np.sum(np.mean(sv_impact[sv_1_ndx], axis=0)) / len(train_age_readmit_ndx)
-            impact_2 = np.sum(np.mean(sv_impact[sv_2_ndx], axis=0)) / len(train_age_noreadmit_ndx)
-            impact_3 = np.sum(np.mean(sv_impact[sv_3_ndx], axis=0)) / len(train_noage_readmit_ndx)
-            impact_4 = np.sum(np.mean(sv_impact[sv_4_ndx], axis=0)) / len(train_noage_noreadmit_ndx)
+            impact_1 = np.zeros((X_train.shape[0], sv_impact.shape[1]))
+            impact_1[train_sv_1_ndx] = sv_impact[sv_1_ndx]
+            impact_1 = impact_1[train_age_readmit_ndx]
+
+            impact_2 = np.zeros((X_train.shape[0], sv_impact.shape[1]))
+            impact_2[train_sv_2_ndx] = sv_impact[sv_2_ndx]
+            impact_2 = impact_2[train_age_noreadmit_ndx]
+
+            impact_3 = np.zeros((X_train.shape[0], sv_impact.shape[1]))
+            impact_3[train_sv_3_ndx] = sv_impact[sv_3_ndx]
+            impact_3 = impact_3[train_noage_readmit_ndx]
+
+            impact_4 = np.zeros((X_train.shape[0], sv_impact.shape[1]))
+            impact_4[train_sv_4_ndx] = sv_impact[sv_4_ndx]
+            impact_4 = impact_4[train_noage_noreadmit_ndx]
 
     elif aggregation == 'sum':
         impact_1 = np.sum(sv_impact[sv_1_ndx])
@@ -187,10 +201,17 @@ def mismatch(model='lgb', encoding='leaf_output', dataset='hospital2', n_estimat
         exit('{} aggregation unsupported'.format(aggregation))
 
     print('\nours:')
-    print('age, readmit: {}'.format(impact_1))
-    print('age, no readmit: {}'.format(impact_2))
-    print('no age, readmit: {}'.format(impact_3))
-    print('no age, no readmit: {}'.format(impact_4))
+    print('age, readmit: {}'.format(impact_1.mean()))
+    print('age, no readmit: {}'.format(impact_2.mean()))
+    print('no age, readmit: {}'.format(impact_3.mean()))
+    print('no age, no readmit: {}'.format(impact_4.mean()))
+
+    if save_results:
+        sexee_dir = os.path.join(out_dir, 'ours')
+        os.makedirs(sexee_dir, exist_ok=True)
+        np.save(os.path.join(sexee_dir, 'age_readmit.npy'), impact_1)
+        np.save(os.path.join(out_dir, 'test_age_ndx.npy'), test_age_ndx)
+        np.save(os.path.join(out_dir, 'test_age_readmit_ndx.npy'), test_age_readmit_ndx)
 
     if retrain:
         if sv_only:

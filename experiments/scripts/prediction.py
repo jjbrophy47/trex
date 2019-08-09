@@ -36,7 +36,7 @@ def _svm_predictions(explainer, data, yhat_data, ax=None):
 
 
 def prediction(model='lgb', encoding='leaf_path', dataset='iris', n_estimators=100, random_state=69,
-               timeit=False, true_labels=False, k=1000, data_dir='data'):
+               timeit=False, true_labels=False, data_dir='data'):
 
     # get model and data
     clf = model_util.get_classifier(model, n_estimators=n_estimators, random_state=random_state)
@@ -55,7 +55,7 @@ def prediction(model='lgb', encoding='leaf_path', dataset='iris', n_estimators=1
         yhat_tree_train = yhat_tree_train[:, 1]
         yhat_tree_test = yhat_tree_test[:, 1]
 
-    # test different combinations of encodings and labelsfor the svm
+    # test different combinations of encodings and labels for the svm
     data = X_train, y_train, X_test, y_test
     yhat_data = yhat_tree_train, yhat_tree_test
 
@@ -77,6 +77,7 @@ def prediction(model='lgb', encoding='leaf_path', dataset='iris', n_estimators=1
             print('{} and true_label={} took {:.3f}s'.format(encoding, true_labels, time.time() - start))
     plt.tight_layout()
     plt.show()
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Feature representation extractions for tree ensembles',

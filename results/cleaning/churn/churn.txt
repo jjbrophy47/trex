@@ -1,0 +1,27 @@
+Namespace(dataset='churn', encoding='leaf_path', flip_frac=0.35, inf_k=-1, model='cb', n_estimators=100, rs=1, save_plot=True, save_results=True, svm_loss=True, timeit=False)
+train instances: 5634
+test instances: 1409
+sum before: 1495
+ones flipped: 520
+zeros flipped: 1451
+sum after: 2426
+num noisy labels: 1971
+
+Before noise:
+model (CatBoostClassifier)
+train set acc: 0.843983
+train log loss: 0.34169
+train auroc: 0.905
+test set acc: 0.802697
+test log loss: 0.43637
+test auroc: 0.831
+
+After noise:
+model (CatBoostClassifier)
+train set acc: 0.698083
+train log loss: 0.59689
+train auroc: 0.777
+test set acc: 0.724627
+test log loss: 0.58884
+test auroc: 0.719
+saving to output/cleaning/churn/cleaning.pdf...

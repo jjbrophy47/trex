@@ -1,0 +1,27 @@
+Namespace(dataset='MFC18_EvalPart1', encoding='leaf_output', flip_frac=0.35, inf_k=-1, model='cb', n_estimators=100, rs=1, save_plot=True, save_results=True, svm_loss=True, timeit=False)
+train instances: 13936
+test instances: 3485
+sum before: 2612
+ones flipped: 935
+zeros flipped: 3942
+sum after: 5619
+num noisy labels: 4877
+
+Before noise:
+model (CatBoostClassifier)
+train set acc: 0.987945
+train log loss: 0.04816
+train auroc: 0.999
+test set acc: 0.967575
+test log loss: 0.09053
+test auroc: 0.990
+
+After noise:
+model (CatBoostClassifier)
+train set acc: 0.734357
+train log loss: 0.54909
+train auroc: 0.827
+test set acc: 0.883501
+test log loss: 0.47951
+test auroc: 0.902
+saving to output/cleaning/MFC18_EvalPart1/cleaning.pdf...

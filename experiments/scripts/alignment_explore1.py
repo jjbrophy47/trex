@@ -168,10 +168,10 @@ def feature_clustering(model='lgb', encoding='leaf_output', dataset='nc17_mfc18'
     ax.legend()
 
     if save_results:
-        train_negative = np.hstack([X_embed[:, 0][:n_train][train0], X_embed[:, 1][:n_train][train0]])
-        train_positive = np.hstack([X_embed[:, 0][:n_train][train1], X_embed[:, 1][:n_train][train1]])
-        test_negative = np.hstack([X_embed[:, 0][n_train:][test0], X_embed[:, 1][n_train:][test0]])
-        test_positive = np.hstack([X_embed[:, 0][n_train:][test1], X_embed[:, 1][n_train:][test1]])
+        train_negative = X_embed[:n_train][train0]
+        train_positive = X_embed[:n_train][train1]
+        test_negative = X_embed[n_train:][test0]
+        test_positive = X_embed[n_train:][test1]
 
         plot_dir = os.path.join(out_dir, dataset + '_' + encoding)
         os.makedirs(plot_dir, exist_ok=True)

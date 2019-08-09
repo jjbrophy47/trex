@@ -1,0 +1,47 @@
+Namespace(aggregation='mean', dataset='hospital2', encoding='leaf_output', impact_true_label=True, inf_k=0, model='cb', modify=True, n_estimators=100, n_subset=None, retrain=False, rs=1, save_results=True, sv_only=False, train_true_label=True, verbose=1)
+
+Original Data
+[Train] 196/1864 people aged 40-50 were readmitted.
+[Train] 1944/18136 people NOT aged 40-50 were readmitted.
+[Train] 2140/20000 people were readmitted
+model (CatBoostClassifier)
+train set acc: 0.903100
+train log loss: 0.27686
+train auroc: 0.799
+test set acc: 0.885674
+test log loss: 0.34035
+test auroc: 0.647
+
+Modified Data
+[Train] 20/1688 people aged 40-50 were readmitted.
+[Train] 1944/18136 people NOT aged 40-50 were readmitted.
+[Train] 1964/19824 people were readmitted
+model (CatBoostClassifier)
+train set acc: 0.910664
+train log loss: 0.25620
+train auroc: 0.816
+test set acc: 0.886028
+test log loss: 0.35280
+test auroc: 0.625
+
+Target test instances
+[Test] 831/7821 people aged 40-50 were readmitted.
+[Test] 8386/73945 people NOT aged 40-50 were readmitted.
+[Test] 9217/81766 people were readmitted
+[Test] people aged 40-50 accuracy: 0.894
+
+total support vectors: 4328
+age, readmit support vectors: 20
+age, no readmit support vectors: 79
+no age, readmit support vectors: 1944
+no age, no readmit support vectors: 2285
+n_subset: None
+
+ours:
+age, readmit: -15.667221582352747
+age, no readmit: 0.05761447877152374
+no age, readmit: -0.08901838638775553
+no age, no readmit: 0.009086534794495213
+
+leaf_influence:
+age, readmit: -0.0014421599821770159, time: 15120.968

@@ -1,0 +1,27 @@
+Namespace(dataset='amazon', encoding='leaf_output', flip_frac=0.4, inf_k=-1, model='cb', n_estimators=100, rs=1, save_plot=True, save_results=True, svm_loss=True, timeit=False)
+train instances: 26215
+test instances: 6554
+sum before: 24711
+ones flipped: 9871
+zeros flipped: 615
+sum after: 15455
+num noisy labels: 10486
+
+Before noise:
+model (CatBoostClassifier)
+train set acc: 0.946176
+train log loss: 0.16173
+train auroc: 0.873
+test set acc: 0.941562
+test log loss: 0.18010
+test auroc: 0.820
+
+After noise:
+model (CatBoostClassifier)
+train set acc: 0.619111
+train log loss: 0.64896
+train auroc: 0.657
+test set acc: 0.883583
+test log loss: 0.55343
+test auroc: 0.547
+saving to output/cleaning/amazon/cleaning.pdf...

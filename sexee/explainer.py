@@ -1,91 +1,90 @@
 """
-Explainer for a tree ensemble using an SVM.
-Currently supports: sklearn's RandomForestClassifier, GBMClassifier, lightgbm, xgboost, and catboost.
+Instance-based explainer for a tree ensemble using an SVM or LR.
+Currently supports: sklearn's RandomForestClassifier and GBMClassifier, lightgbm, xgboost, and catboost.
+    Is also only compatible with dense dataset inputs.
 """
-import time
-
 import numpy as np
-from sklearn.base import clone
 from sklearn.utils.validation import check_X_y
-from sklearn.svm import SVC
-from sklearn.multiclass import OneVsRestClassifier
 from sklearn.metrics.pairwise import linear_kernel, rbf_kernel
 from sklearn.preprocessing import LabelEncoder
 
-from . import util
 from .extractor import TreeExtractor
+from models.linear_model import SVM, KernelLogisticRegression
 
 
 class TreeExplainer:
 
-    def __init__(self, model, X_train, y_train, encoding='leaf_output', C=0.1, gamma='scale',
-                 use_predicted_labels=True, random_state=None, timeit=False):
+    def __init__(self, tree, X_train, y_train, linear_model='svm', encoding='leaf_output', C=0.1,
+                 kernel='linear', gamma=None, coef0=0.0, degree=3, dense_output=False,
+                 use_predicted_labels=True, random_state=None):
         """
         Trains an svm on feature representations from a learned tree ensemble.
 
         Parameters
         ----------
-        model : object
-            Learned tree ensemble. Supported: RandomForestClassifier, LightGBM, CatBoost.
-            Unsupported: XGBoost, GBM.
+        tree : object
+            Learned tree ensemble. Supported: RandomForestClassifier, GBM, LightGBM, CatBoost, XGBoost.
         X_train : 2d array-like
             Train instances in original feature space.
         y_train : 1d array-like (default=None)
             Ground-truth train labels.
-        encoding : str (default='leaf_path')
+        linear_model : str (default='svm', {'svm', 'lr'})
+            Linear model to approximate the tree ensemble.
+        encoding : str (default='leaf_output', {'leaf_output', 'leaf_path', 'feature_path'})
             Feature representation to extract from the tree ensemble.
         C : float (default=0.1)
-            Hyperparameter for the SVM.
+            Regularization parameter for the linear model. Lower C values result
+            in stronger regularization.
+        kernel : str (default='linear', {'linear', 'poly', 'rbf', 'sigmoid'})
+            Kernel to use in the dual optimization of the linear model.
+            If linear_model='lr', only 'linear' is currently supported.
+        gamma : float (default=None)
+            Kernel coefficient for 'rbf', 'poly', and 'sigmoid'.
+            If None, defaults to 1 / n_features.
+            Only applies if linear_model='svm'.
+        coef0 : float (default=0.0)
+            Independent term in 'poly' and 'sigmoid'.
+            Only applies if linear_model='svm'.
+        degree : int (default=3)
+            Degree of the 'poly' kernel.
+            Only applies if linear_model='svm'.
+        dense_output : bool (default=False)
+            If True, returns impact of all training instances; otherwise, returns
+            only support vector impacts and their corresponding training indices.
+            Only applies if linear_model='svm'.
         use_predicted_labels : bool (default=True)
-            If True, predicted labels from the tree ensemble are used to train the SVM.
+            If True, predicted labels from the tree ensemble are used to train the linear model.
         random_state : int (default=None)
             Random state to promote reproducibility.
-        timeit : bool (default=False)
-            Displays feature extraction and SVM fit times.
         """
 
         # error checking
-        self.model_type_ = util.validate_model(model)
-        self._validate_data(X_train, y_train)
-        assert encoding in ['leaf_path', 'feature_path', 'leaf_output'], '{} unsupported!'.format(encoding)
-
-        self.model = model
+        self.tree = tree
         self.X_train = X_train
         self.y_train = y_train
         self.encoding = encoding
         self.C = C
         self.gamma = gamma
+        self.coef0 = coef0
+        self.degree = degree
         self.use_predicted_labels = use_predicted_labels
         self.random_state = random_state
-        self.timeit = timeit
-
-        # set kernel for svm
-        if self.encoding == 'leaf_path' or self.encoding == 'feature_path':
-            self.kernel_ = 'linear'
-            self.sparse_ = True
-
-        elif self.encoding == 'leaf_output':
-
-            if self.model_type_ == 'RandomForestClassifier':
-                self.kernel_ = 'linear'
-                self.sparse_ = True
-            else:
-                self.kernel_ = 'rbf'
-                self.sparse_ = False
+        self._validate()
 
         # extract feature representations from the tree ensemble
-        start = time.time()
-        self.extractor_ = TreeExtractor(self.model, encoding=self.encoding, sparse=self.sparse_)
+        self.extractor_ = TreeExtractor(self.model, encoding=self.encoding)
         self.train_feature_ = self.extractor_.fit_transform(self.X_train)
-        if self.timeit:
-            print('train feature extraction took {}s'.format(time.time() - start))
 
-        # train svm on feature representations and labels (true or predicted)
-        clf = SVC(kernel=self.kernel_, random_state=self.random_state, C=self.C, gamma=self.gamma)
+        # create a linear model to approximate the tree ensemble
+        if self.linear_model == 'svm':
+            self.linear_model_ = SVM(kernel=self.kernel, C=self.C, gamma=self.gamma,
+                                     coef0=self.coef0, degree=self.degree, random_state=self.random_state)
+        else:
+            self.linear_model_ = KernelLogisticRegression(C=self.C)
 
-        # choose ground truth or predicted labels to train the svm
+        # choose ground truth or predicted labels to train the linear model
         if use_predicted_labels:
-            train_label = self.model.predict(X_train).flatten()
+            train_label = self.tree.predict(X_train).flatten()
         else:
             train_label = self.y_train
 
@@ -93,29 +92,79 @@ class TreeExplainer:
         self.le_ = LabelEncoder().fit(train_label)
         train_label = self.le_.transform(train_label)
 
-        # if multiclass then train an SVM for each class, otherwise train one SVM
-        start = time.time()
-        if self.n_classes_ > 2:
-            self.ovr_ = OneVsRestClassifier(clf).fit(self.train_feature_, train_label)
-            self.svm_ = None
-        else:
-            self.svm_ = clone(clf).fit(self.train_feature_, train_label)
-        if self.timeit:
-            print('fitting svm took {}s'.format(time.time() - start))
+        # train the linear model on the tree ensemble feature representation
+        self.linear_model_ = self.linear_model_.fit(self.train_feature_, train_label)
 
     def __str__(self):
         s = '\nTree Explainer:'
         s += '\ntrain shape: {}'.format(self.X_train.shape)
         s += '\nclasses: {}'.format(self.le_.classes_)
+        s += '\nlinear_model: {}'.format(self.linear_model)
         s += '\nencoding: {}'.format(self.encoding)
-        s += '\nsparse: {}'.format(self.sparse_)
         s += '\nkernel: {}'.format(self.kernel_)
-        s += '\nfit predicted labels: {}'.format(self.use_predicted_labels)
-        s += '\nC: {}'.format(self.C)
         s += '\ngamma: {}'.format(self.gamma)
+        s += '\ncoef0: {}'.format(self.coef0)
+        s += '\ndegree: {}'.format(self.degree)
+        s += '\nC: {}'.format(self.C)
+        s += '\ndense_output: {}'.format(self.dense_output)
+        s += '\nfit predicted labels: {}'.format(self.use_predicted_labels)
         s += '\nrandom state: {}'.format(self.random_state)
         s += '\n'
         return s
+
+    def decision_function(self, X):
+        """
+        Parameters
+        ----------
+        X : 2d array-like
+            Instances to make predictions on.
+        """
+        assert X.ndim == 2, 'X is not 2d!'
+        assert self.linear_model == 'svm', 'decision_function only supports svm!'
+        return self.linear_model_.decision_function(self.transform(X))
+
+    def predict_proba(self, X):
+        """
+        Parameters
+        ----------
+        X : 2d array-like
+            Instances to make predictions on.
+        """
+        assert X.ndim == 2, 'X is not 2d!'
+        assert self.linear_model == 'lr', 'decision_function only supports lr!'
+        return self.linear_model_.predict_proba(self.transform(X))
+
+    def predict(self, X):
+        """
+        Parameters
+        ----------
+        X : 2d array-like
+            Instances to make predictions on.
+
+        Return predicted label for each x in X using the linear model.
+        """
+        assert X.ndim == 2, 'X is not 2d!'
+        return self.linear_model_.predict(self.transform(X))
+
+    # Note: If len(X) is large and the number of training instances is large,
+    #       the resulting matrix may be huge.
+    def similarity(self, X, train_indices=None):
+        """
+        Computes the similarity between the instances in X and the training data.
+
+        Parameters
+        ----------
+        X : 2d array-like
+            Instances to compute the similarity to.
+        train_indices : 1d array-like (default=None)
+            If not None, compute similarities to only these train instances.
+
+        Returns an array of shape (len(X), n_train_samples).
+        """
+        assert X.ndim == 2, 'X is not 2d!'
+        X_feature = self.transform(X)
+        X_sim = self.linear_model_.compute_similarity(X_feature, train_indices=train_indices)
+        return X_sim
 
     def train_impact(self, X, similarity=False, weight=False, intercept=False, y=None):
         """
@@ -209,70 +258,70 @@ class TreeExplainer:
 
         return impact_tuple
 
-    def similarity(self, X, train_indices=None):
-        """Finds which instances are most similar to each x in X."""
+    # def similarity(self, X, train_indices=None):
+    #     """Finds which instances are most similar to each x in X."""
 
-        # error checking
-        assert self.train_feature_ is not None, 'train_feature_ is not fitted!'
-        X_feature = self.transform(X)
+    #     # error checking
+    #     assert self.train_feature_ is not None, 'train_feature_ is not fitted!'
+    #     X_feature = self.transform(X)
 
-        # if multiclass, get svm of whose class is predicted
-        if self.n_classes_ > 2:
-            assert X_feature.shape[0] == 1, 'must be 1 instance if n_classes_ > 2!'
-            decision, pred_label = self.decision_function(X, pred_label=True)
-            pred_label = int(pred_label[0])
-            svm = self.ovr_.estimators_[pred_label]
-        else:
-            assert self.svm_ is not None, 'svm_ is not fitted!'
-            svm = self.svm_
+    #     # if multiclass, get svm of whose class is predicted
+    #     if self.n_classes_ > 2:
+    #         assert X_feature.shape[0] == 1, 'must be 1 instance if n_classes_ > 2!'
+    #         decision, pred_label = self.decision_function(X, pred_label=True)
+    #         pred_label = int(pred_label[0])
+    #         svm = self.ovr_.estimators_[pred_label]
+    #     else:
+    #         assert self.svm_ is not None, 'svm_ is not fitted!'
+    #         svm = self.svm_
 
-        # return similarity only for a subset of train instances
-        if train_indices is not None:
-            train_feature = self.train_feature_[train_indices]
-        else:
-            train_feature = self.train_feature_
+    #     # return similarity only for a subset of train instances
+    #     if train_indices is not None:
+    #         train_feature = self.train_feature_[train_indices]
+    #     else:
+    #         train_feature = self.train_feature_
 
-        # compute similarity
-        if self.kernel_ == 'linear':
-            sim = linear_kernel(train_feature, X_feature)
-            # sim /= self.extractor_.num_trees_
-        elif self.kernel_ == 'rbf':
-            sim = rbf_kernel(train_feature, X_feature, gamma=svm._gamma)
+    #     # compute similarity
+    #     if self.kernel_ == 'linear':
+    #         sim = linear_kernel(train_feature, X_feature)
+    #         # sim /= self.extractor_.num_trees_
+    #     elif self.kernel_ == 'rbf':
+    #         sim = rbf_kernel(train_feature, X_feature, gamma=svm._gamma)
 
-        return sim
+    #     return sim
 
-    def decision_function(self, X, pred_label=False):
-        """
-        Parameters
-        ----------
-        X : 2d array-like
-            Instances to make predictions on.
-        pred_label : bool (default=False)
-            If True, returns prediction class label in addition to its decision.
-        Returns decision function values from learned SVM.
-        If multiclass, returns a flattened array of distances from each SVM.
-        """
-        X_feature = self.transform(X)
+    # def decision_function(self, X, pred_label=False):
+    #     """
+    #     Parameters
+    #     ----------
+    #     X : 2d array-like
+    #         Instances to make predictions on.
+    #     pred_label : bool (default=False)
+    #         If True, returns prediction class label in addition to its decision.
+    #     Returns decision function values from learned SVM.
+    #     If multiclass, returns a flattened array of distances from each SVM.
+    #     """
+    #     X_feature = self.transform(X)
 
-        if self.n_classes_ == 2:
-            decision = self.svm_.decision_function(X_feature)
-            pred = np.where(decision < 0, 0, 1)
-        else:
-            decision = self.ovr_.decision_function(X_feature)
-            pred = np.argmax(decision, axis=1)
+    #     if self.n_classes_ == 2:
+    #         decision = self.svm_.decision_function(X_feature)
+    #         pred = np.where(decision < 0, 0, 1)
+    #     else:
+    #         decision = self.ovr_.decision_function(X_feature)
+    #         pred = np.argmax(decision, axis=1)
 
-        if pred_label:
-            pred_class = self.le_.inverse_transform(pred)
-            result = decision, pred_class
-        else:
-            result = decision
+    #     if pred_label:
+    #         pred_class = self.le_.inverse_transform(pred)
+    #         result = decision, pred_class
+    #     else:
+    #         result = decision
 
-        return result
+    #     return result
 
-    def predict(self, X):
-        """Return prediction label for each x in X using the trained SVM."""
-        decision, pred_label = self.decision_function(X, pred_label=True)
-        return pred_label
+    # def predict(self, X):
+    #     """Return prediction label for each x in X using the trained SVM."""
+    #     decision, pred_label = self.decision_function(X, pred_label=True)
+    #     return pred_label
 
     def get_train_weight(self, sort=True):
         """
@@ -297,11 +346,17 @@ class TreeExplainer:
         return train_weight
 
     def transform(self, X):
-        """Transform X using the extractor."""
+        """
+        Transform X using the tree-ensemble feature extractor.
 
-        if X.ndim == 1:
-            X = X.reshape(1, -1)
-            assert X.shape[0] == 1, 'x must be a single instance!'
+        Parameters
+        ----------
+        X : 2d array-like
+            Instances to transform.
+
+        Returns an array of shape (len(X), n_tree_features).
+        """
+        assert X.ndim == 2, 'X is not 2d!'
         assert X.shape[1] == self.n_feats_, 'num features do not match!'
 
         X_feature = self.extractor_.transform(X)
@@ -341,9 +396,12 @@ class TreeExplainer:
 
         return weighted_prod
 
-    def _validate_data(self, X, y):
-        """Make sure the data is well-formed."""
+    def _validate(self, X, y):
+        """
+        Check model and data inputs.
+        """
 
+        # check data
         check_X_y(X, y)
         if y.dtype == np.float and not np.all(np.mod(y, 1) == 0):
             raise ValueError('Unknown label type: ')
@@ -351,3 +409,26 @@ class TreeExplainer:
         self.classes_ = np.unique(y)
         self.n_classes_ = len(self.classes_)
         self.labels_ = dict(zip(self.classes_, np.arange(self.n_classes_)))
+
+        # check encoding
+        assert self.encoding in ['leaf_path', 'feature_path', 'leaf_output'], '{} unsupported!'.format(self.encoding)
+
+        # check model
+        if 'RandomForestClassifier' in str(self.tree):
+            self.tree_type_ = 'RandomForestClassifier'
+        elif 'GradientBoostingClassifier' in str(self.tree):
+            self.tree_type_ = 'GradientBoostingClassifier'
+        elif 'LGBMClassifier' in str(self.tree):
+            self.tree_type_ = 'LGBMClassifier'
+        elif 'CatBoostClassifier' in str(self.tree):
+            self.tree_type_ = 'CatBoostClassifier'
+        elif 'XGBClassifier' in str(self.tree):
+            self.tree_type_ = 'XGBClassifier'
+        else:
+            exit('{} self.tree not currently supported!'.format(str(self.tree)))
+
+        # check linear model
+        assert self.linear_model in ['svm', 'lr'], '{} unsupported'.format(self.linear_model)
+
+        # check kernel
+        assert self.kernel in ['linear', 'rbf', 'poly', 'sigmoid'], '{} unsupported'.format(self.kernel)

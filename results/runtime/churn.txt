@@ -1,0 +1,183 @@
+Namespace(dataset='churn', encoding='leaf_output', inf_k=0, model='cb', n_estimators=100, repeats=10, rs=1, true_label=False)
+
+run 0
+train instances: 5634
+num features: 19
+model (CatBoostClassifier)
+test set acc: 0.795600
+test log loss: 0.41980
+test auroc: 0.843
+sexee...
+fine tune: 3.784s
+test time: 0.004s
+leafinfluence...
+fine tune: 1.356s
+test time: 519.001s
+maple...
+fine tune: 768.013s
+test time: 0.029s
+
+run 1
+train instances: 5634
+num features: 19
+model (CatBoostClassifier)
+test set acc: 0.791341
+test log loss: 0.43174
+test auroc: 0.834
+sexee...
+fine tune: 3.817s
+test time: 0.012s
+leafinfluence...
+fine tune: 1.337s
+test time: 525.862s
+maple...
+fine tune: 765.372s
+test time: 0.023s
+
+run 2
+train instances: 5634
+num features: 19
+model (CatBoostClassifier)
+test set acc: 0.779276
+test log loss: 0.44169
+test auroc: 0.826
+sexee...
+fine tune: 3.567s
+test time: 0.006s
+leafinfluence...
+fine tune: 1.249s
+test time: 516.999s
+maple...
+fine tune: 780.952s
+test time: 0.022s
+
+run 3
+train instances: 5634
+num features: 19
+model (CatBoostClassifier)
+test set acc: 0.804116
+test log loss: 0.41774
+test auroc: 0.845
+sexee...
+fine tune: 3.798s
+test time: 0.006s
+leafinfluence...
+fine tune: 1.241s
+test time: 524.654s
+maple...
+fine tune: 743.538s
+test time: 0.025s
+
+run 4
+train instances: 5634
+num features: 19
+model (CatBoostClassifier)
+test set acc: 0.804116
+test log loss: 0.42836
+test auroc: 0.840
+sexee...
+fine tune: 3.636s
+test time: 0.008s
+leafinfluence...
+fine tune: 1.370s
+test time: 527.320s
+maple...
+fine tune: 804.804s
+test time: 0.026s
+
+run 5
+train instances: 5634
+num features: 19
+model (CatBoostClassifier)
+test set acc: 0.809084
+test log loss: 0.41271
+test auroc: 0.849
+sexee...
+fine tune: 3.958s
+test time: 0.015s
+leafinfluence...
+fine tune: 1.427s
+test time: 557.311s
+maple...
+fine tune: 788.633s
+test time: 0.026s
+
+run 6
+train instances: 5634
+num features: 19
+model (CatBoostClassifier)
+test set acc: 0.809084
+test log loss: 0.40989
+test auroc: 0.851
+sexee...
+fine tune: 4.030s
+test time: 0.009s
+leafinfluence...
+fine tune: 1.404s
+test time: 562.877s
+maple...
+fine tune: 772.311s
+test time: 0.021s
+
+run 7
+train instances: 5634
+num features: 19
+model (CatBoostClassifier)
+test set acc: 0.794180
+test log loss: 0.41940
+test auroc: 0.844
+sexee...
+fine tune: 3.817s
+test time: 0.005s
+leafinfluence...
+fine tune: 1.352s
+test time: 560.345s
+maple...
+fine tune: 812.141s
+test time: 0.022s
+
+run 8
+train instances: 5634
+num features: 19
+model (CatBoostClassifier)
+test set acc: 0.801278
+test log loss: 0.42728
+test auroc: 0.837
+sexee...
+fine tune: 4.074s
+test time: 0.005s
+leafinfluence...
+fine tune: 1.426s
+test time: 567.529s
+maple...
+fine tune: 800.467s
+test time: 0.027s
+
+run 9
+train instances: 5634
+num features: 19
+model (CatBoostClassifier)
+test set acc: 0.798439
+test log loss: 0.44139
+test auroc: 0.823
+sexee...
+fine tune: 3.477s
+test time: 0.007s
+leafinfluence...
+fine tune: 1.621s
+test time: 556.842s
+maple...
+fine tune: 751.219s
+test time: 0.020s
+
+sexee
+fine tuning: 3.796s +/- 0.184s
+test time: 0.008s +/- 0.003s
+
+leafinfluence
+fine tuning: 1.378s +/- 0.101s
+test time: 541.874s +/- 19.518s
+
+maple
+fine tuning: 778.745s +/- 21.683s
+test time: 0.024s +/- 0.003s

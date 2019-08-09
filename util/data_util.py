@@ -8,6 +8,46 @@ from sklearn.datasets import load_iris, load_breast_cancer, load_wine
 from sklearn.model_selection import train_test_split
 
 
+def _load_wikipedia(test_size=0.2, random_state=69, data_dir='data', return_feature=False):
+    data = np.load(os.path.join(data_dir, 'wikipedia/data.npy'))
+    X = data[:, :-1]
+    y = data[:, -1].astype(np.int32)
+    label = ['non-spammer', 'spammer']
+
+    if test_size is not None:
+        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=test_size,
+                                                            random_state=random_state, stratify=y)
+        result = (X_train, X_test, y_train, y_test, label)
+    else:
+        result = (X, y, label)
+
+    if return_feature:
+        feature_names = np.load(os.path.join(data_dir, 'wikipedia/feature.npy'))
+        result += (feature_names,)
+
+    return result
+
+
+def _load_banknote(test_size=0.2, random_state=69, data_dir='data', return_feature=False):
+    data = np.load(os.path.join(data_dir, 'banknote/data.npy'))
+    X = data[:, :-1]
+    y = data[:, -1].astype(np.int32)
+    label = ['0', '1']
+
+    if test_size is not None:
+        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=test_size,
+                                                            random_state=random_state, stratify=y)
+        result = (X_train, X_test, y_train, y_test, label)
+    else:
+        result = (X, y, label)
+
+    if return_feature:
+        feature_names = np.load(os.path.join(data_dir, 'banknote/feature.npy'))
+        result += (feature_names,)
+
+    return result
+
+
 def _load_iris(test_size=0.2, random_state=69, return_feature=False):
     data = load_iris()
     X, y, label = data['data'], data['target'], data['target_names']
@@ -310,6 +350,12 @@ def get_data(dataset, test_size=0.2, random_state=69, data_dir='data', return_fe
         return _load_adult(data_dir=data_dir)
     elif dataset == 'amazon':
         return _load_amazon(data_dir=data_dir)
+    elif dataset == 'banknote':
+        return _load_banknote(test_size=test_size, random_state=random_state, data_dir=data_dir,
+                              return_feature=return_feature)
+    elif dataset == 'wikipedia':
+        return _load_wikipedia(test_size=test_size, random_state=random_state, data_dir=data_dir,
+                               return_feature=return_feature)
     elif dataset == 'churn':
         return _load_churn(data_dir=data_dir, test_size=test_size, random_state=random_state)
     elif dataset == 'creditcard':

@@ -53,7 +53,6 @@ def missed_instances(y1, y2, y_true):
     return both_ndx
 
 
-# TODO: add AUROC as another metric if it's a binary problem
 def performance(model, X_train=None, y_train=None, X_test=None, y_test=None):
     """Displays train and test performance for a learned model."""
 

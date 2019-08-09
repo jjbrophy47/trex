@@ -80,6 +80,7 @@ def fidelity(variable='C', model='lgb', encoding='tree_path', dataset='iris', n_
     ax.legend()
     plt.show()
 
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Feature representation extractions for tree ensembles',
                                      formatter_class=argparse.ArgumentDefaultsHelpFormatter)
