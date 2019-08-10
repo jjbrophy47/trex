@@ -1,0 +1,9 @@
+# remove dependency
+catboost
+
+# tests
+nose
+
+numpy
+scipy
+scikit-learn
