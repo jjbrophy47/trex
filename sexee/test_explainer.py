@@ -15,7 +15,7 @@ y = data['target']
 
 tree = GradientBoostingClassifier().fit(X, y)
 
-m = sexee.TreeExplainer(tree, X, y, linear_model='lr', kernel='linear', encoding='leaf_output')
+m = sexee.TreeExplainer(tree, X, y, linear_model='svm', kernel='linear', encoding='leaf_path')
 print(m)
 
 print('prediction tests')
@@ -29,3 +29,5 @@ print('weight tests')
 print(m.get_weight())
 
 print('explain tests')
+print(m.explain(X[0].reshape(1, -1)))
+print(m.explain(X[:2]))

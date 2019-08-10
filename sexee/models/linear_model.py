@@ -87,11 +87,11 @@ class SVM(BaseEstimator, ClassifierMixin):
 
         Returns a sparse matrix of shape (len(X), n_train_samples).
         """
-        if y is not None:
+        if y is None:
             y = self.predict(X)
         assert len(y) == len(X)
 
-        return sps.vstack([self.ovr.estimators_[y[i]].explain(x.reshape(1, -1)) for i, x in enumerate(X)])
+        return sps.vstack([self.ovr_.estimators_[y[i]].explain(x.reshape(1, -1)) for i, x in enumerate(X)])
 
     def _create_kernel_callable(self):
         assert self.kernel in ['rbf', 'poly', 'sigmoid', 'linear']
@@ -162,12 +162,33 @@ class BinarySVM(BaseEstimator, ClassifierMixin):
 
     def get_weight(self):
         """
-        Return a sparse array train instance weights with shape (1, n_train_samples).
+        Return a sparse array of train instance weights with shape (1, n_train_samples).
         """
         data = self.coef_
         indices = self.coef_indices_
         indptr = np.array([0, len(data)])
         return sps.csr_matrix((data, indices, indptr), shape=(1, len(self.X_train_)))
+
+    def explain(self, x):
+        """
+        Return a sparse matrix of the impact of the training instances on x.
+        The resulting array is of shape (1, n_train_samples).
+        """
+        assert x.shape == (1, self.X_train_.shape[1])
+        x_sim = self.kernel(x, self.X_train_[self.coef_indices_])
+        impact = (x_sim * self.coef_)[0]
+        indptr = np.array([0, len(impact)])
+
+        print(self.decision_function(x))
+        print(x_sim)
+        print(self.coef_)
+        print(np.sum(impact) + self.intercept_)
+
+        print(impact)
+        print(self.coef_indices_)
+        print(indptr)
+
+        return sps.csr_matrix((impact, self.coef_indices_, indptr), shape=(1, len(self.X_train_)))
 
 
 class KernelLogisticRegression(BaseEstimator, ClassifierMixin):
@@ -208,6 +229,27 @@ class KernelLogisticRegression(BaseEstimator, ClassifierMixin):
 
     def get_weight(self):
         return np.vstack([estimator.get_weight() for estimator in self.ovr_.estimators_])
+
+    def explain(self, X, y=None):
+        """
+        Return an array of train instance contributions to X. A positive score
+        means the training instance contributed towards the predicted label.
+
+        Parameters
+        ----------
+        X : 2d array-like
+            Instances to explain.
+        y : 1d array-like
+            If not None, a positive score means the training instance contributed
+            to the label in y. Must be the same length as X.
+
+        Returns a sparse matrix of shape (len(X), n_train_samples).
+        """
+        if y is None:
+            y = self.predict(X)
+        assert len(y) == len(X)
+
+        return np.vstack([self.ovr_.estimators_[y[i]].explain(x.reshape(1, -1)) for i, x in enumerate(X)])
 
 
 class BinaryKernelLogisticRegression(BaseEstimator, ClassifierMixin):
@@ -277,6 +319,19 @@ class BinaryKernelLogisticRegression(BaseEstimator, ClassifierMixin):
         Return an array of train instance weights.
         """
         return self.coef_.copy()
+
+    def explain(self, X):
+        """
+        Return an array of train instance impacts of shape (len(X), n_train_samples).
+        """
+        X_sim = linear_kernel(X, self.X_train_)
+        print(self.predict_proba(X))
+        print(X_sim)
+        print(self.coef_)
+        impact = X_sim * self.coef_
+        print(np.sum(impact))
+        print(self._sigmoid(np.sum(impact)))
+        return impact
 
     def _sigmoid(self, z):
         return 1 / (1 + np.exp(-z))
