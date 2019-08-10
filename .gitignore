@@ -4,6 +4,7 @@
 **.csv
 **catboost_info
 myenv
+testenv
 dist
 build
 .*

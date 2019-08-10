@@ -16,7 +16,7 @@ from sklearn.metrics import accuracy_score
 from sklearn.preprocessing import minmax_scale
 
 import sexee
-from util import model_util, data_util, exp_util
+from ..util import model_util, data_util, exp_util
 from influence_boosting.influence.leaf_influence import CBLeafInfluenceEnsemble
 
 
