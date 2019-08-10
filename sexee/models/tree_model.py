@@ -352,3 +352,33 @@ class Node:
             self.right = child_node
         else:
             exit('unrecognized position: {}'.format(child_position))
+
+
+def parse_xgb(model, nodes_per_tree=False, leaf_values=False):
+    """
+    Parses the xgb raw string data for leaf information.
+    """
+
+    if nodes_per_tree:
+        dump = model._Booster.get_dump()
+        nodes_per_tree = [len(tree.strip().replace('\t', '').split('\n')) for tree in dump]
+        result = nodes_per_tree
+
+    elif leaf_values:
+
+        trees = {}
+        for i, tree in enumerate(model._Booster.get_dump()):
+            nodes = tree.strip().replace('\t', '').split('\n')
+            trees[i] = np.array([float(node.split('=')[1]) if 'leaf' in node else 0.0 for node in nodes])
+
+        if model.n_classes_ > 2:
+            assert len(trees) == model.n_estimators * model.n_classes_, 'trees len does not equal num total trees!'
+        else:
+            assert len(trees) == model.n_estimators, 'trees len does not equal num total trees!'
+
+        return trees
+
+    else:
+        exit('No info specified to extract!')
+
+    return result

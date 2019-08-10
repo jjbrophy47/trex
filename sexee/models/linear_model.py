@@ -54,8 +54,8 @@ class SVM(BaseEstimator, ClassifierMixin):
         self.ovr_ = OneVsRestClassifier(estimator).fit(X, y)
         return self
 
-    def predict_proba(self, X):
-        return self.ovr_.predict_proba(X)
+    def decision_function(self, X):
+        return self.ovr_.decision_function(X)
 
     def predict(self, X):
         return self.ovr_.predict(X)
@@ -101,10 +101,11 @@ class SVM(BaseEstimator, ClassifierMixin):
             self.kernel_func_ = lambda X1, X2: rbf_kernel(X1, X2, gamma=self.gamma_)
         elif self.kernel == 'poly':
             self.gamma_ = 1.0 / self.n_features_ if self.gamma is None else self.gamma
-            self.kernel_func_ = lambda X1, X2: polynomial_kernel(X1, X2, degree=self.degree, gamma=self.gamma_)
+            self.kernel_func_ = lambda X1, X2: polynomial_kernel(X1, X2, degree=self.degree, gamma=self.gamma_,
+                                                                 coef0=self.coef0)
         elif self.kernel == 'sigmoid':
             self.gamma_ = 1.0 / self.n_features_ if self.gamma is None else self.gamma
-            self.kernel_func_ = lambda X1, X2: sigmoid_kernel(X1, X2, degree=self.degree, gamma=self.gamma_)
+            self.kernel_func_ = lambda X1, X2: sigmoid_kernel(X1, X2, coef0=self.coef0, gamma=self.gamma_)
         elif self.kernel == 'linear':
             self.kernel_func_ = lambda X1, X2: linear_kernel(X1, X2)
 
@@ -178,16 +179,6 @@ class BinarySVM(BaseEstimator, ClassifierMixin):
         x_sim = self.kernel(x, self.X_train_[self.coef_indices_])
         impact = (x_sim * self.coef_)[0]
         indptr = np.array([0, len(impact)])
-
-        print(self.decision_function(x))
-        print(x_sim)
-        print(self.coef_)
-        print(np.sum(impact) + self.intercept_)
-
-        print(impact)
-        print(self.coef_indices_)
-        print(indptr)
-
         return sps.csr_matrix((impact, self.coef_indices_, indptr), shape=(1, len(self.X_train_)))
 
 
@@ -320,17 +311,13 @@ class BinaryKernelLogisticRegression(BaseEstimator, ClassifierMixin):
         """
         return self.coef_.copy()
 
-    def explain(self, X):
+    def explain(self, x):
         """
-        Return an array of train instance impacts of shape (len(X), n_train_samples).
+        Return an array of train instance impacts of shape (1, n_train_samples).
         """
-        X_sim = linear_kernel(X, self.X_train_)
-        print(self.predict_proba(X))
-        print(X_sim)
-        print(self.coef_)
-        impact = X_sim * self.coef_
-        print(np.sum(impact))
-        print(self._sigmoid(np.sum(impact)))
+        assert x.shape == (1, self.X_train_.shape[1])
+        x_sim = linear_kernel(x, self.X_train_)
+        impact = x_sim * self.coef_
         return impact
 
     def _sigmoid(self, z):

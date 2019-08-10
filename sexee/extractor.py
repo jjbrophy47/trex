@@ -1,5 +1,7 @@
 """
 Feature representation extractor for different tree ensemble models.
+TODO: Remove catboost from imports, and assert tree imports if they're being used;
+      this removes the depndency on specific tree implementations.
 """
 import os
 import time
@@ -10,7 +12,7 @@ import catboost
 import numpy as np
 from sklearn.preprocessing import OneHotEncoder
 
-from . import util, tree_model
+from .models import tree_model
 
 
 class TreeExtractor:
@@ -29,12 +31,10 @@ class TreeExtractor:
         sparse: bool (default=False)
             If True, feature representations are returned in a sparse format if possible.
         """
-        self.model_type_ = util.validate_model(model)
-        assert encoding in ['leaf_path', 'feature_path', 'leaf_output'], '{} not supported!'.format(encoding)
-
         self.model = model
         self.encoding = encoding
         self.sparse = sparse
+        self._validate()
 
     def fit_transform(self, X):
         """
@@ -222,7 +222,7 @@ class TreeExtractor:
 
         elif self.model_type_ == 'XGBClassifier':
             leaves = self.model.apply(X)
-            leaf_values = util.parse_xgb(self.model, leaf_values=True)
+            leaf_values = tree_model.parse_xgb(self.model, leaf_values=True)
             self.num_trees_ = leaves.shape[1]
 
             encoding = np.zeros(leaves.shape)
@@ -240,3 +240,22 @@ class TreeExtractor:
             print('output encoding time: {:.3f}'.format(time.time() - start))
 
         return encoding
+
+    def _validate(self):
+        """
+        Validate model inputs.
+        """
+        assert self.encoding in ['leaf_path', 'feature_path', 'leaf_output'], '{} not supported!'.format(self.encoding)
+
+        if 'RandomForestClassifier' in str(self.model):
+            self.model_type_ = 'RandomForestClassifier'
+        elif 'GradientBoostingClassifier' in str(self.model):
+            self.model_type_ = 'GradientBoostingClassifier'
+        elif 'LGBMClassifier' in str(self.model):
+            self.model_type_ = 'LGBMClassifier'
+        elif 'CatBoostClassifier' in str(self.model):
+            self.model_type_ = 'CatBoostClassifier'
+        elif 'XGBClassifier' in str(self.model):
+            self.model_type_ = 'XGBClassifier'
+        else:
+            exit('{} not currently supported!'.format(str(self.model)))
