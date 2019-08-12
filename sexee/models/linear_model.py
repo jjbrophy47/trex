@@ -109,6 +109,7 @@ class SVM(BaseEstimator, ClassifierMixin):
             self._compute_gamma()
             self.kernel_func_ = lambda X1, X2: sigmoid_kernel(X1, X2, coef0=self.coef0, gamma=self.gamma_)
         elif self.kernel == 'linear':
+            self.gamma_ = self.gamma
             self.kernel_func_ = lambda X1, X2: linear_kernel(X1, X2)
 
     def _compute_gamma(self):

@@ -1,0 +1,122 @@
+(myenv) Jonathans-MacBook-Air-3:trees Jonny$ python3 experiments/scripts/runtime.py --dataset churn --rs 1 --linear_model svm --kernel linear
+/Users/Jonny/Documents/research/interpretability/classification/trees/myenv/lib/python3.7/site-packages/lightgbm/__init__.py:46: UserWarning: Starting from version 2.2.1, the library file in distribution wheels for macOS is built by the Apple Clang (Xcode_8.3.3) compiler.
+This means that in case of installing LightGBM from PyPI via the ``pip install lightgbm`` command, you don't need to install the gcc compiler anymore.
+Instead of that, you need to install the OpenMP library, which is required for running LightGBM on the system with the Apple Clang compiler.
+You can install the OpenMP library by the following command: ``brew install libomp``.
+  "You can install the OpenMP library by the following command: ``brew install libomp``.", UserWarning)
+Namespace(dataset='churn', encoding='leaf_output', inf_k=None, kernel='linear', linear_model='svm', maple=False, model='cb', n_estimators=100, repeats=10, rs=1, true_label=False)
+
+run 0
+train instances: 5634
+num features: 19
+model (CatBoostClassifier)
+test set acc: 0.795600
+test log loss: 0.41980
+test auroc: 0.843
+ours...
+fine tune: 3.688s
+test time: 0.003s
+
+run 1
+train instances: 5634
+num features: 19
+model (CatBoostClassifier)
+test set acc: 0.791341
+test log loss: 0.43174
+test auroc: 0.834
+ours...
+fine tune: 3.633s
+test time: 0.003s
+
+run 2
+train instances: 5634
+num features: 19
+model (CatBoostClassifier)
+test set acc: 0.779276
+test log loss: 0.44169
+test auroc: 0.826
+ours...
+fine tune: 3.660s
+test time: 0.003s
+
+run 3
+train instances: 5634
+num features: 19
+model (CatBoostClassifier)
+test set acc: 0.804116
+test log loss: 0.41774
+test auroc: 0.845
+ours...
+fine tune: 3.570s
+test time: 0.003s
+
+run 4
+train instances: 5634
+num features: 19
+model (CatBoostClassifier)
+test set acc: 0.804116
+test log loss: 0.42836
+test auroc: 0.840
+ours...
+fine tune: 3.558s
+test time: 0.003s
+
+run 5
+train instances: 5634
+num features: 19
+model (CatBoostClassifier)
+test set acc: 0.809084
+test log loss: 0.41271
+test auroc: 0.849
+ours...
+fine tune: 3.797s
+test time: 0.003s
+
+run 6
+train instances: 5634
+num features: 19
+model (CatBoostClassifier)
+test set acc: 0.809084
+test log loss: 0.40989
+test auroc: 0.851
+ours...
+fine tune: 3.735s
+test time: 0.003s
+
+run 7
+train instances: 5634
+num features: 19
+model (CatBoostClassifier)
+test set acc: 0.794180
+test log loss: 0.41940
+test auroc: 0.844
+ours...
+fine tune: 3.892s
+test time: 0.003s
+
+run 8
+train instances: 5634
+num features: 19
+model (CatBoostClassifier)
+test set acc: 0.801278
+test log loss: 0.42728
+test auroc: 0.837
+ours...
+fine tune: 3.930s
+test time: 0.003s
+
+run 9
+train instances: 5634
+num features: 19
+model (CatBoostClassifier)
+test set acc: 0.798439
+test log loss: 0.44139
+test auroc: 0.823
+ours...
+fine tune: 3.732s
+test time: 0.003s
+
+our
+fine tuning: 3.720s +/- 0.119s
+test time: 0.003s +/- 0.000s
+(myenv) Jonathans-MacBook-Air-3:trees Jonny$ 
