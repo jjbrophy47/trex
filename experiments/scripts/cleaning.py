@@ -159,8 +159,9 @@ def _influence_method(explainer, noisy_ndx, X_train, y_train, y_train_noisy, int
         influence_scores.append(buf.loss_derivative(X_train[[i]], y_train_noisy[[i]])[0])
     influence_scores = np.array(influence_scores)
 
-    # sort by descending order; train instances that increase the log loss the most are first
-    train_order = np.argsort(influence_scores)[::-1][:n_check]
+    # sort by descending order; the most negative train instances
+    # are the ones that increase the log loss the most, and are the most harmful
+    train_order = np.argsort(influence_scores)[:n_check]
     ckpt_ndx, fix_ndx = _record_fixes(train_order, noisy_ndx, n_train, interval)
     return ckpt_ndx, fix_ndx, influence_scores, train_order
 
