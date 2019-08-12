@@ -14,7 +14,7 @@ from .models.linear_model import SVM, KernelLogisticRegression
 class TreeExplainer:
 
     def __init__(self, tree, X_train, y_train, linear_model='svm', encoding='leaf_output', C=0.1,
-                 kernel='linear', gamma=None, coef0=0.0, degree=3, dense_output=False,
+                 kernel='linear', gamma='scale', coef0=0.0, degree=3, dense_output=False,
                  use_predicted_labels=True, random_state=None):
         """
         Trains an svm on feature representations from a learned tree ensemble.
@@ -37,8 +37,9 @@ class TreeExplainer:
         kernel : str (default='linear', {'linear', 'poly', 'rbf', 'sigmoid'})
             Kernel to use in the dual optimization of the linear model.
             If linear_model='lr', only 'linear' is currently supported.
-        gamma : float (default=None)
+        gamma : float (default='scale')
             Kernel coefficient for 'rbf', 'poly', and 'sigmoid'.
+            If 'scale', gamma defaults to 1 / (n_features * X.var()).
             If None, defaults to 1 / n_features.
             Only applies if linear_model='svm'.
         coef0 : float (default=0.0)

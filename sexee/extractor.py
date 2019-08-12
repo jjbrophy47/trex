@@ -11,6 +11,8 @@ from sklearn.preprocessing import OneHotEncoder
 from .models import tree_model
 from .utility.common import assert_import, record_import_error
 
+# from memory_profiler import profile
+
 try:
     import lightgbm
 except ImportError as e:

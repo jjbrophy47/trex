@@ -22,7 +22,7 @@ def find_version(*file_paths):
     raise RuntimeError("Unable to find version string.")
 
 
-def run_setup(with_binary=True, test_xgboost=True, test_lightgbm=True, test_catboost=True):
+def run_setup(test_xgboost=True, test_lightgbm=True, test_catboost=True):
 
     tests_require = ['nose']
     if test_xgboost:
@@ -52,17 +52,6 @@ def run_setup(with_binary=True, test_xgboost=True, test_lightgbm=True, test_catb
     )
 
 
-# setup(name='util',
-#       version='0.1',
-#       description='project library',
-#       url='',
-#       author='Jonathan Brophy',
-#       author_email='jbrophy@cs.uoregon.edu',
-#       license='MIT',
-#       packages=['util'],
-#       zip_safe=False)
-
-
 def try_run_setup(**kwargs):
     """
     Fails gracefully when various install steps don't work.
@@ -89,14 +78,9 @@ def try_run_setup(**kwargs):
             print("Couldn't install CatBoost for testing!")
             try_run_setup(**kwargs)
 
-        elif kwargs["with_binary"]:
-            kwargs["with_binary"] = False
-            print("WARNING: The C extension could not be compiled, sklearn tree models not supported.")
-            try_run_setup(**kwargs)
-
         else:
             print("ERROR: Failed to build!")
 
 
 if __name__ == "__main__":
-    try_run_setup(with_binary=True, test_xgboost=True, test_lightgbm=True)
+    try_run_setup(test_xgboost=True, test_lightgbm=True, test_catboost=True)

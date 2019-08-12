@@ -21,12 +21,12 @@ class SVM(BaseEstimator, ClassifierMixin):
     If multiclass, uses a one-vs-rest strategy and fits a BinaryKernelLogisticRegression classifier for each class.
     """
 
-    def __init__(self, C=1.0, kernel='linear', gamma=None, coef0=0.0, degree=3, random_state=None):
+    def __init__(self, C=1.0, kernel='linear', gamma='scale', coef0=0.0, degree=3, random_state=None):
         """
         Parameters
         ----------
         C: float (default=1.0)
-            Regularization parameter, where 0 <= alpha_i <= C.
+            Regularization parameter.
         kernel: str (default='linear')
             Type of kernel to use. Also 'rbf', 'poly', and 'sigmoid'.
         gamma: float (default=None)
@@ -50,7 +50,9 @@ class SVM(BaseEstimator, ClassifierMixin):
         self.X_train_ = X
         self.n_features_ = X.shape[1]
         self._create_kernel_callable()
-        estimator = BinarySVM(kernel=self.kernel_func_, random_state=self.random_state)
+        estimator = BinarySVM(C=self.C, kernel=self.kernel, gamma=self.gamma_, coef0=self.coef0,
+                              degree=self.degree, kernel_func=self.kernel_func_,
+                              random_state=self.random_state)
         self.ovr_ = OneVsRestClassifier(estimator).fit(X, y)
         return self
 
@@ -97,17 +99,25 @@ class SVM(BaseEstimator, ClassifierMixin):
         assert self.kernel in ['rbf', 'poly', 'sigmoid', 'linear']
 
         if self.kernel == 'rbf':
-            self.gamma_ = 1.0 / self.n_features_ if self.gamma is None else self.gamma
+            self._compute_gamma()
             self.kernel_func_ = lambda X1, X2: rbf_kernel(X1, X2, gamma=self.gamma_)
         elif self.kernel == 'poly':
-            self.gamma_ = 1.0 / self.n_features_ if self.gamma is None else self.gamma
+            self._compute_gamma()
             self.kernel_func_ = lambda X1, X2: polynomial_kernel(X1, X2, degree=self.degree, gamma=self.gamma_,
                                                                  coef0=self.coef0)
         elif self.kernel == 'sigmoid':
-            self.gamma_ = 1.0 / self.n_features_ if self.gamma is None else self.gamma
+            self._compute_gamma()
             self.kernel_func_ = lambda X1, X2: sigmoid_kernel(X1, X2, coef0=self.coef0, gamma=self.gamma_)
         elif self.kernel == 'linear':
             self.kernel_func_ = lambda X1, X2: linear_kernel(X1, X2)
+
+    def _compute_gamma(self):
+        if self.gamma == 'scale':
+            self.gamma_ = 1.0 / (self.n_features_ * self.X_train_.var())
+        elif self.gamma is None:
+            self.gamma_ = 1.0 / self.n_features_
+        else:
+            self.gamma_ = self.gamma
 
 
 class BinarySVM(BaseEstimator, ClassifierMixin):
@@ -115,21 +125,35 @@ class BinarySVM(BaseEstimator, ClassifierMixin):
     Wrapper around sklearn's SVC. This is to unify the API for the SVM and Kernel LR models.
     """
 
-    def __init__(self, C=1.0, kernel=linear_kernel, random_state=None):
+    def __init__(self, C=1.0, kernel='linear', gamma='scale', coef0=0.0, degree=3,
+                 kernel_func=None, random_state=None):
         """
         Parameters
         ----------
         C: float (default=1.0)
-            Regularization parameter, where 0 <= alpha_i <= C.
+            Regularization parameter.
         kernel: str (default='linear')
             Type of kernel to use. Also 'rbf', 'poly', and 'sigmoid'.
+        gamma: float (default=None)
+            Kernel coefficient for 'rbf', 'poly', and 'sigmoid'.
+            If None, defaults to 1 / n_features.
+        coef0: float (default=0.0)
+            Independent term in 'poly' and 'sigmoid'.
+        degree: int (default=3)
+            Degree of the 'poly' kernel.
+        kernel_func: callable (default=None)
+            Callable similarity kernel.
         random_state: int (default=None)
             Number for reproducibility.
         """
         self.C = C
         self.kernel = kernel
+        self.gamma = gamma
+        self.coef0 = coef0
+        self.degree = degree
+        self.kernel_func = kernel_func
         self.random_state = random_state
-        assert callable(self.kernel)
+        assert callable(self.kernel_func)
 
     def fit(self, X, y):
 
@@ -138,14 +162,16 @@ class BinarySVM(BaseEstimator, ClassifierMixin):
         self.n_features_ = X.shape[1]
 
         # train the SVM
-        self.model_ = SVC(C=self.C, kernel=self.kernel, random_state=self.random_state).fit(X, y)
+        estimator = SVC(C=self.C, kernel=self.kernel, random_state=self.random_state, gamma=self.gamma,
+                        coef0=self.coef0, degree=self.degree)
+        self.model_ = estimator.fit(X, y)
         self.coef_ = self.model_.dual_coef_[0]
         self.coef_indices_ = self.model_.support_
         self.intercept_ = self.model_.intercept_[0]
 
-        # make sure our decomposition is making the predictions as the svm
-        assert np.allclose(self.model_.predict(X), self.predict(X))
-        assert np.allclose(self.model_.decision_function(X), self.decision_function(X))
+        # # sanity check to make sure our decomposition is making the predictions as the svm
+        assert np.allclose(self.model_.predict(X[:10]), self.predict(X[:10]))
+        assert np.allclose(self.model_.decision_function(X[:10]), self.decision_function(X[:10]))
 
         return self
 
@@ -153,7 +179,7 @@ class BinarySVM(BaseEstimator, ClassifierMixin):
     # the similarity matrix all at once may be intractable, do them one at a time.
     def decision_function(self, X):
         assert X.ndim == 2
-        X_sim = self.kernel(X, self.X_train_[self.coef_indices_])
+        X_sim = self.kernel_func(X, self.X_train_[self.coef_indices_])
         decision = np.sum(X_sim * self.coef_, axis=1) + self.intercept_
         return decision
 
@@ -176,7 +202,7 @@ class BinarySVM(BaseEstimator, ClassifierMixin):
         The resulting array is of shape (1, n_train_samples).
         """
         assert x.shape == (1, self.X_train_.shape[1])
-        x_sim = self.kernel(x, self.X_train_[self.coef_indices_])
+        x_sim = self.kernel_func(x, self.X_train_[self.coef_indices_])
         impact = (x_sim * self.coef_)[0]
         indptr = np.array([0, len(impact)])
         return sps.csr_matrix((impact, self.coef_indices_, indptr), shape=(1, len(self.X_train_)))
@@ -287,8 +313,8 @@ class BinaryKernelLogisticRegression(BaseEstimator, ClassifierMixin):
         # make sure our decomposition is making the same predictions as liblinear
         liblinear_util.predict(train_data_path, model_path, prediction_path)
         pred_label, pred_proba = liblinear_util.parse_prediction_file(prediction_path, minus_to_zeros=True)
-        assert np.allclose(pred_label, self.predict(X))
-        assert np.allclose(pred_proba.flatten(), self.predict_proba(X).flatten())
+        assert np.allclose(pred_label[:10], self.predict(X)[:10])
+        assert np.allclose(pred_proba.flatten()[:10], self.predict_proba(X).flatten()[:10])
 
         return self
 
