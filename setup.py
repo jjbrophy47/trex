@@ -6,7 +6,48 @@ import re
 import codecs
 from setuptools import setup
 
+import distutils.cmd
+import distutils.log
+import setuptools
+import subprocess
+
 here = os.path.abspath(os.path.dirname(__file__))
+
+
+class LiblinearMake(distutils.cmd.Command):
+    """A custom command to run Pylint on all Python source files."""
+
+    description = 'compiles liblinear'
+    user_options = [
+        # The format is (long option, short option, description).
+        # ('pylint-rcfile=', None, 'path to Pylint config file'),
+    ]
+
+    def initialize_options(self):
+      """Set default values for options."""
+    #   # Each user option must be listed here with their default value.
+    #   self.pylint_rcfile = ''
+
+    def finalize_options(self):
+      """Post-process options."""
+    #   if self.pylint_rcfile:
+    #     assert os.path.exists(self.pylint_rcfile), (
+    #         'Pylint config file %s does not exist.' % self.pylint_rcfile)
+
+    def run(self):
+        """
+        Run command.
+        """
+        # command = ['pushd sexee/models/liblinear/ && make clean && make && popd']
+        # command = ['cd', 'sexee/models/liblinear/', '&&', 'make', 'clean', '&&', 'make', '&&', 'cd', '-']
+        command = 'cd sexee/models/liblinear/ && make clean && make && cd -'
+        # if self.pylint_rcfile:
+        #     command.append('--rcfile=%s' % self.pylint_rcfile)
+        #     command.append(os.getcwd())
+        self.announce('Running command: %s' % str(command), level=distutils.log.INFO)
+        # subprocess.check_call(command)
+
+        os.system(command)
 
 
 def read(*parts):
@@ -48,6 +89,9 @@ def run_setup(test_xgboost=True, test_lightgbm=True, test_catboost=True):
             'Programming Language :: Python :: 3',
             'Programming Language :: Python :: 3.7',
         ],
+        cmdclass={
+            'liblinearmake': LiblinearMake,
+        },
         zip_safe=False
     )
 

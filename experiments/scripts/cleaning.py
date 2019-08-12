@@ -295,18 +295,18 @@ def noise_detection(model_type='lgb', encoding='tree_path', dataset='iris', line
 
     # ours vs leafinfluence
     if model_type == 'cb' and inf_k is not None:
-        top_inf_ndx = np.argsort(np.abs(inf_scores))[::-1][:values_cutoff]
+        top_inf_ndx = np.argsort(inf_scores)[::-1][:values_cutoff]
 
         fig, ax = plt.subplots()
         ax.scatter(np.abs(our_train_weight[top_our_ndx]), inf_scores[top_our_ndx], color='green',
                    label='top {}: ours'.format(values_pct_str), alpha=alpha, marker='o')
-        ax.scatter(np.abs(our_train_weight[top_inf_ndx]), linear_loss[top_inf_ndx], color='orange',
-                   label='top {}: leaf_inf'.format(values_pct_str, linear_model), alpha=alpha, marker='X')
-        ax.set_ylabel('leafinfluence'.format(linear_model))
+        ax.scatter(np.abs(our_train_weight[top_inf_ndx]), inf_scores[top_inf_ndx], color='orange',
+                   label='top {}: leaf_inf'.format(values_pct_str), alpha=alpha, marker='X')
+        ax.set_ylabel('leafinfluence')
         ax.set_xlabel(r'ours (|$\alpha_i$|)')
         ax.legend()
         plt.savefig(os.path.join(instance_vals_dir, 'influence.pdf'), format='pdf', bbox_inches='tight')
-        np.save(os.path.join(instance_vals_dir, 'influence_instance_vals.npy'.format(linear_model)), linear_loss)
+        np.save(os.path.join(instance_vals_dir, 'influence_instance_vals.npy'), inf_scores)
 
     # plot results
     print('plotting...')
