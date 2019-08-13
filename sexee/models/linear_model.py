@@ -93,7 +93,14 @@ class SVM(BaseEstimator, ClassifierMixin):
             y = self.predict(X)
         assert len(y) == len(X)
 
-        return sps.vstack([self.ovr_.estimators_[y[i]].explain(x.reshape(1, -1)) for i, x in enumerate(X)])
+        # handle multiclass and binary slightly differently
+        if len(self.ovr_.estimators_) > 1:
+            result = sps.vstack([self.ovr_.estimators_[y[i]].explain(X[[i]]) for i in range(len(X))])
+        else:
+            result = sps.vstack([self.ovr_.estimators_[0].explain(X[[i]]) for i in range(len(X))])
+            result[np.where(y == 0)] *= -1
+
+        return result
 
     def _create_kernel_callable(self):
         assert self.kernel in ['rbf', 'poly', 'sigmoid', 'linear']
@@ -230,6 +237,7 @@ class KernelLogisticRegression(BaseEstimator, ClassifierMixin):
     def fit(self, X, y):
         self.X_train_ = X
         self.n_features_ = X.shape[1]
+        self.n_classes_ = len(np.unique(y))
         estimator = BinaryKernelLogisticRegression(C=self.C)
         self.ovr_ = OneVsRestClassifier(estimator).fit(X, y)
         self.coef_ = np.vstack([estimator.coef_ for estimator in self.ovr_.estimators_])
@@ -267,7 +275,14 @@ class KernelLogisticRegression(BaseEstimator, ClassifierMixin):
             y = self.predict(X)
         assert len(y) == len(X)
 
-        return np.vstack([self.ovr_.estimators_[y[i]].explain(x.reshape(1, -1)) for i, x in enumerate(X)])
+        # handle multiclass and binary slightly differently
+        if len(self.ovr_.estimators_) > 1:
+            result = np.vstack([self.ovr_.estimators_[y[i]].explain(X[[i]]) for i in range(len(X))])
+        else:
+            result = np.vstack([self.ovr_.estimators_[0].explain(X[[i]]) for i in range(len(X))])
+            result[np.where(y == 0)] *= -1
+
+        return result
 
 
 class BinaryKernelLogisticRegression(BaseEstimator, ClassifierMixin):

@@ -137,7 +137,6 @@ void do_predict(FILE *input, FILE *output)
 		{
 			int j;
 			predict_label = predict_probability(model_,x,prob_estimates);
-//            fprintf(output,"%g",predict_label);
             fprintf(output,"%g",predict_label);
 			for(j=0;j<model_->nr_class;j++)
 				fprintf(output," %g",prob_estimates[j]);

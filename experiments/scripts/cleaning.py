@@ -296,7 +296,7 @@ def noise_detection(model_type='lgb', encoding='tree_path', dataset='iris', line
 
     # ours vs leafinfluence
     if model_type == 'cb' and inf_k is not None:
-        top_inf_ndx = np.argsort(inf_scores)[::-1][:values_cutoff]
+        top_inf_ndx = np.argsort(inf_scores)[:values_cutoff]
 
         fig, ax = plt.subplots()
         ax.scatter(np.abs(our_train_weight[top_our_ndx]), inf_scores[top_our_ndx], color='green',

@@ -2494,17 +2494,6 @@ model* train(const problem *prob, const parameter *param)
 		// group training data of the same class
 		group_classes(prob,&nr_class,&label,&start,&count,perm);
 
-//        prob->perm = *perm;
-        
-//        for (int i = 0; i < l; i++) {
-//            prob->perm[i] = perm[i];
-//        }
-        
-//        for (int i = 0; i < l; i++) {
-//            printf("%d ", perm[i]);
-//        }
-//        printf("\n");
-
 		model_->nr_class=nr_class;
 		model_->label = Malloc(int,nr_class);
 		for(i=0;i<nr_class;i++)

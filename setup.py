@@ -24,12 +24,12 @@ class LiblinearMake(distutils.cmd.Command):
     ]
 
     def initialize_options(self):
-      """Set default values for options."""
+        """Set default values for options."""
     #   # Each user option must be listed here with their default value.
     #   self.pylint_rcfile = ''
 
     def finalize_options(self):
-      """Post-process options."""
+        """Post-process options."""
     #   if self.pylint_rcfile:
     #     assert os.path.exists(self.pylint_rcfile), (
     #         'Pylint config file %s does not exist.' % self.pylint_rcfile)
@@ -81,7 +81,7 @@ def run_setup(test_xgboost=True, test_lightgbm=True, test_catboost=True):
         author='Jonathan Brophy',
         author_email='jbrophy@cs.uoregon.edu',
         license='MIT',
-        packages=['sexee'],
+        packages=['sexee', 'sexee.models', 'sexee.utility', 'sexee.models.liblinear'],
         install_requires=['numpy', 'scipy', 'scikit-learn'],
         test_suite='nose.collector',
         tests_require=tests_require,
