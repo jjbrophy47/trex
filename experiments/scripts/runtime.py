@@ -14,7 +14,7 @@ from sklearn.base import clone
 from maple import MAPLE
 
 import sexee
-from util import model_util, data_util, exp_util
+from utility import model_util, data_util, exp_util
 
 
 def _our_method(test_ndx, X_test, model, X_train, y_train, encoding='leaf_output', linear_model='svm',
