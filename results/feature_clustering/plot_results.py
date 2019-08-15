@@ -17,22 +17,24 @@ def _get_results(dataset):
     return res
 
 
-def _plot_graph(ax, res, xlabel=None, ylabel=None, alpha=0.5):
+def _plot_graph(ax, res, xlabel=None, ylabel=None, alpha=0.5, s=100):
 
     ax.scatter(res['train_neg'][:, 0], res['train_neg'][:, 1], color='blue', alpha=alpha, label='train (y=0)',
-               marker='+')
+               marker='+', s=s, rasterized=True)
     ax.scatter(res['train_pos'][:, 0], res['train_pos'][:, 1], color='red', alpha=alpha, label='train (y=1)',
-               marker='1')
+               marker='1', s=s, rasterized=True)
     ax.scatter(res['test_neg'][:, 0], res['test_neg'][:, 1], color='cyan', alpha=alpha, label='test (y=0)',
-               marker='x')
+               marker='x', s=s, rasterized=True)
     ax.scatter(res['test_pos'][:, 0], res['test_pos'][:, 1], color='orange', alpha=alpha, label='test (y=1)',
-               marker='2')
+               marker='2', s=s, rasterized=True)
 
     if xlabel is not None:
-        ax.set_xlabel(xlabel)
+        ax.set_xlabel(xlabel, fontsize=22)
 
     if ylabel is not None:
-        ax.set_ylabel(ylabel)
+        ax.set_ylabel(ylabel, fontsize=22)
+
+    ax.tick_params(axis='both', which='major', labelsize=24)
 
 
 def main():
@@ -54,10 +56,11 @@ def main():
     _plot_graph(ax1, res_nc17leafoutput, xlabel='tsne 0', ylabel=None)
     _plot_graph(ax2, res_nc17mfc18leafoutput, xlabel='tsne 0', ylabel='tsne 1')
 
-    ax2.legend(loc='right', bbox_to_anchor=(0.75, -0.25), ncol=4)
+    ax2.legend(loc='right', bbox_to_anchor=(0.765, -0.5), ncol=2, fontsize=22)
     fig.subplots_adjust(bottom=0.2)
 
-    plt.savefig('clustering.pdf', format='pdf', bbox_inches='tight')
+    plt.tight_layout()
+    plt.savefig('clustering.pdf', format='pdf', bbox_inches='tight', rasterized=True)
 
 
 if __name__ == '__main__':

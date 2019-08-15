@@ -21,7 +21,8 @@ class SVM(BaseEstimator, ClassifierMixin):
     If multiclass, uses a one-vs-rest strategy and fits a BinaryKernelLogisticRegression classifier for each class.
     """
 
-    def __init__(self, C=1.0, kernel='linear', gamma='scale', coef0=0.0, degree=3, random_state=None):
+    def __init__(self, C=1.0, kernel='linear', gamma='scale', coef0=0.0, degree=3, pred_size=500,
+                 random_state=None):
         """
         Parameters
         ----------
@@ -36,6 +37,9 @@ class SVM(BaseEstimator, ClassifierMixin):
             Independent term in 'poly' and 'sigmoid'.
         degree: int (default=3)
             Degree of the 'poly' kernel.
+        pred_size: int (default=1000)
+            Max number of instancs to predict at one time. A higher number can
+            be faster, but requires more memory to create the similarity matrix.
         random_state: int (default=None)
             Number for reproducibility.
         """
@@ -44,6 +48,7 @@ class SVM(BaseEstimator, ClassifierMixin):
         self.gamma = gamma
         self.coef0 = coef0
         self.degree = degree
+        self.pred_size = pred_size
         self.random_state = random_state
 
     def fit(self, X, y):
@@ -51,7 +56,7 @@ class SVM(BaseEstimator, ClassifierMixin):
         self.n_features_ = X.shape[1]
         self._create_kernel_callable()
         estimator = BinarySVM(C=self.C, kernel=self.kernel, gamma=self.gamma_, coef0=self.coef0,
-                              degree=self.degree, kernel_func=self.kernel_func_,
+                              degree=self.degree, kernel_func=self.kernel_func_, pred_size=self.pred_size,
                               random_state=self.random_state)
         self.ovr_ = OneVsRestClassifier(estimator).fit(X, y)
         return self
@@ -134,7 +139,7 @@ class BinarySVM(BaseEstimator, ClassifierMixin):
     """
 
     def __init__(self, C=1.0, kernel='linear', gamma='scale', coef0=0.0, degree=3,
-                 kernel_func=None, random_state=None):
+                 kernel_func=None, pred_size=1000, random_state=None):
         """
         Parameters
         ----------
@@ -151,6 +156,9 @@ class BinarySVM(BaseEstimator, ClassifierMixin):
             Degree of the 'poly' kernel.
         kernel_func: callable (default=None)
             Callable similarity kernel.
+        pred_size: int (default=1000)
+            Max number of instancs to predict at one time. A higher number can
+            be faster, but requires more memory to create the similarity matrix.
         random_state: int (default=None)
             Number for reproducibility.
         """
@@ -160,10 +168,11 @@ class BinarySVM(BaseEstimator, ClassifierMixin):
         self.coef0 = coef0
         self.degree = degree
         self.kernel_func = kernel_func
+        self.pred_size = pred_size
         self.random_state = random_state
         assert callable(self.kernel_func)
 
-    def fit(self, X, y):
+    def fit(self, X, y, n_check=10):
 
         # store training instances for later use
         self.X_train_ = X
@@ -178,20 +187,28 @@ class BinarySVM(BaseEstimator, ClassifierMixin):
         self.intercept_ = self.model_.intercept_[0]
 
         # # sanity check to make sure our decomposition is making the predictions as the svm
-        assert np.allclose(self.model_.predict(X[:10]), self.predict(X[:10]))
-        assert np.allclose(self.model_.decision_function(X[:10]), self.decision_function(X[:10]))
+        assert np.allclose(self.model_.predict(X[:n_check]), self.predict(X[:n_check]))
+        assert np.allclose(self.model_.decision_function(X[:n_check]), self.decision_function(X[:n_check]))
 
         return self
 
-    # TODO: if X.shape[0] is large, and self.X_train_.shape[0] is also large, then computing
-    # the similarity matrix all at once may be intractable, do them one at a time.
     def decision_function(self, X):
+        """
+        Returns a 1d array of decision values of size=len(X).
+        """
         assert X.ndim == 2
-        X_sim = self.kernel_func(X, self.X_train_[self.coef_indices_])
-        decision = np.sum(X_sim * self.coef_, axis=1) + self.intercept_
+
+        decisions = []
+        for i in range(0, len(X), self.pred_size):
+            X_sim = self.kernel_func(X[i: i + self.pred_size], self.X_train_[self.coef_indices_])
+            decisions.append(np.sum(X_sim * self.coef_, axis=1) + self.intercept_)
+        decision = np.concatenate(decisions)
         return decision
 
     def predict(self, X):
+        """
+        Returns a 1d array of predicted labels of size=len(X).
+        """
         pred_label = np.where(self.decision_function(X) >= 0, 1, 0)
         return pred_label
 
@@ -223,22 +240,24 @@ class KernelLogisticRegression(BaseEstimator, ClassifierMixin):
     If multiclass, uses a one-vs-rest strategy and fits a BinaryKernelLogisticRegression classifier for each class.
     """
 
-    def __init__(self, C=1.0):
+    def __init__(self, C=1.0, pred_size=1000):
         """
         Parameters
         ----------
         C: float (default=1.0)
             Regularization parameter, where 0 <= alpha_i <= C.
-        random_state: int (default=None)
-            Number for reproducibility.
+        pred_size: int (default=1000)
+            Max number of instancs to predict at one time. A higher number can
+            be faster, but requires more memory to create the similarity matrix.
         """
         self.C = C
+        self.pred_size = pred_size
 
     def fit(self, X, y):
         self.X_train_ = X
         self.n_features_ = X.shape[1]
         self.n_classes_ = len(np.unique(y))
-        estimator = BinaryKernelLogisticRegression(C=self.C)
+        estimator = BinaryKernelLogisticRegression(C=self.C, pred_size=self.pred_size)
         self.ovr_ = OneVsRestClassifier(estimator).fit(X, y)
         self.coef_ = np.vstack([estimator.coef_ for estimator in self.ovr_.estimators_])
         return self
@@ -291,19 +310,23 @@ class BinaryKernelLogisticRegression(BaseEstimator, ClassifierMixin):
     Reference: https://www.csie.ntu.edu.tw/~cjlin/papers/liblinear.pdf
     """
 
-    def __init__(self, C=1.0, temp_dir='.temp_klr'):
+    def __init__(self, C=1.0, pred_size=1000, temp_dir='.temp_klr'):
         """
         Parameters
         ----------
         C: float (default=1.0)
             Regularization parameter, where 0 <= alpha_i <= C.
+        pred_size: int (default=1000)
+            Max number of instancs to predict at one time. A higher number can
+            be faster, but requires more memory to create the similarity matrix.
         temp_dir: str (default='.temp_klr')
             Temporary directory for storing liblinear models and prediction files.
         """
         self.C = C
+        self.pred_size = pred_size
         self.temp_dir = temp_dir
 
-    def fit(self, X, y):
+    def fit(self, X, y, n_check=10, atol=1e-5):
 
         # store training instances for later use
         self.X_train_ = X
@@ -329,33 +352,41 @@ class BinaryKernelLogisticRegression(BaseEstimator, ClassifierMixin):
         # make sure our decomposition is making the same predictions as liblinear
         liblinear_util.predict(train_data_path, model_path, prediction_path)
         pred_label, pred_proba = liblinear_util.parse_prediction_file(prediction_path, minus_to_zeros=True)
-        assert np.allclose(pred_label[:10], self.predict(X)[:10])
-        assert np.allclose(pred_proba.flatten()[:10], self.predict_proba(X).flatten()[:10])
+        assert np.allclose(pred_label[:n_check], self.predict(X[:n_check]))
+        assert np.allclose(pred_proba.flatten()[:n_check * 2], self.predict_proba(X[:n_check]).flatten(), atol=atol)
 
         return self
 
-    # TODO: if X.shape[0] is large, and self.X_train_.shape[0] is also large, then computing
-    # the similarity matrix all at once may be intractable, do them one at a time.
     def predict_proba(self, X):
+        """
+        Returns a 2d array of probabilities of shape (n_classes, len(X)).
+        """
         assert X.ndim == 2
-        X_sim = linear_kernel(X, self.X_train_)
-        proba_pos = self._sigmoid(np.sum(X_sim * self.coef_, axis=1)).reshape(-1, 1)
-        proba = np.hstack([1 - proba_pos, proba_pos])
+
+        pos_probas = []
+        for i in range(0, len(X), self.pred_size):
+            X_sim = linear_kernel(X[i: i + self.pred_size], self.X_train_)
+            pos_probas.append(self._sigmoid(np.sum(X_sim * self.coef_, axis=1)))
+        pos_proba = np.concatenate(pos_probas).reshape(-1, 1)
+        proba = np.hstack([1 - pos_proba, pos_proba])
         return proba
 
     def predict(self, X):
+        """
+        Returns a 1d array of predicted labels of size=len(X).
+        """
         pred_label = np.argmax(self.predict_proba(X), axis=1)
         return pred_label
 
     def get_weight(self):
         """
-        Return an array of train instance weights.
+        Return a 1d array of train instance weights.
         """
         return self.coef_.copy()
 
     def explain(self, x):
         """
-        Return an array of train instance impacts of shape (1, n_train_samples).
+        Return a 2d array of train instance impacts of shape (1, n_train_samples).
         """
         assert x.shape == (1, self.X_train_.shape[1])
         x_sim = linear_kernel(x, self.X_train_)

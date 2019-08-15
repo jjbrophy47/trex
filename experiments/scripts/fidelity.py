@@ -7,6 +7,7 @@ import time
 import argparse
 here = os.path.abspath(os.path.dirname(__file__))
 sys.path.insert(0, here + '/../')  # for utility
+sys.path.insert(0, here + '/../../')  # for libliner; TODO: remove this dependency
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -19,14 +20,33 @@ from utility import model_util, data_util
 def _plot_predictions(tree, explainer, data, ax=None):
 
     X_train, y_train, X_test, y_test = data
+    multiclass = True if len(np.unique(y_train)) > 2 else False
 
     # tree ensemble predictions
-    yhat_tree_train = tree.predict_proba(X_train).flatten()
-    yhat_tree_test = tree.predict_proba(X_test).flatten()
+    yhat_tree_train = tree.predict_proba(X_train)
+    yhat_tree_test = tree.predict_proba(X_test)
+
+    if not multiclass:
+        yhat_tree_train = yhat_tree_train[:, 1].flatten()
+        yhat_tree_test = yhat_tree_test[:, 1].flatten()
+    else:
+        yhat_tree_train = yhat_tree_train.flatten()
+        yhat_tree_test = yhat_tree_test.flatten()
 
     # linear model predictions
-    yhat_linear_train = explainer.decision_function(X_train).flatten()
-    yhat_linear_test = explainer.decision_function(X_test).flatten()
+    if explainer.linear_model == 'svm':
+        yhat_linear_train = explainer.decision_function(X_train).flatten()
+        yhat_linear_test = explainer.decision_function(X_test).flatten()
+    else:
+        yhat_linear_train = explainer.predict_proba(X_train)
+        yhat_linear_test = explainer.predict_proba(X_test)
+
+        if not multiclass:
+            yhat_linear_train = yhat_linear_train[:, 1].flatten()
+            yhat_linear_test = yhat_linear_test[:, 1].flatten()
+        else:
+            yhat_linear_train = yhat_linear_train.flatten()
+            yhat_linear_test = yhat_linear_test.flatten()
 
     # compute correlation between tree probabilities and linear probabilities/decision values
     train_pear = np.corrcoef(yhat_tree_train, yhat_linear_train)[0][1]
@@ -41,6 +61,11 @@ def _plot_predictions(tree, explainer, data, ax=None):
 
     ax.scatter(yhat_linear_train, yhat_tree_train, color='blue', label=train_label)
     ax.scatter(yhat_linear_test, yhat_tree_test, color='cyan', label=test_label)
+
+    res = {}
+    res['tree'] = {'train': yhat_tree_train, 'test': yhat_tree_test}
+    res['ours'] = {'train': yhat_linear_train, 'test': yhat_linear_test}
+    return res
 
 
 def fidelity(model='lgb', encoding='leaf_path', dataset='iris', n_estimators=100, random_state=69,
@@ -59,22 +84,26 @@ def fidelity(model='lgb', encoding='leaf_path', dataset='iris', n_estimators=100
     start = time.time()
     explainer = sexee.TreeExplainer(tree, X_train, y_train, encoding=encoding, linear_model=linear_model,
                                     kernel=kernel, random_state=random_state, use_predicted_labels=not true_label)
-    _plot_predictions(tree, explainer, data, ax=ax)
+    results = _plot_predictions(tree, explainer, data, ax=ax)
     print('time: {:.3f}s'.format(time.time() - start))
     true_label_str = 'true_label' if true_label else ''
-    ax.set_xlabel('svm decision')
-    ax.set_ylabel('{} proba'.format(model))
+    ax.set_xlabel('{}'.format(linear_model))
+    ax.set_ylabel('{}'.format(model))
     ax.set_title('{}, {}\n{}, {}, {}, {}'.format(dataset, model, linear_model, kernel, encoding, true_label_str))
     ax.legend()
     plt.tight_layout()
 
     # save plot
-    out_dir = os.path.join(out_dir, dataset)
+    setting = '{}_{}_{}_{}_{}'.format(model, linear_model, kernel, encoding, true_label_str)
+    out_dir = os.path.join(out_dir, dataset, setting)
     os.makedirs(out_dir, exist_ok=True)
-    out_fname = '{}_{}_{}_{}_{}.pdf'.format(model, linear_model, kernel, encoding, true_label_str)
-    plt.savefig(os.path.join(out_dir, out_fname), format='pdf', bbox_inches='tight')
+    plt.savefig(os.path.join(out_dir, 'fidelity.pdf'), format='pdf', bbox_inches='tight')
 
-    plt.show()
+    # save data
+    np.save(os.path.join(out_dir, 'tree_train.npy'), results['tree']['train'])
+    np.save(os.path.join(out_dir, 'tree_test.npy'), results['tree']['test'])
+    np.save(os.path.join(out_dir, 'ours_train.npy'), results['ours']['train'])
+    np.save(os.path.join(out_dir, 'ours_test.npy'), results['ours']['test'])
 
 
 if __name__ == '__main__':

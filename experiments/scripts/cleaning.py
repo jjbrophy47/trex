@@ -78,10 +78,10 @@ def _our_method(explainer, noisy_ndx, y_train, points=10, cutoff_pct=0.3):
     """Sorts train instances by largest weight support vectors."""
 
     train_weight = explainer.get_weight()[0]
-    n_check = len(np.where(np.abs(train_weight) > 0)[0])
+    # n_check = len(np.where(np.abs(train_weight) > 0)[0])
 
-    if n_check == len(y_train):
-        n_check = int(len(y_train) * cutoff_pct)
+    # if n_check == len(y_train):
+    n_check = int(len(y_train) * cutoff_pct)
 
     train_order = np.argsort(np.abs(train_weight))[::-1][:n_check]
     interval = (n_check / len(y_train)) / points
@@ -210,6 +210,8 @@ def noise_detection(model_type='lgb', encoding='tree_path', dataset='iris', line
     ckpt_ndx, fix_ndx, interval, n_check, our_train_weight = _our_method(explainer, noisy_ndx, y_train,
                                                                          cutoff_pct=check_pct)
     our_results = _interval_performance(ckpt_ndx, fix_ndx, noisy_ndx, clf, data, acc_test_noisy)
+    settings = '{}_{}'.format(linear_model, kernel)
+    settings += '_true_label' if true_label else ''
 
     # random method
     print('ordering by random...')
@@ -276,7 +278,7 @@ def noise_detection(model_type='lgb', encoding='tree_path', dataset='iris', line
     ax.set_xlabel(r'ours (|$\alpha_i$|)')
     ax.legend()
     plt.savefig(os.path.join(instance_vals_dir, 'tree_loss.pdf'), format='pdf', bbox_inches='tight')
-    np.save(os.path.join(instance_vals_dir, 'our{}_instance_vals.npy'.format(linear_model)), our_train_weight)
+    np.save(os.path.join(instance_vals_dir, 'our_{}_instance_vals.npy'.format(settings)), our_train_weight)
     np.save(os.path.join(instance_vals_dir, 'tree_instance_vals.npy'), tree_loss)
 
     # ours vs linear loss
@@ -292,7 +294,7 @@ def noise_detection(model_type='lgb', encoding='tree_path', dataset='iris', line
         ax.set_xlabel(r'ours (|$\alpha_i$|)')
         ax.legend()
         plt.savefig(os.path.join(instance_vals_dir, 'linear_loss.pdf'), format='pdf', bbox_inches='tight')
-        np.save(os.path.join(instance_vals_dir, 'linear{}_instance_vals.npy'.format(linear_model)), linear_loss)
+        np.save(os.path.join(instance_vals_dir, 'linear_{}_instance_vals.npy'.format(settings)), linear_loss)
 
     # ours vs leafinfluence
     if model_type == 'cb' and inf_k is not None:
@@ -359,10 +361,10 @@ def noise_detection(model_type='lgb', encoding='tree_path', dataset='iris', line
         np.save(os.path.join(effectiveness_dir, 'acc_test_clean.npy'), acc_test_clean)
 
         # ours
-        np.save(os.path.join(efficiency_dir, 'our{}_check_pct.npy'.format(linear_model)), our_check_pct)
-        np.save(os.path.join(efficiency_dir, 'our{}_fix_pct.npy'.format(linear_model)), our_fix_pct)
-        np.save(os.path.join(effectiveness_dir, 'our{}_check_pct.npy'.format(linear_model)), our_check_pct)
-        np.save(os.path.join(effectiveness_dir, 'our_{}acc.npy'.format(linear_model)), our_acc)
+        np.save(os.path.join(efficiency_dir, 'our_{}_check_pct.npy'.format(settings)), our_check_pct)
+        np.save(os.path.join(efficiency_dir, 'our_{}_fix_pct.npy'.format(settings)), our_fix_pct)
+        np.save(os.path.join(effectiveness_dir, 'our_{}_check_pct.npy'.format(settings)), our_check_pct)
+        np.save(os.path.join(effectiveness_dir, 'our_{}_acc.npy'.format(settings)), our_acc)
 
         # random
         np.save(os.path.join(efficiency_dir, 'rand_check_pct.npy'), rand_check_pct)
@@ -377,13 +379,13 @@ def noise_detection(model_type='lgb', encoding='tree_path', dataset='iris', line
         np.save(os.path.join(effectiveness_dir, 'tree_loss_acc.npy'), tree_loss_acc)
 
         if linear_model_loss:
-            np.save(os.path.join(efficiency_dir, 'linear{}_loss_check_pct.npy'.format(linear_model)),
+            np.save(os.path.join(efficiency_dir, 'linear_{}_loss_check_pct.npy'.format(settings)),
                     linear_loss_check_pct)
-            np.save(os.path.join(efficiency_dir, 'linear{}_loss_fix_pct.npy'.format(linear_model)),
+            np.save(os.path.join(efficiency_dir, 'linear_{}_loss_fix_pct.npy'.format(settings)),
                     linear_loss_fix_pct)
-            np.save(os.path.join(effectiveness_dir, 'linear{}_loss_check_pct.npy'.format(linear_model)),
+            np.save(os.path.join(effectiveness_dir, 'linear_{}_loss_check_pct.npy'.format(settings)),
                     linear_loss_check_pct)
-            np.save(os.path.join(effectiveness_dir, 'linear{}_loss_acc.npy'.format(linear_model)),
+            np.save(os.path.join(effectiveness_dir, 'linear_{}_loss_acc.npy'.format(settings)),
                     linear_loss_acc)
 
         if model_type == 'cb' and inf_k is not None:

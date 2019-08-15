@@ -1,5 +1,5 @@
 """
-This script takes results from multiople datasets, and plots them vertically.
+This script takes results from multiple datasets, and plots them vertically.
 """
 
 import os
@@ -26,15 +26,20 @@ def _dataset_results(dataset):
     return res
 
 
-def _plot_graph(ax, res, y_key, xlabel=None, ylabel=None):
+def _plot_graph(ax, res, y_key, xlabel=None, ylabel=None, markersize=11, linewidth=2):
 
     inf_label = 'leaf_inf (all)'
 
-    l1 = ax.plot(res['sexee']['check_pct'], res['sexee'][y_key], marker='.', color='g', label='ours')
-    l2 = ax.plot(res['rand']['check_pct'], res['rand'][y_key], marker='^', color='r', label='random')
-    l3 = ax.plot(res['tree_loss']['check_pct'], res['tree_loss'][y_key], marker='p', color='c', label='tree_loss')
-    l4 = ax.plot(res['svm_loss']['check_pct'], res['svm_loss'][y_key], marker='*', color='y', label='svm_loss')
-    l5 = ax.plot(res['influence']['check_pct'], res['influence'][y_key], marker='+', color='m', label=inf_label)
+    l1 = ax.plot(res['sexee']['check_pct'], res['sexee'][y_key], marker='.', color='g', label='ours',
+                 markersize=markersize + 2, linewidth=linewidth)
+    l2 = ax.plot(res['rand']['check_pct'], res['rand'][y_key], marker='^', color='r', label='random',
+                 markersize=markersize, linewidth=linewidth)
+    l3 = ax.plot(res['tree_loss']['check_pct'], res['tree_loss'][y_key], marker='p', color='c', label='tree_loss',
+                 markersize=markersize, linewidth=linewidth)
+    l4 = ax.plot(res['svm_loss']['check_pct'], res['svm_loss'][y_key], marker='*', color='y', label='svm_loss',
+                 markersize=markersize, linewidth=linewidth)
+    l5 = ax.plot(res['influence']['check_pct'], res['influence'][y_key], marker='+', color='m', label=inf_label,
+                 markersize=markersize, linewidth=linewidth)
     ax.tick_params(axis='both', which='major', labelsize=24)
 
     if y_key == 'acc':
@@ -51,8 +56,8 @@ def _plot_graph(ax, res, y_key, xlabel=None, ylabel=None):
 
 def main():
 
-    res_adult = _dataset_results('adult')
-    res_amazon = _dataset_results('amazon')
+    res_adult = _dataset_results('adult/svm')
+    res_amazon = _dataset_results('amazon/svm')
 
     fig, axs = plt.subplots(2, 2, figsize=(14, 12), sharex='col')
     axs = axs.flatten()
