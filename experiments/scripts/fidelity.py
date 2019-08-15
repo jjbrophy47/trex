@@ -17,7 +17,11 @@ import sexee
 from utility import model_util, data_util
 
 
-def _plot_predictions(tree, explainer, data, ax=None):
+def _sigmoid(x):
+    return 1 / (1 + np.exp(-x))
+
+
+def _plot_predictions(tree, explainer, data, ax=None, use_sigmoid=False):
 
     X_train, y_train, X_test, y_test = data
     multiclass = True if len(np.unique(y_train)) > 2 else False
@@ -48,6 +52,10 @@ def _plot_predictions(tree, explainer, data, ax=None):
             yhat_linear_train = yhat_linear_train.flatten()
             yhat_linear_test = yhat_linear_test.flatten()
 
+    if use_sigmoid and explainer.linear_model == 'svm':
+        yhat_linear_train = _sigmoid(yhat_linear_train)
+        yhat_linear_test = _sigmoid(yhat_linear_test)
+
     # compute correlation between tree probabilities and linear probabilities/decision values
     train_pear = np.corrcoef(yhat_tree_train, yhat_linear_train)[0][1]
     test_pear = np.corrcoef(yhat_tree_test, yhat_linear_test)[0][1]
@@ -69,7 +77,8 @@ def _plot_predictions(tree, explainer, data, ax=None):
 
 
 def fidelity(model='lgb', encoding='leaf_path', dataset='iris', n_estimators=100, random_state=69,
-             true_label=False, data_dir='data', linear_model='svm', kernel='rbf', out_dir='output/fidelity/'):
+             true_label=False, data_dir='data', linear_model='svm', kernel='rbf', use_sigmoid=False,
+             out_dir='output/fidelity/'):
 
     # get model and data
     clf = model_util.get_classifier(model, n_estimators=n_estimators, random_state=random_state)
@@ -84,9 +93,10 @@ def fidelity(model='lgb', encoding='leaf_path', dataset='iris', n_estimators=100
     start = time.time()
     explainer = sexee.TreeExplainer(tree, X_train, y_train, encoding=encoding, linear_model=linear_model,
                                     kernel=kernel, random_state=random_state, use_predicted_labels=not true_label)
-    results = _plot_predictions(tree, explainer, data, ax=ax)
+    results = _plot_predictions(tree, explainer, data, ax=ax, use_sigmoid=use_sigmoid)
     print('time: {:.3f}s'.format(time.time() - start))
     true_label_str = 'true_label' if true_label else ''
+    sigmoid_str = 'sigmoid' if use_sigmoid else ''
     ax.set_xlabel('{}'.format(linear_model))
     ax.set_ylabel('{}'.format(model))
     ax.set_title('{}, {}\n{}, {}, {}, {}'.format(dataset, model, linear_model, kernel, encoding, true_label_str))
@@ -94,7 +104,7 @@ def fidelity(model='lgb', encoding='leaf_path', dataset='iris', n_estimators=100
     plt.tight_layout()
 
     # save plot
-    setting = '{}_{}_{}_{}_{}'.format(model, linear_model, kernel, encoding, true_label_str)
+    setting = '{}_{}_{}_{}_{}_{}'.format(model, linear_model, kernel, encoding, true_label_str, sigmoid_str)
     out_dir = os.path.join(out_dir, dataset, setting)
     os.makedirs(out_dir, exist_ok=True)
     plt.savefig(os.path.join(out_dir, 'fidelity.pdf'), format='pdf', bbox_inches='tight')
@@ -117,7 +127,9 @@ if __name__ == '__main__':
     parser.add_argument('--n_estimators', metavar='N', type=int, default=100, help='number of trees in random forest.')
     parser.add_argument('--rs', metavar='RANDOM_STATE', type=int, default=69, help='for reproducibility.')
     parser.add_argument('--true_label', action='store_true', default=False, help='Use true labels for explainer.')
+    parser.add_argument('--use_sigmoid', action='store_true', default=False, help='Run svm results through sigmoid.')
     args = parser.parse_args()
     print(args)
     fidelity(model=args.model, encoding=args.encoding, dataset=args.dataset, n_estimators=args.n_estimators,
-             random_state=args.rs, true_label=args.true_label, linear_model=args.linear_model, kernel=args.kernel)
+             random_state=args.rs, true_label=args.true_label, linear_model=args.linear_model,
+             kernel=args.kernel, use_sigmoid=args.use_sigmoid)
