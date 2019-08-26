@@ -96,9 +96,9 @@ def _get_short_names(feature):
     return feature
 
 
-def misclassification(model='lgb', encoding='leaf_path', dataset='iris', n_estimators=100, random_state=69,
-                      topk_train=5, topk_test=1, data_dir='data', verbose=0, feature_length=20,
-                      linear_model='svm', kernel='linear', topk_feature=5):
+def misclassification(model='lgb', encoding='leaf_output', dataset='nc17_mfc18', n_estimators=100, random_state=69,
+                      topk_train=4, topk_test=1, data_dir='data', verbose=0, feature_length=20,
+                      linear_model='lr', kernel='linear', topk_feature=5, true_label=False):
 
     # get model and data
     clf = model_util.get_classifier(model, n_estimators=n_estimators, random_state=random_state)
@@ -107,6 +107,12 @@ def misclassification(model='lgb', encoding='leaf_path', dataset='iris', n_estim
 
     # shorten feature names
     feature = _get_short_names(feature)
+
+    remove_ndx = np.array([2, 4, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 25, 26, 29, 31, 32, 33, 34])
+
+    X_train = np.delete(X_train, remove_ndx, axis=1)
+    X_test = np.delete(X_test, remove_ndx, axis=1)
+    feature = np.delete(feature, remove_ndx)
 
     # remove_ndx = np.where(feature == 'lstmwresampling')[0]
     # X_train = np.delete(X_train, remove_ndx, axis=1)
@@ -119,7 +125,8 @@ def misclassification(model='lgb', encoding='leaf_path', dataset='iris', n_estim
 
     # train an svm on learned representations from the tree ensemble
     explainer = TreeExplainer(tree, X_train, y_train, encoding=encoding, random_state=random_state,
-                              linear_model=linear_model, kernel=kernel)
+                              dense_output=True, linear_model=linear_model, kernel=kernel,
+                              use_predicted_labels=not true_label)
 
     if verbose > 0:
         print(explainer)
@@ -139,10 +146,33 @@ def misclassification(model='lgb', encoding='leaf_path', dataset='iris', n_estim
     test_dist = test_dist[test_dist_ndx]
     both_missed_test = test_dist_ndx
 
+    test_dist_ndx1 = np.where((y_test == 1) & (tree.predict(X_test) == 0))[0]
+    print(test_dist_ndx1, test_dist_ndx1.shape)
+
+    test_dist_ndx2 = np.where((y_test == 0) & (tree.predict(X_test) == 1))[0]
+    print(test_dist_ndx2, test_dist_ndx2.shape)
+
+    # lstm_ndx = np.where(feature == 'lstmwresampling')[0]
+    # X_test[test_dist_ndx1, lstm_ndx] = 1.0
+    # X_test[test_dist_ndx2, lstm_ndx] = 0.0
+    # tree_yhat = model_util.performance(tree, X_train, y_train, X_test, y_test)
+
+    # # get worst missed test indices
+    # test_dist = exp_util.instance_loss(tree.predict_proba(X_test), y_test)
+    # test_dist_ndx = np.argsort(test_dist)[::-1]
+    # test_dist = test_dist[test_dist_ndx]
+    # both_missed_test = test_dist_ndx
+
+    # target_ndx = test_dist_ndx[np.where(test_dist >= 0)]
+    # print(target_ndx, target_ndx.shape)
+    # x_target = X_test[target_ndx][:, 16]
+    # print(len(np.where(x_target == -1)[0]), len(x_target))
+    # exit(0)
+
     # show explanations for missed instances
     test_str = '\ntest_{}\npredicted as {}, actual is {}'
-    train_str = '\ntrain_{} predicted as {}, actual is {}, contribution={:.3f}'
-    train_str2 = '\ntrain_{}\npredicted as {}, actual is {}'
+    train_str = 'train_{} predicted as {}, actual is {}, contribution={:.3f}'
+    train_str2 = 'train_{}\npredicted as {}, actual is {}'
 
     # explain test instances
     for test_ndx in both_missed_test[:topk_test]:
@@ -153,17 +183,18 @@ def misclassification(model='lgb', encoding='leaf_path', dataset='iris', n_estim
         shap_sum = np.sum(np.abs(test_shap[test_ndx]))
 
         # find the most impactful training instances
-        contributions = explainer.explain(x_test).toarray()[0]
+        contributions = explainer.explain(x_test)[0]
         sort_ndx = np.argsort(np.abs(contributions))[::-1]
+        contribution_sum = np.abs(contributions).sum()
 
         # display test instance
         test_instance_str = test_str.format(test_ndx, tree_pred_test[test_ndx], y_test[test_ndx])
         print(test_instance_str)
         for feature_name, feature_val, feature_shap in shap_list:
-            print('\t{}: val={:.3f}, shap={:.3f}'.format(feature_name, feature_val, feature_shap))
+            print('\t{}: val={:.3f}, shap={:.3f}'.format(feature_name, feature_val, feature_shap / shap_sum))
 
-        fig, axs = plt.subplots(1, 5, figsize=(30, 4))
-        _plot_instance(test_instance_str, shap_list, shap_sum=shap_sum, ax=axs[0])
+        # fig, axs = plt.subplots(1, 5, figsize=(30, 4))
+        # _plot_instance(test_instance_str, shap_list, shap_sum=shap_sum, ax=axs[0])
 
         # display training instances
         for i, train_ndx in enumerate(sort_ndx[:topk_train]):
@@ -174,26 +205,21 @@ def misclassification(model='lgb', encoding='leaf_path', dataset='iris', n_estim
 
             # display train instance
             train_instance_str = train_str.format(train_ndx, tree_pred_train[train_ndx], y_train[train_ndx],
-                                                  contributions[train_ndx])
+                                                  contributions[train_ndx] / contribution_sum)
             train_instance_str2 = train_str2.format(train_ndx, tree_pred_train[train_ndx], y_train[train_ndx])
             print(train_instance_str)
             for feature_name, feature_val, feature_shap in shap_list:
-                print('\t{}: val={:.3f}, shap={:.3f}'.format(feature_name, feature_val, feature_shap))
+                print('\t{}: val={:.3f}, shap={:.3f}'.format(feature_name, feature_val, feature_shap / shap_sum))
 
-            _plot_instance(train_instance_str2, shap_list, shap_sum=shap_sum, ax=axs[i + 1])
+            # _plot_instance(train_instance_str2, shap_list, shap_sum=shap_sum, ax=axs[i + 1])
 
-        # adjust spacing of the subplots
-        plt.subplots_adjust(wspace=0)
-        _shift_plot_right(axs[0], amt=-0.02)
+        # # adjust spacing of the subplots
+        # plt.subplots_adjust(wspace=0)
+        # _shift_plot_right(axs[0], amt=-0.02)
 
-        # # avoid overlapping labels
-        # xticks = axs[1].xaxis.get_major_ticks()
-        # xticks[5].label1.set_visible(False)
-        # xticks[5].tick1line.set_visible(False)
-
-        out_dir = os.path.join('output', 'misclassification')
-        os.makedirs(out_dir, exist_ok=True)
-        plt.savefig(os.path.join(out_dir, 'misclassification.pdf'), bbox_inches='tight')
+        # out_dir = os.path.join('output', 'misclassification')
+        # os.makedirs(out_dir, exist_ok=True)
+        # plt.savefig(os.path.join(out_dir, 'misclassification.pdf'), bbox_inches='tight')
 
 
 if __name__ == '__main__':

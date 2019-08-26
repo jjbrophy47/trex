@@ -66,8 +66,9 @@ def _maple_method(model, test_ndx, X_train, y_train, X_test, y_test):
     return fine_tune, test_time
 
 
-def runtime(model_type='lgb', linear_model='svm', kernel='rbf', encoding='tree_path', dataset='iris',
-            n_estimators=100, random_state=69, inf_k=None, repeats=10, true_label=False, maple=False):
+def runtime(model_type='cb', linear_model='svm', kernel='rbf', encoding='tree_path', dataset='iris',
+            n_estimators=100, random_state=69, inf_k=None, repeats=10, true_label=False, maple=False,
+            data_dir='data'):
     """
     Main method that trains a tree ensemble, then compares the runtime of different methods to explain
     a random subset of test instances.
@@ -83,7 +84,8 @@ def runtime(model_type='lgb', linear_model='svm', kernel='rbf', encoding='tree_p
 
         # get model and data
         clf = model_util.get_classifier(model_type, n_estimators=n_estimators, random_state=random_state)
-        X_train, X_test, y_train, y_test, label = data_util.get_data(dataset, random_state=random_state)
+        X_train, X_test, y_train, y_test, label = data_util.get_data(dataset, random_state=random_state,
+                                                                     data_dir=data_dir)
 
         print('train instances: {}'.format(len(X_train)))
         print('num features: {}'.format(X_train.shape[1]))

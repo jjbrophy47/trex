@@ -186,6 +186,7 @@ def feature_clustering(model='lgb', encoding='leaf_output', dataset='nc17_mfc18'
 
     plt.show()
 
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Feature representation extractions for tree ensembles',
                                      formatter_class=argparse.ArgumentDefaultsHelpFormatter)

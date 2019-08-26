@@ -166,9 +166,9 @@ def _influence_method(explainer, noisy_ndx, X_train, y_train, y_train_noisy, int
     return ckpt_ndx, fix_ndx, influence_scores, train_order
 
 
-def noise_detection(model_type='lgb', encoding='tree_path', dataset='iris', linear_model='svm',
+def noise_detection(model_type='lgb', encoding='leaf_output', dataset='adult', linear_model='svm',
                     n_estimators=100, random_state=69, linear_model_loss=False, inf_k=None, data_dir='data',
-                    flip_frac=0.4, true_label=False, kernel='rbf', out_dir='output/cleaning',
+                    flip_frac=0.4, true_label=False, kernel='linear', out_dir='output/cleaning',
                     save_plot=False, save_results=False, alpha=0.69, check_pct=0.3, values_pct=0.1):
     """
     Main method that trains a tree ensemble, flips a percentage of train labels, prioritizes train
@@ -269,47 +269,48 @@ def noise_detection(model_type='lgb', encoding='tree_path', dataset='iris', line
     top_our_ndx = np.argsort(np.abs(our_train_weight))[::-1][:values_cutoff]
     top_tree_ndx = np.argsort(np.abs(tree_loss))[::-1][:values_cutoff]
 
-    fig, ax = plt.subplots()
-    ax.scatter(np.abs(our_train_weight[top_our_ndx]), tree_loss[top_our_ndx], color='green',
-               label='top {}: ours'.format(values_pct_str), alpha=alpha, marker='o')
-    ax.scatter(np.abs(our_train_weight[top_tree_ndx]), tree_loss[top_tree_ndx], color='orange',
-               label='top {}: tree_loss'.format(values_pct_str), alpha=alpha, marker='X')
-    ax.set_ylabel('tree-ensemble (L1 loss)')
-    ax.set_xlabel(r'ours (|$\alpha_i$|)')
-    ax.legend()
-    plt.savefig(os.path.join(instance_vals_dir, 'tree_loss.pdf'), format='pdf', bbox_inches='tight')
-    np.save(os.path.join(instance_vals_dir, 'our_{}_instance_vals.npy'.format(settings)), our_train_weight)
-    np.save(os.path.join(instance_vals_dir, 'tree_instance_vals.npy'), tree_loss)
-
-    # ours vs linear loss
-    if linear_model_loss:
-        top_linear_ndx = np.argsort(np.abs(linear_loss))[::-1][:values_cutoff]
-
+    if save_plot:
         fig, ax = plt.subplots()
-        ax.scatter(np.abs(our_train_weight[top_our_ndx]), linear_loss[top_our_ndx], color='green',
+        ax.scatter(np.abs(our_train_weight[top_our_ndx]), tree_loss[top_our_ndx], color='green',
                    label='top {}: ours'.format(values_pct_str), alpha=alpha, marker='o')
-        ax.scatter(np.abs(our_train_weight[top_linear_ndx]), linear_loss[top_linear_ndx], color='orange',
-                   label='top {}: {}_loss'.format(values_pct_str, linear_model), alpha=alpha, marker='X')
-        ax.set_ylabel('{} (L1 loss)'.format(linear_model))
+        ax.scatter(np.abs(our_train_weight[top_tree_ndx]), tree_loss[top_tree_ndx], color='orange',
+                   label='top {}: tree_loss'.format(values_pct_str), alpha=alpha, marker='X')
+        ax.set_ylabel('tree-ensemble (L1 loss)')
         ax.set_xlabel(r'ours (|$\alpha_i$|)')
         ax.legend()
-        plt.savefig(os.path.join(instance_vals_dir, 'linear_loss.pdf'), format='pdf', bbox_inches='tight')
-        np.save(os.path.join(instance_vals_dir, 'linear_{}_instance_vals.npy'.format(settings)), linear_loss)
+        plt.savefig(os.path.join(instance_vals_dir, 'tree_loss.pdf'), format='pdf', bbox_inches='tight')
+        np.save(os.path.join(instance_vals_dir, 'our_{}_instance_vals.npy'.format(settings)), our_train_weight)
+        np.save(os.path.join(instance_vals_dir, 'tree_instance_vals.npy'), tree_loss)
 
-    # ours vs leafinfluence
-    if model_type == 'cb' and inf_k is not None:
-        top_inf_ndx = np.argsort(inf_scores)[:values_cutoff]
+        # ours vs linear loss
+        if linear_model_loss:
+            top_linear_ndx = np.argsort(np.abs(linear_loss))[::-1][:values_cutoff]
 
-        fig, ax = plt.subplots()
-        ax.scatter(np.abs(our_train_weight[top_our_ndx]), inf_scores[top_our_ndx], color='green',
-                   label='top {}: ours'.format(values_pct_str), alpha=alpha, marker='o')
-        ax.scatter(np.abs(our_train_weight[top_inf_ndx]), inf_scores[top_inf_ndx], color='orange',
-                   label='top {}: leaf_inf'.format(values_pct_str), alpha=alpha, marker='X')
-        ax.set_ylabel('leafinfluence')
-        ax.set_xlabel(r'ours (|$\alpha_i$|)')
-        ax.legend()
-        plt.savefig(os.path.join(instance_vals_dir, 'influence.pdf'), format='pdf', bbox_inches='tight')
-        np.save(os.path.join(instance_vals_dir, 'influence_instance_vals.npy'), inf_scores)
+            fig, ax = plt.subplots()
+            ax.scatter(np.abs(our_train_weight[top_our_ndx]), linear_loss[top_our_ndx], color='green',
+                       label='top {}: ours'.format(values_pct_str), alpha=alpha, marker='o')
+            ax.scatter(np.abs(our_train_weight[top_linear_ndx]), linear_loss[top_linear_ndx], color='orange',
+                       label='top {}: {}_loss'.format(values_pct_str, linear_model), alpha=alpha, marker='X')
+            ax.set_ylabel('{} (L1 loss)'.format(linear_model))
+            ax.set_xlabel(r'ours (|$\alpha_i$|)')
+            ax.legend()
+            plt.savefig(os.path.join(instance_vals_dir, 'linear_loss.pdf'), format='pdf', bbox_inches='tight')
+            np.save(os.path.join(instance_vals_dir, 'linear_{}_instance_vals.npy'.format(settings)), linear_loss)
+
+        # ours vs leafinfluence
+        if model_type == 'cb' and inf_k is not None:
+            top_inf_ndx = np.argsort(inf_scores)[:values_cutoff]
+
+            fig, ax = plt.subplots()
+            ax.scatter(np.abs(our_train_weight[top_our_ndx]), inf_scores[top_our_ndx], color='green',
+                       label='top {}: ours'.format(values_pct_str), alpha=alpha, marker='o')
+            ax.scatter(np.abs(our_train_weight[top_inf_ndx]), inf_scores[top_inf_ndx], color='orange',
+                       label='top {}: leaf_inf'.format(values_pct_str), alpha=alpha, marker='X')
+            ax.set_ylabel('leafinfluence')
+            ax.set_xlabel(r'ours (|$\alpha_i$|)')
+            ax.legend()
+            plt.savefig(os.path.join(instance_vals_dir, 'influence.pdf'), format='pdf', bbox_inches='tight')
+            np.save(os.path.join(instance_vals_dir, 'influence_instance_vals.npy'), inf_scores)
 
     # plot results
     print('plotting...')

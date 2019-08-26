@@ -17,7 +17,7 @@ def _get_results(dataset):
     return res
 
 
-def _plot_graph(ax, res, xlabel=None, ylabel=None, alpha=0.5, s=100):
+def _plot_graph(ax, res, xlabel=None, ylabel=None, alpha=0.5, s=100, title=''):
 
     ax.scatter(res['train_neg'][:, 0], res['train_neg'][:, 1], color='blue', alpha=alpha, label='train (y=0)',
                marker='+', s=s, rasterized=True)
@@ -35,6 +35,7 @@ def _plot_graph(ax, res, xlabel=None, ylabel=None, alpha=0.5, s=100):
         ax.set_ylabel(ylabel, fontsize=22)
 
     ax.tick_params(axis='both', which='major', labelsize=24)
+    ax.set_title(title, fontsize=24)
 
 
 def main():
@@ -52,12 +53,12 @@ def main():
     ax1 = fig.add_subplot(gs[0, 1])
     ax2 = fig.add_subplot(gs[1, :])  # second row, using all columns
 
-    _plot_graph(ax0, res_nc17none, xlabel='tsne 0', ylabel='tsne 1')
-    _plot_graph(ax1, res_nc17leafoutput, xlabel='tsne 0', ylabel=None)
-    _plot_graph(ax2, res_nc17mfc18leafoutput, xlabel='tsne 0', ylabel='tsne 1')
+    _plot_graph(ax0, res_nc17none, xlabel='tsne 0', ylabel='tsne 1', title='(a)')
+    _plot_graph(ax1, res_nc17leafoutput, xlabel='tsne 0', ylabel=None, title='(b)')
+    _plot_graph(ax2, res_nc17mfc18leafoutput, xlabel='tsne 0', ylabel='tsne 1', title='(c)')
 
     ax2.legend(loc='right', bbox_to_anchor=(0.765, -0.5), ncol=2, fontsize=22)
-    fig.subplots_adjust(bottom=0.2)
+    fig.subplots_adjust(bottom=0.85)
 
     plt.tight_layout()
     plt.savefig('clustering.pdf', format='pdf', bbox_inches='tight', rasterized=True)

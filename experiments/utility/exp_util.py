@@ -92,7 +92,8 @@ def log_loss_increase(yhat1, yhat2, y_true, sort='ascending', k=50):
 
 def instance_loss(y_hat, y_true=None, logloss=False):
     """
-    Returns the log loss per instance.
+    Returns the loss per instance.
+
     Parameters
     ----------
     y_hat : 1d or 2d array-like
@@ -102,6 +103,7 @@ def instance_loss(y_hat, y_true=None, logloss=False):
         True labels.
     logloss : bool (default=False)
         If True, returns loss values in log form.
+
     Returns
     -------
     1d array-like of loss values, one for each instance.
@@ -110,14 +112,28 @@ def instance_loss(y_hat, y_true=None, logloss=False):
     if y_hat.ndim == 2 and y_true is not None:
         assert len(y_hat) == len(y_true), 'y_hat is not the same len as y_true!'
         assert y_hat.shape[1] == len(np.unique(y_true)), 'number of classes do not match!'
-        y_hat = model_util.positive_class_proba(y_true, y_hat)
+        y_hat = positive_class_proba(y_true, y_hat)
 
     if logloss:
-        result = np.log(y_hat)
+        result = np.log(1 - y_hat)
     else:
         result = 1 - y_hat
 
     return result
+
+
+def positive_class_proba(labels, probas):
+    """
+    Given the predicted label of each sample and the probabilities for each class for each sample,
+    return the probabilities of the positive class for each sample.
+    """
+
+    assert labels.ndim == 1, 'labels is not 1d!'
+    assert probas.ndim == 2, 'probas is not 2d!'
+    assert len(labels) == len(probas), 'num samples do not match between labels and probas!'
+    y_pred = probas[np.arange(len(labels)), labels]
+    assert y_pred.ndim == 1, 'y_pred is not 1d!'
+    return y_pred
 
 
 def make_multiclass(yhat):
