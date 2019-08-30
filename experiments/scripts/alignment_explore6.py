@@ -5,13 +5,13 @@ Exploration: Examine the raw image data from the most impactful train instances 
 import os
 import argparse
 
-import sexee
+import trex
 import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.base import clone
 from PIL import Image, ExifTags
 
-from util import model_util, data_util, exp_util, print_util
+from utility import model_util, data_util, exp_util, print_util
 
 
 def _sort_impact(sv_ndx, impact):
@@ -114,7 +114,7 @@ def prediction_explanation(model='lgb', encoding='tree_path', dataset='medifor1b
 
     # fit a tree ensemble and an explainer for that tree ensemble
     tree = clone(clf).fit(X_train, y_train)
-    explainer = sexee.TreeExplainer(tree, X_train, y_train, encoding=encoding, use_predicted_labels=not true_label)
+    explainer = trex.TreeExplainer(tree, X_train, y_train, encoding=encoding, use_predicted_labels=not true_label)
 
     if show_performance:
         model_util.performance(tree, X_train, y_train, X_test, y_test)
@@ -167,6 +167,7 @@ def prediction_explanation(model='lgb', encoding='tree_path', dataset='medifor1b
                        dataset_dir=dataset_dir, impact=train_impact)
     plt.tight_layout()
     plt.show()
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Feature representation extractions for tree ensembles',

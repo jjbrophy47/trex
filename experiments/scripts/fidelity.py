@@ -13,7 +13,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from scipy.stats import spearmanr
 
-import sexee
+import trex
 from utility import model_util, data_util
 
 
@@ -78,12 +78,18 @@ def _plot_predictions(tree, explainer, data, ax=None, use_sigmoid=False):
 
 def fidelity(model='lgb', encoding='leaf_path', dataset='iris', n_estimators=100, random_state=69,
              true_label=False, data_dir='data', linear_model='svm', kernel='rbf', use_sigmoid=False,
-             out_dir='output/fidelity/'):
+             out_dir='output/fidelity/', flip_frac=None):
 
     # get model and data
     clf = model_util.get_classifier(model, n_estimators=n_estimators, random_state=random_state)
     X_train, X_test, y_train, y_test, label = data_util.get_data(dataset, random_state=random_state, data_dir=data_dir)
     data = X_train, y_train, X_test, y_test
+
+    # corrupt the data if specified
+    if flip_frac is not None:
+        y_train, noisy_ndx = data_util.flip_labels(y_train, k=flip_frac, random_state=random_state)
+        noisy_ndx = np.array(sorted(noisy_ndx))
+        print('num noisy labels: {}'.format(len(noisy_ndx)))
 
     # train a tree ensemble
     tree = clf.fit(X_train, y_train)
@@ -91,8 +97,8 @@ def fidelity(model='lgb', encoding='leaf_path', dataset='iris', n_estimators=100
     # plot fidelity
     fig, ax = plt.subplots()
     start = time.time()
-    explainer = sexee.TreeExplainer(tree, X_train, y_train, encoding=encoding, linear_model=linear_model,
-                                    kernel=kernel, random_state=random_state, use_predicted_labels=not true_label)
+    explainer = trex.TreeExplainer(tree, X_train, y_train, encoding=encoding, linear_model=linear_model,
+                                   kernel=kernel, random_state=random_state, use_predicted_labels=not true_label)
     results = _plot_predictions(tree, explainer, data, ax=ax, use_sigmoid=use_sigmoid)
     print('time: {:.3f}s'.format(time.time() - start))
     true_label_str = 'true_label' if true_label else ''

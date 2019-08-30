@@ -12,7 +12,7 @@ sys.path.insert(0, here + '/../')  # for utility
 sys.path.insert(0, here + '/../../')  # for libliner; TODO: remove this dependency
 
 import tqdm
-import sexee
+import trex
 import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.base import clone
@@ -151,9 +151,9 @@ def mismatch(model='lgb', encoding='leaf_output', dataset='hospital2', n_estimat
 
         # compute the most impactful train instances on the chosen test instances
         print('fitting explainer...')
-        explainer = sexee.TreeExplainer(tree, X_train, y_train, encoding=encoding, random_state=random_state,
-                                        use_predicted_labels=not train_true_label, linear_model=linear_model,
-                                        kernel=kernel, dense_output=True)
+        explainer = trex.TreeExplainer(tree, X_train, y_train, encoding=encoding, random_state=random_state,
+                                       use_predicted_labels=not train_true_label, linear_model=linear_model,
+                                       kernel=kernel, dense_output=True)
         y = None if not impact_true_label else y_test[test_target_ndx]
         print('explaining...')
         contributions = explainer.explain(X_test[test_target_ndx], y=y).T

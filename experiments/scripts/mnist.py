@@ -8,7 +8,7 @@ import argparse
 import warnings
 warnings.simplefilter(action='ignore', category=UserWarning)  # lgb compiler warning
 
-import sexee
+import trex
 import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.base import clone
@@ -87,9 +87,9 @@ def prediction_explanation(model='lgb', encoding='leaf_path', dataset='MFC18_Eva
     tree = clone(clf).fit(X_train_pca, y_train)
 
     print('fitting tree explainer...')
-    explainer = sexee.TreeExplainer(tree, X_train_pca, y_train, encoding=encoding, dense_output=True,
-                                    use_predicted_labels=not true_label, random_state=random_state,
-                                    kernel=kernel, linear_model=linear_model)
+    explainer = trex.TreeExplainer(tree, X_train_pca, y_train, encoding=encoding, dense_output=True,
+                                   use_predicted_labels=not true_label, random_state=random_state,
+                                   kernel=kernel, linear_model=linear_model)
     print(explainer)
 
     if show_performance:

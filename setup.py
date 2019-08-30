@@ -38,9 +38,9 @@ class LiblinearMake(distutils.cmd.Command):
         """
         Run command.
         """
-        # command = ['pushd sexee/models/liblinear/ && make clean && make && popd']
-        # command = ['cd', 'sexee/models/liblinear/', '&&', 'make', 'clean', '&&', 'make', '&&', 'cd', '-']
-        command = 'cd sexee/models/liblinear/ && make clean && make && cd -'
+        # command = ['pushd trex/models/liblinear/ && make clean && make && popd']
+        # command = ['cd', 'trex/models/liblinear/', '&&', 'make', 'clean', '&&', 'make', '&&', 'cd', '-']
+        command = 'cd trex/models/liblinear/ && make clean && make && cd -'
         # if self.pylint_rcfile:
         #     command.append('--rcfile=%s' % self.pylint_rcfile)
         #     command.append(os.getcwd())
@@ -74,14 +74,14 @@ def run_setup(test_xgboost=True, test_lightgbm=True, test_catboost=True):
         tests_require += ['catboost']
 
     setup(
-        name='sexee',
-        version=find_version("sexee", "__init__.py"),
+        name='trex',
+        version=find_version("trex", "__init__.py"),
         description='Instance-based explanations for tree ensembles',
         url='',
         author='Jonathan Brophy',
         author_email='jbrophy@cs.uoregon.edu',
         license='MIT',
-        packages=['sexee', 'sexee.models', 'sexee.utility', 'sexee.models.liblinear'],
+        packages=['trex', 'trex.models', 'trex.utility', 'trex.models.liblinear'],
         install_requires=['numpy', 'scipy', 'scikit-learn'],
         test_suite='nose.collector',
         tests_require=tests_require,

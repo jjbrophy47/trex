@@ -16,8 +16,8 @@ here = os.path.abspath(os.path.dirname(__file__))
 sys.path.insert(0, here + '/../../')  # for influence_boosting
 sys.path.insert(0, here + '/../')  # for utility
 
-import sexee
-from utility import model_util, data_util, exp_util
+import trex
+from utility import model_util, data_util
 
 
 def _retrain(train_order, clf, X_train, y_train, X_test, y_test, k=6):
@@ -65,8 +65,8 @@ def remove_data(model='lgb', dataset='nc17_mfc18', encoding='leaf_output', linea
     model_util.performance(tree, X_train, y_train, X_test, y_test)
     original_auroc = roc_auc_score(y_test, tree.predict_proba(X_test)[:, 1])
 
-    explainer = sexee.TreeExplainer(tree, X_train, y_train, encoding=encoding, kernel=kernel,
-                                    random_state=random_state, linear_model=linear_model, dense_output=True)
+    explainer = trex.TreeExplainer(tree, X_train, y_train, encoding=encoding, kernel=kernel,
+                                   random_state=random_state, linear_model=linear_model, dense_output=True)
     if verbose > 0:
         print(explainer)
 

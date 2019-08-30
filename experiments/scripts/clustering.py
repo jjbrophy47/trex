@@ -15,7 +15,7 @@ from sklearn.base import clone
 from sklearn.decomposition import PCA, TruncatedSVD
 from sklearn.manifold import TSNE
 
-import sexee
+import trex
 from utility import model_util, data_util
 
 
@@ -26,7 +26,24 @@ def feature_clustering(model='lgb', encoding='leaf_output', dataset='nc17_mfc18'
 
     # get model and data
     clf = model_util.get_classifier(model, n_estimators=n_estimators, random_state=random_state)
-    X_train, X_test, y_train, y_test, label = data_util.get_data(dataset, random_state=random_state, data_dir=data_dir)
+    X_train, X_test, y_train, y_test, label, feature = data_util.get_data(dataset, random_state=random_state,
+                                                                          data_dir=data_dir, return_feature=True)
+
+    # filter the features to be the same as MFC18
+    if dataset == 'NC17_EvalPart1':
+        _, _, _, _, _, reduced_feature = data_util.get_data('nc17_mfc18', random_state=random_state, data_dir=data_dir,
+                                                            return_feature=True)
+
+        keep_ndx = []
+        for f1 in reduced_feature:
+            for i, f2 in enumerate(feature):
+                if f1 == f2:
+                    keep_ndx.append(i)
+        keep_ndx = np.array(keep_ndx)
+
+        feature = feature[keep_ndx]
+        X_train = X_train[:, keep_ndx]
+        X_test = X_test[:, keep_ndx]
 
     # train a tree ensemble and explainer
     tree = clone(clf).fit(X_train, y_train)
@@ -44,8 +61,8 @@ def feature_clustering(model='lgb', encoding='leaf_output', dataset='nc17_mfc18'
 
     if encoding in ['leaf_output', 'leaf_path', 'feature_path']:
         print('exracting tree features...')
-        explainer = sexee.TreeExplainer(tree, X_train, y_train, encoding=encoding, random_state=random_state,
-                                        linear_model=linear_model, kernel=kernel)
+        explainer = trex.TreeExplainer(tree, X_train, y_train, encoding=encoding, random_state=random_state,
+                                       linear_model=linear_model, kernel=kernel)
         print(explainer)
         X_feature = explainer.transform(X_feature)
 

@@ -17,7 +17,7 @@ from sklearn.base import clone
 from sklearn.metrics import accuracy_score
 from sklearn.preprocessing import minmax_scale
 
-import sexee
+import trex
 from utility import model_util, data_util, exp_util
 from influence_boosting.influence.leaf_influence import CBLeafInfluenceEnsemble
 
@@ -75,12 +75,8 @@ def _record_fixes(train_order, noisy_ndx, train_len, interval):
 
 
 def _our_method(explainer, noisy_ndx, y_train, points=10, cutoff_pct=0.3):
-    """Sorts train instances by largest weight support vectors."""
 
     train_weight = explainer.get_weight()[0]
-    # n_check = len(np.where(np.abs(train_weight) > 0)[0])
-
-    # if n_check == len(y_train):
     n_check = int(len(y_train) * cutoff_pct)
 
     train_order = np.argsort(np.abs(train_weight))[::-1][:n_check]
@@ -204,9 +200,9 @@ def noise_detection(model_type='lgb', encoding='leaf_output', dataset='adult', l
 
     # our method
     print('\nordering by our method...')
-    explainer = sexee.TreeExplainer(model_noisy, X_train, y_train_noisy, encoding=encoding, dense_output=True,
-                                    random_state=random_state, use_predicted_labels=not true_label,
-                                    kernel=kernel, linear_model=linear_model)
+    explainer = trex.TreeExplainer(model_noisy, X_train, y_train_noisy, encoding=encoding, dense_output=True,
+                                   random_state=random_state, use_predicted_labels=not true_label,
+                                   kernel=kernel, linear_model=linear_model)
     ckpt_ndx, fix_ndx, interval, n_check, our_train_weight = _our_method(explainer, noisy_ndx, y_train,
                                                                          cutoff_pct=check_pct)
     our_results = _interval_performance(ckpt_ndx, fix_ndx, noisy_ndx, clf, data, acc_test_noisy)

@@ -202,46 +202,86 @@ def _load_hospital2(data_dir='data', feature=False):
         return X_train, X_test, y_train, y_test, label
 
 
-def _load_nc17_mfc18(data_dir='data', feature=False, switch=False):
-    train = np.load(os.path.join(data_dir, 'nc17_mfc18/NC17_EvalPart1.npy'))
-    test = np.load(os.path.join(data_dir, 'nc17_mfc18/MFC18_EvalPart1.npy'))
+def _load_nc17_mfc18(data_dir='data', return_feature=False, return_image_id=False, return_manipulation=False):
+    train = np.load(os.path.join(data_dir, 'nc17_mfc18/nc17.npy'))
+    test = np.load(os.path.join(data_dir, 'nc17_mfc18/mfc18.npy'))
     label = ['non-manipulated', 'manipulated']
     X_train = train[:, :-1]
     y_train = train[:, -1].astype(np.int32)
     X_test = test[:, :-1]
     y_test = test[:, -1].astype(np.int32)
 
-    if switch:
-        X_temp, y_temp = X_train.copy(), y_train.copy()
-        X_train, y_train = X_test, y_test
-        X_test, y_test = X_temp, y_temp
+    # remove features that have missing values in the test set
+    remove_ndx = np.array([2, 4, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 25, 26, 29, 31, 32, 33, 34])
+    X_train = np.delete(X_train, remove_ndx, axis=1)
+    X_test = np.delete(X_test, remove_ndx, axis=1)
 
-    if feature:
+    result = (X_train, X_test, y_train, y_test, label)
+
+    if return_feature:
         feature = np.load(os.path.join(data_dir, 'nc17_mfc18/feature.npy'))[:-1]
-        return X_train, X_test, y_train, y_test, label, feature
-    else:
-        return X_train, X_test, y_train, y_test, label
+        feature = np.delete(feature, remove_ndx)
+        result += (feature,)
+
+    if return_manipulation:
+        manipulation = pd.read_csv(os.path.join(data_dir, 'nc17_mfc18/nc17_manipulations.csv'))
+        manipulation_names = np.array(manipulation.columns)[2:]
+        manipulation = manipulation.to_numpy()[:, 2:]
+        result += (manipulation, manipulation_names)
+
+        manipulation = pd.read_csv(os.path.join(data_dir, 'nc17_mfc18/mfc18_manipulations.csv'))
+        manipulation_names = np.array(manipulation.columns)[2:]
+        manipulation = manipulation.to_numpy()[:, 2:]
+        result += (manipulation, manipulation_names)
+
+    if return_image_id:
+        train_id = pd.read_csv(os.path.join(data_dir, 'nc17_mfc18/nc17_reference.csv'))['image_id'].values
+        test_id = pd.read_csv(os.path.join(data_dir, 'nc17_mfc18/mfc18_reference.csv'))['image_id'].values
+        result += (train_id, test_id)
+
+    return result
 
 
-def _load_mfc18_mfc19(data_dir='data', feature=False, switch=False):
-    train = np.load(os.path.join(data_dir, 'mfc18_mfc19/MFC18_EvalPart1.npy'))
-    test = np.load(os.path.join(data_dir, 'mfc18_mfc19/MFC19_EvalPart1.npy'))
+def _load_mfc18_mfc19(data_dir='data', return_feature=False, return_image_id=False, return_manipulation=False):
+    train = np.load(os.path.join(data_dir, 'mfc18_mfc19/mfc18.npy'))
+    test = np.load(os.path.join(data_dir, 'mfc18_mfc19/mfc19.npy'))
     label = ['non-manipulated', 'manipulated']
     X_train = train[:, :-1]
     y_train = train[:, -1].astype(np.int32)
     X_test = test[:, :-1]
     y_test = test[:, -1].astype(np.int32)
 
-    if switch:
-        X_temp, y_temp = X_train.copy(), y_train.copy()
-        X_train, y_train = X_test, y_test
-        X_test, y_test = X_temp, y_temp
+    # remove features that have missing values in the test set
+    remove_train_ndx = np.where(X_train == -1)[0]
+    remove_test_ndx = np.where(X_test == -1)[0]
+    remove_ndx = np.union1d(remove_train_ndx, remove_test_ndx)
+    X_train = np.delete(X_train, remove_ndx, axis=1)
+    X_test = np.delete(X_test, remove_ndx, axis=1)
 
-    if feature:
+    result = (X_train, X_test, y_train, y_test, label)
+
+    if return_feature:
         feature = np.load(os.path.join(data_dir, 'mfc18_mfc19/feature.npy'))
-        return X_train, X_test, y_train, y_test, label, feature
-    else:
-        return X_train, X_test, y_train, y_test, label
+        feature = np.delete(feature, remove_ndx)
+        result += (feature,)
+
+    if return_manipulation:
+        manipulation = pd.read_csv(os.path.join(data_dir, 'mfc18_mfc19/mfc18_manipulations.csv'))
+        manipulation_names = np.array(manipulation.columns)[2:]
+        manipulation = manipulation.to_numpy()[:, 2:]
+        result += (manipulation, manipulation_names)
+
+        manipulation = pd.read_csv(os.path.join(data_dir, 'mfc18_mfc19/mfc19_manipulations.csv'))
+        manipulation_names = np.array(manipulation.columns)[2:]
+        manipulation = manipulation.to_numpy()[:, 2:]
+        result += (manipulation, manipulation_names)
+
+    if return_image_id:
+        train_id = pd.read_csv(os.path.join(data_dir, 'mfc18_mfc19/mfc18_reference.csv'))['image_id'].values
+        test_id = pd.read_csv(os.path.join(data_dir, 'mfc18_mfc19/mfc19_reference.csv'))['image_id'].values
+        result += (train_id, test_id)
+
+    return result
 
 
 def _load_medifor(data_dir='data', test_size=0.2, random_state=69, return_feature=False, return_manipulation=False,
@@ -367,13 +407,11 @@ def get_data(dataset, test_size=0.2, random_state=69, data_dir='data', return_fe
     elif dataset == 'hospital2':
         return _load_hospital2(data_dir=data_dir, feature=return_feature)
     elif dataset == 'nc17_mfc18':
-        return _load_nc17_mfc18(data_dir=data_dir, feature=return_feature)
-    elif dataset == 'nc17_mfc18_switch':
-        return _load_nc17_mfc18(data_dir=data_dir, feature=return_feature, switch=True)
+        return _load_nc17_mfc18(data_dir=data_dir, return_feature=return_feature,
+                                return_manipulation=return_manipulation, return_image_id=return_image_id)
     elif dataset == 'mfc18_mfc19':
-        return _load_mfc18_mfc19(data_dir=data_dir, feature=return_feature)
-    elif dataset == 'mfc18_mfc19_switch':
-        return _load_mfc18_mfc19(data_dir=data_dir, feature=return_feature, switch=True)
+        return _load_mfc18_mfc19(data_dir=data_dir, return_feature=return_feature,
+                                 return_manipulation=return_manipulation, return_image_id=return_image_id)
     elif dataset == 'NC17_EvalPart1':
         return _load_medifor(data_dir=data_dir, return_feature=return_feature, return_manipulation=return_manipulation,
                              dataset=dataset, test_size=test_size, random_state=random_state)

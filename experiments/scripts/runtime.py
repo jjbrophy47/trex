@@ -13,7 +13,7 @@ import numpy as np
 from sklearn.base import clone
 from maple import MAPLE
 
-import sexee
+import trex
 from utility import model_util, data_util, exp_util
 
 
@@ -22,8 +22,8 @@ def _our_method(test_ndx, X_test, model, X_train, y_train, encoding='leaf_output
     """Explains the predictions of each test instance."""
 
     start = time.time()
-    explainer = sexee.TreeExplainer(model, X_train, y_train, encoding=encoding, random_state=random_state,
-                                    linear_model=linear_model, kernel=kernel)
+    explainer = trex.TreeExplainer(model, X_train, y_train, encoding=encoding, random_state=random_state,
+                                   linear_model=linear_model, kernel=kernel)
     fine_tune = time.time() - start
 
     start = time.time()
@@ -98,7 +98,7 @@ def runtime(model_type='cb', linear_model='svm', kernel='rbf', encoding='tree_pa
         np.random.seed(random_state)
         test_ndx = np.random.choice(len(y_test), size=1, replace=False)
 
-        # train on predicted labels (sexee and maple methods only)
+        # train on predicted labels (ours and maple methods only)
         train_label = y_train if true_label else model.predict(X_train)
 
         # our method

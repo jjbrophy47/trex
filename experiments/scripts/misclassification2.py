@@ -1,6 +1,7 @@
 """
 Explanation of missclassified test instances for the NC17_EvalPart1 (train) and
-MFC18_EvalPart1 (test) dataset using TREX and SHAP.
+MFC18_EvalPart1 (test) dataset using TREX and SHAP. Visualize the instances using
+the raw images and their manipulation types.
 """
 import os
 import sys
@@ -11,7 +12,9 @@ sys.path.insert(0, here + '/../../')  # for libliner; TODO: remove this dependen
 
 import shap
 import numpy as np
+import pandas as pd
 import matplotlib.pyplot as plt
+from PIL import Image, ExifTags
 
 from trex.explainer import TreeExplainer
 from utility import model_util, data_util, exp_util
@@ -96,28 +99,122 @@ def _get_short_names(feature):
     return feature
 
 
+def _white_to_transparency(img):
+    from PIL import Image
+
+    x = np.asarray(img.convert('RGBA')).copy()
+    x[:, :, 3] = (255 * (x[:, :, :3] != 255).any(axis=2)).astype(np.uint8)
+    return Image.fromarray(x)
+
+
+def _get_top_contributors(contributions, pct=0.5):
+
+    sort_ndx = np.argsort(np.abs(contributions))[::-1]
+    contribution_sum = np.abs(contributions).sum()
+
+    total = 0.0
+    top_contributors = []
+
+    for i in sort_ndx:
+        total += abs(contributions[i])
+        top_contributors.append(i)
+
+        print(total, total / contribution_sum)
+        if total / contribution_sum >= pct:
+            break
+
+    return np.array(top_contributors)
+
+
+def _open_image(image_name, to_rgb=False, transparent_white=False):
+
+    img = Image.open(image_name)
+
+    if to_rgb:
+        img = img.convert('RGB')
+
+    # rotate image if exif data says to: https://stackoverflow.com/a/11543365
+    if hasattr(img, '_getexif'):  # only present in JPEGs
+
+        for orientation in ExifTags.TAGS.keys():
+            if ExifTags.TAGS[orientation] == 'Orientation':
+                break
+
+        e = img._getexif()       # returns None if no EXIF data
+        if e is not None:
+            exif = dict(e.items())
+
+            if orientation in exif:
+                orientation = exif[orientation]
+                if orientation == 3:
+                    img = img.rotate(180)
+                elif orientation == 6:
+                    img = img.rotate(270)
+                elif orientation == 8:
+                    img = img.rotate(90)
+
+    if transparent_white:
+        img = _white_to_transparency(img)
+
+    return img
+
+
+def _display_image(image_id, image_ref, probe_dir, ax=None, alpha=0.6, pred=None, actual=None, impact=None,
+                   manipulation=None):
+
+    if ax is None:
+        fig, ax = plt.subplots()
+
+    try:
+        image_info = image_ref[image_ref['image_id'] == image_id]
+        probe_fn = image_info['ProbeFileName'].values[0].split('/')[-1]
+        probe_img = _open_image(os.path.join(probe_dir, probe_fn))
+        ax.imshow(probe_img)
+    except Exception:
+        return
+
+    # mask_fn = image_info['ProbeMaskFileName'].values[0]
+    # if isinstance(mask_fn, str):
+    #     mask_fn = str(mask_fn).split('/')[-1]
+    #     mask_img = _open_image(os.path.join(dataset_dir, 'manipulation_mask', mask_fn),
+    #                            to_rgb=True, transparent_white=True)
+    #     mask_img = _white_to_transparency(mask_img)
+    #     ax.imshow(mask_img, alpha=alpha)
+
+    s = ''
+
+    if pred is not None:
+        s += 'predicted: {}\n'.format(pred)
+
+    if actual is not None:
+        s += 'label: {}'.format(actual)
+
+    if impact is not None:
+        s += '\nimpact: {:.3f}'.format(impact)
+    if manipulation is not None:
+        s += '\nmanipulation: {}'.format(' '.join(manipulation))
+
+    ax.axis('off')
+    ax.set_title(s, fontsize=11)
+
+
 def misclassification(model='lgb', encoding='leaf_output', dataset='nc17_mfc18', n_estimators=100, random_state=69,
                       topk_train=4, topk_test=1, data_dir='data', verbose=0, feature_length=20,
-                      linear_model='lr', kernel='linear', topk_feature=5, true_label=False):
+                      linear_model='lr', kernel='linear', topk_feature=5, true_label=False, alpha=0.5):
 
     # get model and data
     clf = model_util.get_classifier(model, n_estimators=n_estimators, random_state=random_state)
-    data = data_util.get_data(dataset, random_state=random_state, return_feature=True, data_dir=data_dir)
-    X_train, X_test, y_train, y_test, label, feature = data
+    data = data_util.get_data(dataset, random_state=random_state, data_dir=data_dir, return_feature=True,
+                              return_image_id=True, return_manipulation=True)
+    X_train, X_test, y_train, y_test, label, feature, trm, trm_name, tem, tem_name, id_train, id_test = data
+    train_dataset, test_dataset = dataset.split('_')
 
     # shorten feature names
     feature = _get_short_names(feature)
 
-    remove_ndx = np.array([2, 4, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 25, 26, 29, 31, 32, 33, 34])
-
-    X_train = np.delete(X_train, remove_ndx, axis=1)
-    X_test = np.delete(X_test, remove_ndx, axis=1)
-    feature = np.delete(feature, remove_ndx)
-
-    # remove_ndx = np.where(feature == 'lstmwresampling')[0]
-    # X_train = np.delete(X_train, remove_ndx, axis=1)
-    # X_test = np.delete(X_test, remove_ndx, axis=1)
-    # feature = np.delete(feature, remove_ndx)
+    print(feature, feature.shape)
+    print(X_train.shape)
+    print(X_test.shape)
 
     # train a tree ensemble
     tree = clf.fit(X_train, y_train)
@@ -152,23 +249,6 @@ def misclassification(model='lgb', encoding='leaf_output', dataset='nc17_mfc18',
     test_dist_ndx2 = np.where((y_test == 0) & (tree.predict(X_test) == 1))[0]
     print(test_dist_ndx2, test_dist_ndx2.shape)
 
-    # lstm_ndx = np.where(feature == 'lstmwresampling')[0]
-    # X_test[test_dist_ndx1, lstm_ndx] = 1.0
-    # X_test[test_dist_ndx2, lstm_ndx] = 0.0
-    # tree_yhat = model_util.performance(tree, X_train, y_train, X_test, y_test)
-
-    # # get worst missed test indices
-    # test_dist = exp_util.instance_loss(tree.predict_proba(X_test), y_test)
-    # test_dist_ndx = np.argsort(test_dist)[::-1]
-    # test_dist = test_dist[test_dist_ndx]
-    # both_missed_test = test_dist_ndx
-
-    # target_ndx = test_dist_ndx[np.where(test_dist >= 0)]
-    # print(target_ndx, target_ndx.shape)
-    # x_target = X_test[target_ndx][:, 16]
-    # print(len(np.where(x_target == -1)[0]), len(x_target))
-    # exit(0)
-
     # show explanations for missed instances
     test_str = '\ntest_{}\npredicted as {}, actual is {}'
     train_str = 'train_{} predicted as {}, actual is {}, contribution={:.3f}'
@@ -186,6 +266,13 @@ def misclassification(model='lgb', encoding='leaf_output', dataset='nc17_mfc18',
         contributions = explainer.explain(x_test)[0]
         sort_ndx = np.argsort(np.abs(contributions))[::-1]
         contribution_sum = np.abs(contributions).sum()
+
+        pct = 0.5
+        top_contributors = _get_top_contributors(contributions, pct=pct)
+        n_contribs = len(top_contributors)
+        pct_contribs = n_contribs / len(X_train) * 100
+        contrib_str = '\nTop contributors to explain {:.1f}%: {}, {:.1f}% of training'
+        print(contrib_str.format(pct * 100, n_contribs, pct_contribs))
 
         # display test instance
         test_instance_str = test_str.format(test_ndx, tree_pred_test[test_ndx], y_test[test_ndx])
@@ -220,6 +307,28 @@ def misclassification(model='lgb', encoding='leaf_output', dataset='nc17_mfc18',
         # out_dir = os.path.join('output', 'misclassification')
         # os.makedirs(out_dir, exist_ok=True)
         # plt.savefig(os.path.join(out_dir, 'misclassification.pdf'), bbox_inches='tight')
+
+        # show the raw image data
+        dataset_dir = os.path.join(data_dir, dataset)
+        train_image_ref = pd.read_csv(os.path.join(dataset_dir, '{}_image_ref.csv'.format(train_dataset)))
+        test_image_ref = pd.read_csv(os.path.join(dataset_dir, '{}_image_ref.csv'.format(test_dataset)))
+
+        # show the test image
+        print(tem[test_ndx])
+        manip_indices = np.where(tem[test_ndx] == 1)[0]
+        manipulation = tem_name[manip_indices]
+        _display_image(id_test[test_ndx], test_image_ref, alpha=alpha, pred=tree_pred_test[test_ndx],
+                       actual=y_test[test_ndx], manipulation=manipulation,
+                       probe_dir=os.path.join(dataset_dir, '{}_probe'.format(test_dataset)))
+
+        for i, train_ndx in enumerate(sort_ndx[:topk_train]):
+            print(trm[train_ndx])
+            manip_indices = np.where(trm[train_ndx] == 1)[0]
+            manipulation = trm_name[manip_indices]
+            _display_image(id_train[train_ndx], train_image_ref, alpha=alpha, pred=tree_pred_train[train_ndx],
+                           actual=y_train[train_ndx], manipulation=manipulation,
+                           probe_dir=os.path.join(dataset_dir, '{}_probe'.format(train_dataset)))
+        plt.show()
 
 
 if __name__ == '__main__':

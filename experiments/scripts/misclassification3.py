@@ -1,6 +1,6 @@
 """
 Explanation of missclassified test instances for the NC17_EvalPart1 (train) and
-MFC18_EvalPart1 (test) dataset using TREX and SHAP.
+MFC18_EvalPart1 (test) dataset using TREX and SHAP. Visualize the instances using histograms.
 """
 import os
 import sys
@@ -11,7 +11,9 @@ sys.path.insert(0, here + '/../../')  # for libliner; TODO: remove this dependen
 
 import shap
 import numpy as np
+import seaborn as sns
 import matplotlib.pyplot as plt
+from scipy import stats
 
 from trex.explainer import TreeExplainer
 from utility import model_util, data_util, exp_util
@@ -37,37 +39,44 @@ def _get_top_features(x, shap_vals, feature, k=5):
     return list(zip(feature[shap_sort_ndx], x[shap_sort_ndx], shap_vals[shap_sort_ndx]))[:k]
 
 
-def _plot_instance(instance_str, shap_list, shap_sum=None, ax=None):
-    """
-    Plot the the most impactful features for the given instance.
-    """
+def _plot_features(x_test, X_train, target_ndx, alt_ndx, feature, shap_vals, k=5):
 
-    shap_list = shap_list[::-1]
-    feature_name, feature_val, feature_shap = zip(*shap_list)
-    index = np.arange(len(feature_name))
+    fig, axs = plt.subplots(1, k, figsize=(24, 6))
+    axs = axs.flatten()
 
-    pos_ndx = np.where(np.array(feature_shap) > 0)[0]
+    x_test = x_test[0]
+    shap_sort_ndx = np.argsort(np.abs(shap_vals))[::-1][:k]
+    shap_sum = np.abs(shap_vals).sum()
 
-    bar_vals = np.abs(feature_shap)
-    if shap_sum is not None:
-        bar_vals /= shap_sum
+    for i, ndx in enumerate(shap_sort_ndx):
+        axs[i].axvline(x_test[ndx], linestyle='--', color='k')
+        sns.distplot(X_train[target_ndx][:, ndx], ax=axs[i], norm_hist=True, label='excitatory', color='g')
+        sns.distplot(X_train[alt_ndx][:, ndx], ax=axs[i], norm_hist=True, label='inhibitory', color='r')
+        axs[i].set_title('{}: {:.1f}%'.format(feature[ndx], shap_vals[ndx] / shap_sum * -100), fontsize=24)
 
-    barlist = ax.barh(index, bar_vals, color='#ADFF2F')
-    ax.yaxis.set_visible(False)
-    ax.xaxis.set_visible(False)
-    ax.set_title(instance_str, fontsize=22)
-    ax.set_ylabel('feature')
-    ax.set_xlabel('impact on prediction', fontsize=22)
-    ax.tick_params(axis='x', which='major', labelsize=24)
-    ax.spines['top'].set_visible(False)
-    ax.spines['bottom'].set_visible(False)
-    ax.spines['right'].set_visible(False)
+        if feature[ndx] == 'lstmwresampling':
+            axs[i].set_xlim(-0.25, 0.75)
 
-    for i, (name, val) in enumerate(zip(feature_name, feature_val)):
-        ax.text(0, i - 0.1, ' {} = {:.3f}'.format(name, val), color='k', fontsize=22)
+        if feature[ndx] == 'tallc':
+            axs[i].set_xlim(0.65, 0.75)
 
-    for ndx in pos_ndx:
-        barlist[ndx].set_color('#FA8072')  # light red
+        if feature[ndx] == 'contrast_enhance':
+            axs[i].set_xlim(0, 1)
+
+        axs[i].set_xlabel('value', fontsize=24)
+
+        if i == 0:
+            axs[i].set_ylabel('density', fontsize=24)
+
+        axs[i].tick_params(axis='both', which='major', labelsize=22, pad=15)
+
+    handles = axs[i].lines[1:]
+
+    fig.legend(handles, ('excitatory samples', 'inhibitory samples'), loc='center', ncol=2,
+               bbox_to_anchor=(0.5, 0.07), fontsize=24)
+    plt.tight_layout()
+    fig.subplots_adjust(bottom=0.35)
+    plt.subplots_adjust(wspace=0.25)
 
 
 def _shift_plot_right(ax, amt=0.02):
@@ -89,35 +98,50 @@ def _get_short_names(feature):
     replace['p_ucrlstmwresamplingwcmm2_1_0_mediforsystem'] = 'lstmwresampling'
     replace['p_uscisigradbased02a_0_2a_mediforsystem'] = 'gradbased'
     replace['p_purdueta11adoublejpegdetection_2_0_mediforsystem'] = 'doublejpeg'
-    replace['p_purdueta11acontrastenhancementdetection_1_0_mediforsystem'] = 'contrastenhance'
+    replace['p_purdueta11acontrastenhancementdetection_1_0_mediforsystem'] = 'contrast_enhance'
     replace['p_sriprita1imgmdlprnubased_1_0_mediforsystem'] = 'prnubased'
+    replace['p_ta11c_1_0_mediforsystem'] = 'tallc'
 
     feature = np.array([replace.get(f) if replace.get(f) is not None else f for f in feature])
     return feature
 
 
+def _get_top_contributors(contributions, pct=0.5, positive=False):
+
+    if positive and pct is None:
+        return np.where(contributions > 0)[0]
+
+    sort_ndx = np.argsort(np.abs(contributions))[::-1]
+    contribution_sum = np.abs(contributions).sum()
+
+    total = 0.0
+    top_contributors = []
+
+    for i in sort_ndx:
+
+        if positive and contributions[i] < 0:
+            continue
+
+        total += abs(contributions[i])
+        top_contributors.append(i)
+
+        if total / contribution_sum >= pct:
+            break
+
+    return np.array(top_contributors)
+
+
 def misclassification(model='lgb', encoding='leaf_output', dataset='nc17_mfc18', n_estimators=100, random_state=69,
                       topk_train=4, topk_test=1, data_dir='data', verbose=0, feature_length=20,
-                      linear_model='lr', kernel='linear', topk_feature=5, true_label=False):
+                      linear_model='lr', kernel='linear', topk_feature=5, true_label=False, alpha=0.5):
 
     # get model and data
     clf = model_util.get_classifier(model, n_estimators=n_estimators, random_state=random_state)
-    data = data_util.get_data(dataset, random_state=random_state, return_feature=True, data_dir=data_dir)
+    data = data_util.get_data(dataset, random_state=random_state, data_dir=data_dir, return_feature=True)
     X_train, X_test, y_train, y_test, label, feature = data
 
     # shorten feature names
     feature = _get_short_names(feature)
-
-    remove_ndx = np.array([2, 4, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 25, 26, 29, 31, 32, 33, 34])
-
-    X_train = np.delete(X_train, remove_ndx, axis=1)
-    X_test = np.delete(X_test, remove_ndx, axis=1)
-    feature = np.delete(feature, remove_ndx)
-
-    # remove_ndx = np.where(feature == 'lstmwresampling')[0]
-    # X_train = np.delete(X_train, remove_ndx, axis=1)
-    # X_test = np.delete(X_test, remove_ndx, axis=1)
-    # feature = np.delete(feature, remove_ndx)
 
     # train a tree ensemble
     tree = clf.fit(X_train, y_train)
@@ -147,32 +171,15 @@ def misclassification(model='lgb', encoding='leaf_output', dataset='nc17_mfc18',
     both_missed_test = test_dist_ndx
 
     test_dist_ndx1 = np.where((y_test == 1) & (tree.predict(X_test) == 0))[0]
-    print(test_dist_ndx1, test_dist_ndx1.shape)
-
     test_dist_ndx2 = np.where((y_test == 0) & (tree.predict(X_test) == 1))[0]
-    print(test_dist_ndx2, test_dist_ndx2.shape)
 
-    # lstm_ndx = np.where(feature == 'lstmwresampling')[0]
-    # X_test[test_dist_ndx1, lstm_ndx] = 1.0
-    # X_test[test_dist_ndx2, lstm_ndx] = 0.0
-    # tree_yhat = model_util.performance(tree, X_train, y_train, X_test, y_test)
-
-    # # get worst missed test indices
-    # test_dist = exp_util.instance_loss(tree.predict_proba(X_test), y_test)
-    # test_dist_ndx = np.argsort(test_dist)[::-1]
-    # test_dist = test_dist[test_dist_ndx]
-    # both_missed_test = test_dist_ndx
-
-    # target_ndx = test_dist_ndx[np.where(test_dist >= 0)]
-    # print(target_ndx, target_ndx.shape)
-    # x_target = X_test[target_ndx][:, 16]
-    # print(len(np.where(x_target == -1)[0]), len(x_target))
-    # exit(0)
+    if verbose > 0:
+        print(test_dist_ndx1, test_dist_ndx1.shape)
+        print(test_dist_ndx2, test_dist_ndx2.shape)
 
     # show explanations for missed instances
     test_str = '\ntest_{}\npredicted as {}, actual is {}'
     train_str = 'train_{} predicted as {}, actual is {}, contribution={:.3f}'
-    train_str2 = 'train_{}\npredicted as {}, actual is {}'
 
     # explain test instances
     for test_ndx in both_missed_test[:topk_test]:
@@ -187,14 +194,43 @@ def misclassification(model='lgb', encoding='leaf_output', dataset='nc17_mfc18',
         sort_ndx = np.argsort(np.abs(contributions))[::-1]
         contribution_sum = np.abs(contributions).sum()
 
+        if verbose > 0:
+            print(stats.describe(np.abs(contributions)))
+            print(tree.predict_proba(x_test))
+
+        pos_contributors = np.where(contributions > 0)[0]
+        neg_contributors = np.where(contributions < 0)[0]
+
+        # show stats for positive contributors
+        n_contribs = len(pos_contributors)
+        pct_contribs = n_contribs / len(X_train) * 100
+        pct_contrib = np.abs(contributions[pos_contributors]).sum() / contribution_sum * 100
+        contrib_str = 'Positive contributors, {:.1f}% of explanation: {}, {:.1f}% of training'
+        print(contrib_str.format(pct_contrib, n_contribs, pct_contribs))
+
+        # show stats for negative contributors
+        n_contribs = len(neg_contributors)
+        pct_contribs = n_contribs / len(X_train) * 100
+        pct_contrib = np.abs(contributions[neg_contributors]).sum() / contribution_sum * 100
+        contrib_str = 'Negative contributors, {:.1f}% of explanation: {}, {:.1f}% of training'
+        print(contrib_str.format(pct_contrib, n_contribs, pct_contribs))
+
+        # how often do the top contributors share the same predicted label
+        # as the test instance's predicted label
+        shared_ndx = np.where(tree_pred_train[pos_contributors] == tree_pred_test[test_ndx])[0]
+        if verbose > 0:
+            print('{} / {}'.format(len(shared_ndx), len(pos_contributors)))
+
+        # plot feature histograms for specific train instances
+        _plot_features(x_test, X_train, pos_contributors, neg_contributors, feature, test_shap[test_ndx],
+                       k=topk_feature)
+        plt.savefig(os.path.join('output', 'misclassification', 'histogram.pdf'), bbox_inches='tight')
+
         # display test instance
         test_instance_str = test_str.format(test_ndx, tree_pred_test[test_ndx], y_test[test_ndx])
         print(test_instance_str)
         for feature_name, feature_val, feature_shap in shap_list:
             print('\t{}: val={:.3f}, shap={:.3f}'.format(feature_name, feature_val, feature_shap / shap_sum))
-
-        # fig, axs = plt.subplots(1, 5, figsize=(30, 4))
-        # _plot_instance(test_instance_str, shap_list, shap_sum=shap_sum, ax=axs[0])
 
         # display training instances
         for i, train_ndx in enumerate(sort_ndx[:topk_train]):
@@ -206,20 +242,11 @@ def misclassification(model='lgb', encoding='leaf_output', dataset='nc17_mfc18',
             # display train instance
             train_instance_str = train_str.format(train_ndx, tree_pred_train[train_ndx], y_train[train_ndx],
                                                   contributions[train_ndx] / contribution_sum)
-            train_instance_str2 = train_str2.format(train_ndx, tree_pred_train[train_ndx], y_train[train_ndx])
             print(train_instance_str)
             for feature_name, feature_val, feature_shap in shap_list:
                 print('\t{}: val={:.3f}, shap={:.3f}'.format(feature_name, feature_val, feature_shap / shap_sum))
 
-            # _plot_instance(train_instance_str2, shap_list, shap_sum=shap_sum, ax=axs[i + 1])
-
-        # # adjust spacing of the subplots
-        # plt.subplots_adjust(wspace=0)
-        # _shift_plot_right(axs[0], amt=-0.02)
-
-        # out_dir = os.path.join('output', 'misclassification')
-        # os.makedirs(out_dir, exist_ok=True)
-        # plt.savefig(os.path.join(out_dir, 'misclassification.pdf'), bbox_inches='tight')
+        plt.show()
 
 
 if __name__ == '__main__':
