@@ -2,10 +2,13 @@
 Utility methods to make life easier.
 """
 import os
+
 import numpy as np
 import pandas as pd
 from sklearn.datasets import load_iris, load_breast_cancer, load_wine
 from sklearn.model_selection import train_test_split
+from sklearn.datasets import fetch_20newsgroups
+from sklearn.feature_extraction.text import TfidfVectorizer
 
 
 def _load_wikipedia(test_size=0.2, random_state=69, data_dir='data', return_feature=False):
@@ -202,7 +205,8 @@ def _load_hospital2(data_dir='data', feature=False):
         return X_train, X_test, y_train, y_test, label
 
 
-def _load_nc17_mfc18(data_dir='data', return_feature=False, return_image_id=False, return_manipulation=False):
+def _load_nc17_mfc18(data_dir='data', return_feature=False, return_image_id=False, return_manipulation=False,
+                     remove_missing_features=False):
     train = np.load(os.path.join(data_dir, 'nc17_mfc18/nc17.npy'))
     test = np.load(os.path.join(data_dir, 'nc17_mfc18/mfc18.npy'))
     label = ['non-manipulated', 'manipulated']
@@ -212,15 +216,17 @@ def _load_nc17_mfc18(data_dir='data', return_feature=False, return_image_id=Fals
     y_test = test[:, -1].astype(np.int32)
 
     # remove features that have missing values in the test set
-    remove_ndx = np.array([2, 4, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 25, 26, 29, 31, 32, 33, 34])
-    X_train = np.delete(X_train, remove_ndx, axis=1)
-    X_test = np.delete(X_test, remove_ndx, axis=1)
+    if remove_missing_features:
+        remove_ndx = np.array([2, 4, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 25, 26, 29, 31, 32, 33, 34])
+        X_train = np.delete(X_train, remove_ndx, axis=1)
+        X_test = np.delete(X_test, remove_ndx, axis=1)
 
     result = (X_train, X_test, y_train, y_test, label)
 
     if return_feature:
         feature = np.load(os.path.join(data_dir, 'nc17_mfc18/feature.npy'))[:-1]
-        feature = np.delete(feature, remove_ndx)
+        if remove_missing_features:
+            feature = np.delete(feature, remove_ndx)
         result += (feature,)
 
     if return_manipulation:
@@ -375,8 +381,52 @@ def _load_mnist(data_dir='data', dataset='mnist'):
     return X_train, X_test, y_train, y_test, label
 
 
+def _load_20newsgroups(data_dir='data', dataset='alt.atheism|talk.religion.misc',
+                       remove=('headers', 'footers', 'quotes'), return_raw=True):
+    categories = dataset.split('_')
+    newsgroups_train = fetch_20newsgroups(subset='train', categories=categories, remove=remove)
+    newsgroups_test = fetch_20newsgroups(subset='test', categories=categories, remove=remove)
+    vectorizer = TfidfVectorizer()
+    X_train = vectorizer.fit_transform(newsgroups_train.data)
+    y_train = newsgroups_train.target
+    X_test = vectorizer.transform(newsgroups_test.data)
+    y_test = newsgroups_test.target
+    label = newsgroups_train.target_names
+
+    result = X_train, X_test, y_train, y_test, label
+
+    if return_raw:
+        result += (newsgroups_train.data, newsgroups_test.data)
+
+    return result
+
+
+def _load_dota2(data_dir='data'):
+    train = np.load(os.path.join(data_dir, 'dota2/train.npy'))
+    test = np.load(os.path.join(data_dir, 'dota2/test.npy'))
+    label = ['-1', '1']
+    X_train = train[:, 1:]
+    y_train = train[:, 0].astype(np.int32)
+    X_test = test[:, 1:]
+    y_test = test[:, 0].astype(np.int32)
+    return X_train, X_test, y_train, y_test, label
+
+
+def _load_census(data_dir='data'):
+    train = np.load(os.path.join(data_dir, 'census/train.npy'))
+    test = np.load(os.path.join(data_dir, 'census/test.npy'))
+    label = ['0', '1']
+    X_train = train[:, :-1]
+    y_train = train[:, -1].astype(np.int32)
+    X_test = test[:, :-1]
+    y_test = test[:, -1].astype(np.int32)
+    return X_train, X_test, y_train, y_test, label
+
+
 def get_data(dataset, test_size=0.2, random_state=69, data_dir='data', return_feature=False,
-             return_manipulation=False, return_image_id=False):
+             return_manipulation=False, return_image_id=False, remove_missing_features=False,
+             categories='alt.atheism|talk.religion.misc', remove=('headers', 'footers', 'quotes'),
+             return_raw=True):
     """Returns a train and test set from the desired dataset."""
 
     # load dataset
@@ -388,6 +438,8 @@ def get_data(dataset, test_size=0.2, random_state=69, data_dir='data', return_fe
         return _load_wine(test_size=test_size, random_state=random_state, return_feature=return_feature)
     elif dataset == 'adult':
         return _load_adult(data_dir=data_dir)
+    elif dataset == 'census':
+        return _load_census(data_dir=data_dir)
     elif dataset == 'amazon':
         return _load_amazon(data_dir=data_dir)
     elif dataset == 'banknote':
@@ -408,7 +460,8 @@ def get_data(dataset, test_size=0.2, random_state=69, data_dir='data', return_fe
         return _load_hospital2(data_dir=data_dir, feature=return_feature)
     elif dataset == 'nc17_mfc18':
         return _load_nc17_mfc18(data_dir=data_dir, return_feature=return_feature,
-                                return_manipulation=return_manipulation, return_image_id=return_image_id)
+                                return_manipulation=return_manipulation, return_image_id=return_image_id,
+                                remove_missing_features=remove_missing_features)
     elif dataset == 'mfc18_mfc19':
         return _load_mfc18_mfc19(data_dir=data_dir, return_feature=return_feature,
                                  return_manipulation=return_manipulation, return_image_id=return_image_id)
@@ -425,6 +478,10 @@ def get_data(dataset, test_size=0.2, random_state=69, data_dir='data', return_fe
                              random_state=random_state)
     elif dataset.startswith('mnist'):
         return _load_mnist(data_dir=data_dir, dataset=dataset)
+    elif dataset == '20newsgroups':
+        return _load_20newsgroups(data_dir=data_dir, dataset=categories, remove=remove, return_raw=return_raw)
+    elif dataset == 'dota2':
+        return _load_dota2(data_dir=data_dir)
     else:
         exit('dataset {} not supported'.format(dataset))
 

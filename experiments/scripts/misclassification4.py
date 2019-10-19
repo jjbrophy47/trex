@@ -1,6 +1,7 @@
 """
 Explanation of missclassified test instances for the NC17_EvalPart1 (train) and
-MFC18_EvalPart1 (test) dataset using TREX and SHAP. Visualize the instances using histograms.
+MFC18_EvalPart1 (test) dataset using TREX. Visualizes the similarity vs weight for
+excitatory and inhibitory training samples.
 """
 import os
 import sys
@@ -54,9 +55,9 @@ def _plot_features(x_test, X_train, target_ndx, alt_ndx, feature, shap_vals, tra
         axs[i].axvline(x_test[ndx], linestyle='--', color='k')
 
         sns.distplot(X_train[target_ndx][:, ndx], ax=axs[i], norm_hist=True, label='excitatory', color='g',
-                     kde=True, bins=None, kde_kws={'shade': True}, hist=False)
+                     kde=True, bins=None)
         sns.distplot(X_train[alt_ndx][:, ndx], ax=axs[i], norm_hist=True, label='inhibitory', color='r',
-                     kde=True, bins=None, kde_kws={'shade': True}, hist=False)
+                     kde=True, bins=None)
 
         # sns.distplot(X_train[target_ndx][:, ndx], ax=axs[i], norm_hist=True, label='excitatory', color='g',
         #              hist_kws={'weights': weight[target_ndx]}, kde=False, bins=None)
@@ -230,21 +231,38 @@ def misclassification(model='lgb', encoding='leaf_output', dataset='nc17_mfc18',
         # neg_contributors = top_contributors
 
         # high-weighted instances vs low-weighted instances
-        pos_contributors = _get_top_contributors(contributions, pct=top_pct)
-        neg_contributors = np.setdiff1d(sort_ndx, pos_contributors)
+        # pos_contributors = _get_top_contributors(contributions, pct=top_pct)
+        # neg_contributors = np.setdiff1d(sort_ndx, pos_contributors)
 
         # excitatory vs inhibitory instances
-        # pos_contributors = np.where(contributions > 0)[0]
-        # neg_contributors = np.where(contributions < 0)[0]
+        pos_contributors = np.where(contributions > 0)[0]
+        neg_contributors = np.where(contributions < 0)[0]
 
         s = np.argsort(np.abs(contributions[pos_contributors]))
 
-        print(train_weight[pos_contributors][s])
+        alpha = 0.69
+
+        # plot similarity vs weight for excitatory and inhibitory samples
         sim = explainer.similarity(x_test)[0]
-        print(sim[pos_contributors][s])
-        print(contributions[pos_contributors][s])
-        print(y_train[pos_contributors][s])
-        print(tree_pred_train[pos_contributors][s])
+        fig, ax = plt.subplots()
+        ax.scatter(sim[pos_contributors], train_weight[pos_contributors], color='g', label='excitatory', alpha=alpha)
+        ax.scatter(sim[neg_contributors], train_weight[neg_contributors], color='r', label='inhibitory', alpha=alpha)
+        ax.set_xlabel('similarity')
+        ax.set_ylabel('weight')
+        ax.legend()
+        plt.show()
+
+        # plot similarity vs absolute weight for excitatory and inhibitory samples
+        sim = explainer.similarity(x_test)[0]
+        fig, ax = plt.subplots()
+        ax.scatter(sim[pos_contributors], np.abs(train_weight)[pos_contributors], color='g', label='excitatory',
+                   alpha=alpha)
+        ax.scatter(sim[neg_contributors], np.abs(train_weight)[neg_contributors], color='r', label='inhibitory',
+                   alpha=alpha)
+        ax.set_xlabel('similarity')
+        ax.set_ylabel('|weight|')
+        ax.legend()
+        plt.show()
 
         # show stats for positive contributors
         n_contribs = len(pos_contributors)
@@ -267,9 +285,9 @@ def misclassification(model='lgb', encoding='leaf_output', dataset='nc17_mfc18',
             print('{} / {}'.format(len(shared_ndx), len(pos_contributors)))
 
         # plot feature histograms for specific train instances
-        _plot_features(x_test, X_train, pos_contributors, neg_contributors, feature, test_shap[test_ndx],
-                       train_weight, k=topk_feature)
-        plt.savefig(os.path.join('output', 'misclassification', 'histogram.pdf'), bbox_inches='tight')
+        # _plot_features(x_test, X_train, pos_contributors, neg_contributors, feature, test_shap[test_ndx],
+        #                train_weight, k=topk_feature)
+        # plt.savefig(os.path.join('output', 'misclassification', 'histogram.pdf'), bbox_inches='tight')
 
         # display test instance
         test_instance_str = test_str.format(test_ndx, tree_pred_test[test_ndx], y_test[test_ndx])

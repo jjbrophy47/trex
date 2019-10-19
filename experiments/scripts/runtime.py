@@ -17,13 +17,13 @@ import trex
 from utility import model_util, data_util, exp_util
 
 
-def _our_method(test_ndx, X_test, model, X_train, y_train, encoding='leaf_output', linear_model='svm',
+def _our_method(test_ndx, X_test, model, X_train, y_train, encoding='leaf_output', linear_model='svm', C=0.1,
                 kernel='rbf', random_state=69):
     """Explains the predictions of each test instance."""
 
     start = time.time()
     explainer = trex.TreeExplainer(model, X_train, y_train, encoding=encoding, random_state=random_state,
-                                   linear_model=linear_model, kernel=kernel)
+                                   linear_model=linear_model, kernel=kernel, C=C)
     fine_tune = time.time() - start
 
     start = time.time()
@@ -67,8 +67,8 @@ def _maple_method(model, test_ndx, X_train, y_train, X_test, y_test):
 
 
 def runtime(model_type='cb', linear_model='svm', kernel='rbf', encoding='tree_path', dataset='iris',
-            n_estimators=100, random_state=69, inf_k=None, repeats=10, true_label=False, maple=False,
-            data_dir='data'):
+            n_estimators=100, max_depth=None, C=0.1, random_state=69, inf_k=None, repeats=10,
+            true_label=False, maple=False, data_dir='data'):
     """
     Main method that trains a tree ensemble, then compares the runtime of different methods to explain
     a random subset of test instances.
@@ -83,7 +83,8 @@ def runtime(model_type='cb', linear_model='svm', kernel='rbf', encoding='tree_pa
         random_state += 10
 
         # get model and data
-        clf = model_util.get_classifier(model_type, n_estimators=n_estimators, random_state=random_state)
+        clf = model_util.get_classifier(model_type, n_estimators=n_estimators, max_depth=max_depth,
+                                        random_state=random_state)
         X_train, X_test, y_train, y_test, label = data_util.get_data(dataset, random_state=random_state,
                                                                      data_dir=data_dir)
 
@@ -103,7 +104,7 @@ def runtime(model_type='cb', linear_model='svm', kernel='rbf', encoding='tree_pa
 
         # our method
         print('ours...')
-        fine_tune, test_time = _our_method(test_ndx, X_test, model, X_train, train_label, encoding=encoding,
+        fine_tune, test_time = _our_method(test_ndx, X_test, model, X_train, train_label, encoding=encoding, C=C,
                                            linear_model=linear_model, kernel=kernel, random_state=random_state)
         print('fine tune: {:.3f}s'.format(fine_tune))
         print('test time: {:.3f}s'.format(test_time))
@@ -157,7 +158,9 @@ if __name__ == '__main__':
     parser.add_argument('--linear_model', type=str, default='svm', help='linear model to use.')
     parser.add_argument('--encoding', type=str, default='leaf_output', help='type of encoding.')
     parser.add_argument('--kernel', type=str, default='rbf', help='Similarity kernel.')
-    parser.add_argument('--n_estimators', metavar='N', type=int, default=100, help='number of trees in random forest.')
+    parser.add_argument('--n_estimators', metavar='N', type=int, default=100, help='number of trees in tree ensemble.')
+    parser.add_argument('--max_depth', type=int, default=None, help='maximum depth in tree ensemble.')
+    parser.add_argument('--C', type=float, default=0.1, help='kernel model penalty parameter.')
     parser.add_argument('--rs', metavar='RANDOM_STATE', type=int, default=69, help='for reproducibility.')
     parser.add_argument('--inf_k', default=None, type=int, help='Number of leaves for leafinfluence.')
     parser.add_argument('--maple', action='store_true', help='Run experiment using MAPLE.')
@@ -167,4 +170,4 @@ if __name__ == '__main__':
     print(args)
     runtime(model_type=args.model, linear_model=args.linear_model, encoding=args.encoding, kernel=args.kernel,
             dataset=args.dataset, n_estimators=args.n_estimators, random_state=args.rs, inf_k=args.inf_k,
-            repeats=args.repeats, true_label=args.true_label, maple=args.maple)
+            repeats=args.repeats, true_label=args.true_label, maple=args.maple, max_depth=args.max_depth, C=args.C)

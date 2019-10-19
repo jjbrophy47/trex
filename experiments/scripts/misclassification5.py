@@ -1,6 +1,7 @@
 """
 Explanation of missclassified test instances for the NC17_EvalPart1 (train) and
-MFC18_EvalPart1 (test) dataset using TREX and SHAP. Visualize the instances using histograms.
+MFC18_EvalPart1 (test) dataset using TREX. Visualizes the weight x similarity for the
+training samples as well as the weight distribution.
 """
 import os
 import sys
@@ -54,9 +55,9 @@ def _plot_features(x_test, X_train, target_ndx, alt_ndx, feature, shap_vals, tra
         axs[i].axvline(x_test[ndx], linestyle='--', color='k')
 
         sns.distplot(X_train[target_ndx][:, ndx], ax=axs[i], norm_hist=True, label='excitatory', color='g',
-                     kde=True, bins=None, kde_kws={'shade': True}, hist=False)
+                     kde=True, bins=None)
         sns.distplot(X_train[alt_ndx][:, ndx], ax=axs[i], norm_hist=True, label='inhibitory', color='r',
-                     kde=True, bins=None, kde_kws={'shade': True}, hist=False)
+                     kde=True, bins=None)
 
         # sns.distplot(X_train[target_ndx][:, ndx], ax=axs[i], norm_hist=True, label='excitatory', color='g',
         #              hist_kws={'weights': weight[target_ndx]}, kde=False, bins=None)
@@ -197,7 +198,7 @@ def misclassification(model='lgb', encoding='leaf_output', dataset='nc17_mfc18',
     train_str = 'train_{} predicted as {}, actual is {}, contribution={:.3f}'
 
     # explain test instances
-    for test_ndx in both_missed_test[:topk_test]:
+    for test_ndx in both_missed_test[3000:][:topk_test]:
         x_test = X_test[[test_ndx]]
 
         # find the most impactful features
@@ -230,46 +231,30 @@ def misclassification(model='lgb', encoding='leaf_output', dataset='nc17_mfc18',
         # neg_contributors = top_contributors
 
         # high-weighted instances vs low-weighted instances
-        pos_contributors = _get_top_contributors(contributions, pct=top_pct)
-        neg_contributors = np.setdiff1d(sort_ndx, pos_contributors)
+        # pos_contributors = _get_top_contributors(contributions, pct=top_pct)
+        # neg_contributors = np.setdiff1d(sort_ndx, pos_contributors)
 
         # excitatory vs inhibitory instances
-        # pos_contributors = np.where(contributions > 0)[0]
-        # neg_contributors = np.where(contributions < 0)[0]
+        pos_contributors = np.where(contributions > 0)[0]
+        neg_contributors = np.where(contributions < 0)[0]
 
         s = np.argsort(np.abs(contributions[pos_contributors]))
 
-        print(train_weight[pos_contributors][s])
+        alpha = 0.69
+
+        # plot similarity x weight for the training samples
         sim = explainer.similarity(x_test)[0]
-        print(sim[pos_contributors][s])
-        print(contributions[pos_contributors][s])
-        print(y_train[pos_contributors][s])
-        print(tree_pred_train[pos_contributors][s])
+        ax = sns.distplot(sim * train_weight, color='g')
+        ax.set_xlabel('similarity x weight')
+        ax.set_ylabel('density')
+        ax.set_title('test id_{}'.format(test_ndx))
+        plt.show()
 
-        # show stats for positive contributors
-        n_contribs = len(pos_contributors)
-        pct_contribs = n_contribs / len(X_train) * 100
-        pct_contrib = np.abs(contributions[pos_contributors]).sum() / contribution_sum * 100
-        contrib_str = 'Positive contributors, {:.1f}% of explanation: {}, {:.1f}% of training'
-        print(contrib_str.format(pct_contrib, n_contribs, pct_contribs))
-
-        # show stats for negative contributors
-        n_contribs = len(neg_contributors)
-        pct_contribs = n_contribs / len(X_train) * 100
-        pct_contrib = np.abs(contributions[neg_contributors]).sum() / contribution_sum * 100
-        contrib_str = 'Negative contributors, {:.1f}% of explanation: {}, {:.1f}% of training'
-        print(contrib_str.format(pct_contrib, n_contribs, pct_contribs))
-
-        # how often do the top contributors share the same predicted label
-        # as the test instance's predicted label
-        shared_ndx = np.where(tree_pred_train[pos_contributors] == tree_pred_test[test_ndx])[0]
-        if verbose > 0:
-            print('{} / {}'.format(len(shared_ndx), len(pos_contributors)))
-
-        # plot feature histograms for specific train instances
-        _plot_features(x_test, X_train, pos_contributors, neg_contributors, feature, test_shap[test_ndx],
-                       train_weight, k=topk_feature)
-        plt.savefig(os.path.join('output', 'misclassification', 'histogram.pdf'), bbox_inches='tight')
+        # plot weight distribution for the training samples
+        ax = sns.distplot(train_weight, color='orange')
+        ax.set_xlabel('weight')
+        ax.set_ylabel('density')
+        plt.show()
 
         # display test instance
         test_instance_str = test_str.format(test_ndx, tree_pred_test[test_ndx], y_test[test_ndx])
@@ -290,8 +275,6 @@ def misclassification(model='lgb', encoding='leaf_output', dataset='nc17_mfc18',
             print(train_instance_str)
             for feature_name, feature_val, feature_shap in shap_list:
                 print('\t{}: val={:.3f}, shap={:.3f}'.format(feature_name, feature_val, feature_shap / shap_sum))
-
-        plt.show()
 
 
 if __name__ == '__main__':

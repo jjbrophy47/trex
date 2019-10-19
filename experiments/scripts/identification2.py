@@ -1,20 +1,21 @@
 """
-Experiment: dataset cleaning from noisy labels, specifically a percentage of flipped labels
-in the train data. Only for binary classification datasets.
+Experiment: Cleaning experiment with medifor datasets, this one trains
+    a model only on the cleaned samples.
 """
 import argparse
-from copy import deepcopy
 import os
 import sys
+from copy import deepcopy
 here = os.path.abspath(os.path.dirname(__file__))
-sys.path.insert(0, here + '/../../')  # for influence_boosting
 sys.path.insert(0, here + '/../')  # for utility
+sys.path.insert(0, here + '/../../')  # for trex
 
 import tqdm
 import matplotlib.pyplot as plt
 import numpy as np
 from sklearn.base import clone
-from sklearn.metrics import accuracy_score
+from sklearn.metrics import accuracy_score, roc_auc_score
+from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import minmax_scale
 
 import trex
@@ -22,7 +23,7 @@ from utility import model_util, data_util, exp_util
 from influence_boosting.influence.leaf_influence import CBLeafInfluenceEnsemble
 
 
-def _interval_performance(ckpt_ndx, fix_ndx, noisy_ndx, clf, data, acc_test_noisy):
+def _interval_performance(ckpt_ndx, fix_ndx, noisy_ndx, clf, data, acc_test_noisy, scoring='accuracy'):
     """
     Retrains the tree ensemble for each ckeckpoint, where a checkpoint represents
     which flipped labels have been fixed.
@@ -30,9 +31,9 @@ def _interval_performance(ckpt_ndx, fix_ndx, noisy_ndx, clf, data, acc_test_nois
 
     X_train, y_train, X_test, y_test = data
 
-    accs = [acc_test_noisy]
-    checked_pct = [0]
-    fix_pct = [0]
+    accs = []
+    checked_pct = []
+    fix_pct = []
 
     for n_checked, n_fix in tqdm.tqdm(ckpt_ndx):
         fix_indices = fix_ndx[:n_fix]
@@ -40,8 +41,12 @@ def _interval_performance(ckpt_ndx, fix_ndx, noisy_ndx, clf, data, acc_test_nois
         semi_noisy_ndx = np.setdiff1d(noisy_ndx, fix_indices)
         y_train_semi_noisy = data_util.flip_labels_with_indices(y_train, semi_noisy_ndx)
 
-        model_semi_noisy = clone(clf).fit(X_train, y_train_semi_noisy)
-        acc_test = accuracy_score(y_test, model_semi_noisy.predict(X_test))
+        model_semi_noisy = clone(clf).fit(X_train[semi_noisy_ndx], y_train_semi_noisy[semi_noisy_ndx])
+
+        if scoring == 'accuracy':
+            acc_test = accuracy_score(y_test, model_semi_noisy.predict(X_test))
+        else:
+            acc_test = roc_auc_score(y_test, model_semi_noisy.predict_proba(X_test)[:, 1])
 
         accs.append(acc_test)
         checked_pct.append(float(n_checked / len(y_train)))
@@ -75,6 +80,7 @@ def _record_fixes(train_order, noisy_ndx, train_len, interval):
 
 
 def _our_method(explainer, noisy_ndx, y_train, points=10, cutoff_pct=0.3):
+    """Sorts train instances by largest weight."""
 
     train_weight = explainer.get_weight()[0]
     n_check = int(len(y_train) * cutoff_pct)
@@ -162,75 +168,83 @@ def _influence_method(explainer, noisy_ndx, X_train, y_train, y_train_noisy, int
     return ckpt_ndx, fix_ndx, influence_scores, train_order
 
 
-def noise_detection(model_type='lgb', encoding='leaf_output', dataset='adult', linear_model='svm',
-                    n_estimators=100, random_state=69, linear_model_loss=False, inf_k=None, data_dir='data',
-                    flip_frac=0.4, true_label=False, kernel='linear', out_dir='output/cleaning',
-                    save_plot=False, save_results=False, alpha=0.69, check_pct=0.3, values_pct=0.1,
-                    max_depth=None, C=0.1):
+def noise_detection(model_type='lgb', encoding='leaf_output', dataset='nc17_mfc18', linear_model='svm',
+                    n_estimators=100, random_state=69, inf_k=None, data_dir='data', scoring='accuracy',
+                    true_label=False, kernel='linear', out_dir='output/cleaning', linear_model_loss=False,
+                    save_plot=False, save_results=False, alpha=0.69, check_pct=0.3, values_pct=0.1):
     """
     Main method that trains a tree ensemble, flips a percentage of train labels, prioritizes train
     instances using various methods, and computes how effective each method is at cleaning the data.
     """
 
     # get model and data
-    clf = model_util.get_classifier(model_type, n_estimators=n_estimators, max_depth=max_depth,
-                                    random_state=random_state)
-    X_train, X_test, y_train, y_test, label = data_util.get_data(dataset, random_state=random_state, data_dir=data_dir)
-    data = X_train, y_train, X_test, y_test
+    clf = model_util.get_classifier(model_type, n_estimators=n_estimators, random_state=random_state)
+    X_pre_train, X_test, y_pre_train, y_test, label = data_util.get_data(dataset, random_state=random_state,
+                                                                         data_dir=data_dir)
 
+    # split the test set into two pieces: m1 and m2
+    X_train, X_test, y_train, y_test = train_test_split(X_test, y_test, test_size=0.5,
+                                                        random_state=random_state, stratify=y_test)
+
+    print('\npre-train instances: {}'.format(len(X_pre_train)))
     print('train instances: {}'.format(len(X_train)))
-    print('test instances: {}'.format(len(X_test)))
+    print('test instances: {}\n'.format(len(X_test)))
 
-    # add noise
-    y_train_noisy, noisy_ndx = data_util.flip_labels(y_train, k=flip_frac, random_state=random_state)
-    noisy_ndx = np.array(sorted(noisy_ndx))
-    print('num noisy labels: {}'.format(len(noisy_ndx)))
+    # train a tree ensemble on the training set
+    tree = clone(clf).fit(X_pre_train, y_pre_train)
+    model_util.performance(tree, X_pre_train, y_pre_train, X_train, y_train)
 
-    # train a tree ensemble on the clean and noisy labels
-    model = clone(clf).fit(X_train, y_train)
+    # train a clean model on m1
+    model_clean = clone(clf).fit(X_train, y_train)
+    print('\nGround-Truth Performance:')
+    model_util.performance(model_clean, X_train, y_train, X_test, y_test)
+
+    # generate predictions p1 for m1
+    y_train_noisy = tree.predict(X_train).astype(int)
+
+    # train a model on m1 using p1
     model_noisy = clone(clf).fit(X_train, y_train_noisy)
+    print('\nNoisy Performance:')
+    model_util.performance(model_noisy, X_train, y_train_noisy, X_test, y_test)
 
-    # show model performance before and after noise
-    print('\nBefore noise:')
-    model_util.performance(model, X_train, y_train, X_test=X_test, y_test=y_test)
-    print('\nAfter noise:')
-    model_util.performance(model_noisy, X_train, y_train_noisy, X_test=X_test, y_test=y_test)
+    # get indices of noisy labels (incorrectly predicted labels)
+    noisy_ndx = np.where(y_train_noisy != y_train)[0]
+    noisy_ndx = np.array(sorted(noisy_ndx))
+    print('\nnum noisy labels: {}'.format(len(noisy_ndx)))
 
-    # check accuracy before and after noise
-    acc_test_clean = accuracy_score(y_test, model.predict(X_test))
-    acc_test_noisy = accuracy_score(y_test, model_noisy.predict(X_test))
-
-    # find how many corrupted/non-corrupted labels were incorrectly predicted
-    if not true_label:
-        print('\nUsing predicted labels:')
-        predicted_labels = model_noisy.predict(X_train).flatten()
-        incorrect_ndx = np.where(y_train_noisy != predicted_labels)[0]
-        incorrect_corrupted_ndx = np.intersect1d(noisy_ndx, incorrect_ndx)
-        print('incorrectly predicted corrupted labels: {}'.format(incorrect_corrupted_ndx.shape[0]))
-        print('total number of incorrectly predicted labels: {}'.format(incorrect_ndx.shape[0]))
-
-    # our method
-    print('\nordering by our method...')
+    # train TREX on m1
     explainer = trex.TreeExplainer(model_noisy, X_train, y_train_noisy, encoding=encoding, dense_output=True,
                                    random_state=random_state, use_predicted_labels=not true_label,
-                                   kernel=kernel, linear_model=linear_model, C=C)
+                                   kernel=kernel, linear_model=linear_model)
+
+    # check accuracy before and after noise
+    if scoring == 'accuracy':
+        acc_test_clean = accuracy_score(y_test, model_clean.predict(X_test))
+        acc_test_noisy = accuracy_score(y_test, model_noisy.predict(X_test))
+    else:
+        acc_test_clean = roc_auc_score(y_test, model_clean.predict_proba(X_test)[:, 1])
+        acc_test_noisy = roc_auc_score(y_test, model_noisy.predict_proba(X_test)[:, 1])
+
+    # ordering training instances
+    print('ordering by TREX...')
+    data = X_train, y_train, X_test, y_test
     ckpt_ndx, fix_ndx, interval, n_check, our_train_weight = _our_method(explainer, noisy_ndx, y_train,
                                                                          cutoff_pct=check_pct)
-    our_results = _interval_performance(ckpt_ndx, fix_ndx, noisy_ndx, clf, data, acc_test_noisy)
+    our_results = _interval_performance(ckpt_ndx, fix_ndx, noisy_ndx, clf, data, acc_test_noisy, scoring=scoring)
     settings = '{}_{}'.format(linear_model, kernel)
     settings += '_true_label' if true_label else ''
 
     # random method
     print('ordering by random...')
     ckpt_ndx, fix_ndx = _random_method(noisy_ndx, y_train, interval, to_check=n_check, random_state=random_state)
-    random_results = _interval_performance(ckpt_ndx, fix_ndx, noisy_ndx, clf, data, acc_test_noisy)
+    random_results = _interval_performance(ckpt_ndx, fix_ndx, noisy_ndx, clf, data, acc_test_noisy, scoring=scoring)
 
     # tree loss method
     print('ordering by tree loss...')
     y_train_proba = model_noisy.predict_proba(X_train)
     ckpt_ndx, fix_ndx, tree_loss, tree_ndx = _loss_method(noisy_ndx, y_train_proba, y_train_noisy, interval,
                                                           to_check=n_check)
-    tree_loss_results = _interval_performance(ckpt_ndx, fix_ndx, noisy_ndx, clf, data, acc_test_noisy)
+    tree_loss_results = _interval_performance(ckpt_ndx, fix_ndx, noisy_ndx, clf, data, acc_test_noisy, scoring=scoring)
 
     # linear loss method - if smv, squish decision values to between 0 and 1
     if linear_model_loss:
@@ -244,7 +258,8 @@ def noise_detection(model_type='lgb', encoding='leaf_output', dataset='adult', l
             y_train_proba = explainer.predict_proba(X_train)
         ckpt_ndx, fix_ndx, linear_loss, linear_ndx = _loss_method(noisy_ndx, y_train_proba, y_train_noisy, interval,
                                                                   to_check=n_check)
-        linear_loss_results = _interval_performance(ckpt_ndx, fix_ndx, noisy_ndx, clf, data, acc_test_noisy)
+        linear_loss_results = _interval_performance(ckpt_ndx, fix_ndx, noisy_ndx, clf, data, acc_test_noisy,
+                                                    scoring=scoring)
 
     # influence method
     if model_type == 'cb' and inf_k is not None:
@@ -261,10 +276,12 @@ def noise_detection(model_type='lgb', encoding='leaf_output', dataset='adult', l
             update_set = 'TopKLeaves'
 
         leaf_influence = CBLeafInfluenceEnsemble(model_path, X_train, y_train_noisy,
-                                                 learning_rate=model.learning_rate_, update_set=update_set, k=inf_k)
+                                                 learning_rate=model_noisy.learning_rate_, update_set=update_set,
+                                                 k=inf_k)
         ckpt_ndx, fix_ndx, inf_scores, inf_order = _influence_method(leaf_influence, noisy_ndx, X_train, y_train,
                                                                      y_train_noisy, interval, to_check=n_check)
-        influence_results = _interval_performance(ckpt_ndx, fix_ndx, noisy_ndx, clf, data, acc_test_noisy)
+        influence_results = _interval_performance(ckpt_ndx, fix_ndx, noisy_ndx, clf, data, acc_test_noisy,
+                                                  scoring=scoring)
 
     # plot results
     print('plotting...')
@@ -276,9 +293,9 @@ def noise_detection(model_type='lgb', encoding='leaf_output', dataset='adult', l
     axs[0].plot(our_check_pct, our_acc, marker='.', color='g', label='ours')
     axs[0].plot(rand_check_pct, rand_acc, marker='^', color='r', label='random')
     axs[0].plot(tree_loss_check_pct, tree_loss_acc, marker='p', color='c', label='tree_loss')
-    axs[0].axhline(acc_test_clean, color='k', linestyle='--')
+    # axs[0].axhline(acc_test_clean, color='k', linestyle='--')
     axs[0].set_xlabel('fraction of train data checked')
-    axs[0].set_ylabel('test accuracy')
+    axs[0].set_ylabel('test {}'.format(scoring))
     axs[1].plot(our_check_pct, our_fix_pct, marker='.', color='g', label='ours')
     axs[1].plot(rand_check_pct, rand_fix_pct, marker='^', color='r', label='random')
     axs[1].plot(tree_loss_check_pct, tree_loss_fix_pct, marker='p', color='c', label='tree_loss')
@@ -321,59 +338,28 @@ def noise_detection(model_type='lgb', encoding='leaf_output', dataset='adult', l
         np.save(os.path.join(effectiveness_dir, 'our_{}_check_pct.npy'.format(settings)), our_check_pct)
         np.save(os.path.join(effectiveness_dir, 'our_{}_acc.npy'.format(settings)), our_acc)
 
-        # random
-        np.save(os.path.join(efficiency_dir, 'rand_check_pct.npy'), rand_check_pct)
-        np.save(os.path.join(efficiency_dir, 'rand_fix_pct.npy'), rand_fix_pct)
-        np.save(os.path.join(effectiveness_dir, 'rand_check_pct.npy'), rand_check_pct)
-        np.save(os.path.join(effectiveness_dir, 'rand_acc.npy'), rand_acc)
-
-        # tree loss
-        np.save(os.path.join(efficiency_dir, 'tree_loss_check_pct.npy'), tree_loss_check_pct)
-        np.save(os.path.join(efficiency_dir, 'tree_loss_fix_pct.npy'), tree_loss_fix_pct)
-        np.save(os.path.join(effectiveness_dir, 'tree_loss_check_pct.npy'), tree_loss_check_pct)
-        np.save(os.path.join(effectiveness_dir, 'tree_loss_acc.npy'), tree_loss_acc)
-
-        if linear_model_loss:
-            np.save(os.path.join(efficiency_dir, 'linear_{}_loss_check_pct.npy'.format(settings)),
-                    linear_loss_check_pct)
-            np.save(os.path.join(efficiency_dir, 'linear_{}_loss_fix_pct.npy'.format(settings)),
-                    linear_loss_fix_pct)
-            np.save(os.path.join(effectiveness_dir, 'linear_{}_loss_check_pct.npy'.format(settings)),
-                    linear_loss_check_pct)
-            np.save(os.path.join(effectiveness_dir, 'linear_{}_loss_acc.npy'.format(settings)),
-                    linear_loss_acc)
-
-        if model_type == 'cb' and inf_k is not None:
-            np.save(os.path.join(efficiency_dir, 'influence_check_pct.npy'), influence_check_pct)
-            np.save(os.path.join(efficiency_dir, 'influence_fix_pct.npy'), influence_fix_pct)
-            np.save(os.path.join(effectiveness_dir, 'influence_check_pct.npy'), influence_check_pct)
-            np.save(os.path.join(effectiveness_dir, 'influence_acc.npy'), influence_acc)
-
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='Feature representation extractions for tree ensembles',
-                                     formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    parser.add_argument('--dataset', type=str, default='adult', help='dataset to explain.')
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--dataset', type=str, default='nc17_mfc18', help='dataset to explain.')
     parser.add_argument('--model', type=str, default='cb', help='tree model to use.')
     parser.add_argument('--linear_model', type=str, default='svm', help='linear model to use.')
     parser.add_argument('--encoding', type=str, default='leaf_output', help='type of encoding.')
+    parser.add_argument('--scoring', type=str, default='accuracy', help='metric to use for scoring.')
     parser.add_argument('--n_estimators', metavar='N', type=int, default=100, help='number of trees in random forest.')
-    parser.add_argument('--max_depth', type=int, default=None, help='maximum depth in tree ensemble.')
-    parser.add_argument('--C', type=float, default=0.1, help='kernel model penalty parameter.')
-    parser.add_argument('--kernel', default='rbf', help='Similarity kernel for the linear model.')
+    parser.add_argument('--kernel', default='linear', help='Similarity kernel for the linear model.')
     parser.add_argument('--rs', metavar='RANDOM_STATE', type=int, default=69, help='for reproducibility.')
-    parser.add_argument('--linear_model_loss', action='store_true', default=False, help='Include linear loss.')
+    parser.add_argument('--linear_model_loss', action='store_true', help='compare with the linear model loss.')
+    parser.add_argument('--inf_k', type=int, default=None, help='compare with leafinfluence.')
     parser.add_argument('--save_plot', action='store_true', default=False, help='Save plot results.')
     parser.add_argument('--save_results', action='store_true', default=False, help='Save cleaning results.')
-    parser.add_argument('--flip_frac', type=float, default=0.4, help='Fraction of train labels to flip.')
-    parser.add_argument('--inf_k', type=int, default=None, help='Number of leaves to use for leafinfluence.')
     parser.add_argument('--check_pct', type=float, default=0.3, help='Max percentage of train instances to check.')
     parser.add_argument('--values_pct', type=float, default=0.1, help='Percentage of weights/loss values to compare.')
     parser.add_argument('--true_label', action='store_true', help='Train the SVM on the true labels.')
     args = parser.parse_args()
     print(args)
     noise_detection(model_type=args.model, encoding=args.encoding, dataset=args.dataset, values_pct=args.values_pct,
-                    linear_model=args.linear_model, kernel=args.kernel, check_pct=args.check_pct,
-                    n_estimators=args.n_estimators, random_state=args.rs, linear_model_loss=args.linear_model_loss,
-                    save_plot=args.save_plot, flip_frac=args.flip_frac, inf_k=args.inf_k,
-                    save_results=args.save_results, true_label=args.true_label, max_depth=args.max_depth, C=args.C)
+                    linear_model=args.linear_model, kernel=args.kernel, check_pct=args.check_pct, inf_k=args.inf_k,
+                    n_estimators=args.n_estimators, random_state=args.rs,
+                    save_plot=args.save_plot, scoring=args.scoring, linear_model_loss=args.linear_model_loss,
+                    save_results=args.save_results, true_label=args.true_label)

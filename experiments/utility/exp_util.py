@@ -10,7 +10,6 @@ from collections import defaultdict
 from copy import deepcopy
 
 from influence_boosting.influence.leaf_influence import CBLeafInfluenceEnsemble
-from . import model_util
 
 
 def sort_impact(sv_ndx, impact, ascending=False):

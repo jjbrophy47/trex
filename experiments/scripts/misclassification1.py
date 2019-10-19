@@ -1,10 +1,6 @@
 """
 Explanation of missclassified test instances for the NC17_EvalPart1 (train) and
-MFC18_EvalPart1 (test) dataset using TREX. Visualizes the most important feature
-from the raw data perspective (positive vs negative), then weighting it using the weights
-for a global explanation then weighting it using similarity x abs(weight) for a local explanation.
-This also plots the weight distribution, as well as thr similarity vs weight distribution
-for a single tst instance.
+MFC18_EvalPart1 (test) dataset using TREX and SHAP.
 """
 import os
 import sys
@@ -15,9 +11,7 @@ sys.path.insert(0, here + '/../../')  # for libliner; TODO: remove this dependen
 
 import shap
 import numpy as np
-import seaborn as sns
 import matplotlib.pyplot as plt
-from scipy import stats
 
 from trex.explainer import TreeExplainer
 from utility import model_util, data_util, exp_util
@@ -43,6 +37,39 @@ def _get_top_features(x, shap_vals, feature, k=5):
     return list(zip(feature[shap_sort_ndx], x[shap_sort_ndx], shap_vals[shap_sort_ndx]))[:k]
 
 
+def _plot_instance(instance_str, shap_list, shap_sum=None, ax=None):
+    """
+    Plot the the most impactful features for the given instance.
+    """
+
+    shap_list = shap_list[::-1]
+    feature_name, feature_val, feature_shap = zip(*shap_list)
+    index = np.arange(len(feature_name))
+
+    pos_ndx = np.where(np.array(feature_shap) > 0)[0]
+
+    bar_vals = np.abs(feature_shap)
+    if shap_sum is not None:
+        bar_vals /= shap_sum
+
+    barlist = ax.barh(index, bar_vals, color='#ADFF2F')
+    ax.yaxis.set_visible(False)
+    ax.xaxis.set_visible(False)
+    ax.set_title(instance_str, fontsize=22)
+    ax.set_ylabel('feature')
+    ax.set_xlabel('impact on prediction', fontsize=22)
+    ax.tick_params(axis='x', which='major', labelsize=24)
+    ax.spines['top'].set_visible(False)
+    ax.spines['bottom'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+
+    for i, (name, val) in enumerate(zip(feature_name, feature_val)):
+        ax.text(0, i - 0.1, ' {} = {:.3f}'.format(name, val), color='k', fontsize=22)
+
+    for ndx in pos_ndx:
+        barlist[ndx].set_color('#FA8072')  # light red
+
+
 def _shift_plot_right(ax, amt=0.02):
     """
     Shifts the subplot to the right by a specified amount.
@@ -62,32 +89,35 @@ def _get_short_names(feature):
     replace['p_ucrlstmwresamplingwcmm2_1_0_mediforsystem'] = 'lstmwresampling'
     replace['p_uscisigradbased02a_0_2a_mediforsystem'] = 'gradbased'
     replace['p_purdueta11adoublejpegdetection_2_0_mediforsystem'] = 'doublejpeg'
-    replace['p_purdueta11acontrastenhancementdetection_1_0_mediforsystem'] = 'contrast_enhance'
+    replace['p_purdueta11acontrastenhancementdetection_1_0_mediforsystem'] = 'contrastenhance'
     replace['p_sriprita1imgmdlprnubased_1_0_mediforsystem'] = 'prnubased'
-    replace['p_ta11c_1_0_mediforsystem'] = 'tallc'
 
     feature = np.array([replace.get(f) if replace.get(f) is not None else f for f in feature])
     return feature
 
 
 def misclassification(model='lgb', encoding='leaf_output', dataset='nc17_mfc18', n_estimators=100, random_state=69,
-                      topk_train=4, topk_test=1, data_dir='data', verbose=0, linear_model='lr', kernel='linear',
-                      topk_feature=5, true_label=False, alpha=0.5, fontsize=24, out_dir='output/misclassification'):
+                      topk_train=4, topk_test=1, data_dir='data', verbose=0, feature_length=20,
+                      linear_model='lr', kernel='linear', topk_feature=5, true_label=False):
 
     # get model and data
     clf = model_util.get_classifier(model, n_estimators=n_estimators, random_state=random_state)
-    data = data_util.get_data(dataset, random_state=random_state, data_dir=data_dir, return_feature=True)
+    data = data_util.get_data(dataset, random_state=random_state, return_feature=True, data_dir=data_dir)
     X_train, X_test, y_train, y_test, label, feature = data
 
     # shorten feature names
     feature = _get_short_names(feature)
 
-    # get index of specified feature
-    target_feature = 'lstmwresampling'
-    feat_ndx = np.where(feature == target_feature)[0]
+    remove_ndx = np.array([2, 4, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 25, 26, 29, 31, 32, 33, 34])
 
-    X_train = np.delete(X_train, feat_ndx, axis=1)
-    X_test = np.delete(X_test, feat_ndx, axis=1)
+    X_train = np.delete(X_train, remove_ndx, axis=1)
+    X_test = np.delete(X_test, remove_ndx, axis=1)
+    feature = np.delete(feature, remove_ndx)
+
+    # remove_ndx = np.where(feature == 'lstmwresampling')[0]
+    # X_train = np.delete(X_train, remove_ndx, axis=1)
+    # X_test = np.delete(X_test, remove_ndx, axis=1)
+    # feature = np.delete(feature, remove_ndx)
 
     # train a tree ensemble
     tree = clf.fit(X_train, y_train)
@@ -97,7 +127,6 @@ def misclassification(model='lgb', encoding='leaf_output', dataset='nc17_mfc18',
     explainer = TreeExplainer(tree, X_train, y_train, encoding=encoding, random_state=random_state,
                               dense_output=True, linear_model=linear_model, kernel=kernel,
                               use_predicted_labels=not true_label)
-    train_weight = explainer.get_weight()[0]
 
     if verbose > 0:
         print(explainer)
@@ -118,26 +147,32 @@ def misclassification(model='lgb', encoding='leaf_output', dataset='nc17_mfc18',
     both_missed_test = test_dist_ndx
 
     test_dist_ndx1 = np.where((y_test == 1) & (tree.predict(X_test) == 0))[0]
+    print(test_dist_ndx1, test_dist_ndx1.shape)
+
     test_dist_ndx2 = np.where((y_test == 0) & (tree.predict(X_test) == 1))[0]
+    print(test_dist_ndx2, test_dist_ndx2.shape)
 
-    if verbose > 0:
-        print(test_dist_ndx1, test_dist_ndx1.shape)
-        print(test_dist_ndx2, test_dist_ndx2.shape)
+    # lstm_ndx = np.where(feature == 'lstmwresampling')[0]
+    # X_test[test_dist_ndx1, lstm_ndx] = 1.0
+    # X_test[test_dist_ndx2, lstm_ndx] = 0.0
+    # tree_yhat = model_util.performance(tree, X_train, y_train, X_test, y_test)
 
-    pos_ndx = np.where(y_train == 1)[0]
-    neg_ndx = np.where(y_train == 0)[0]
+    # # get worst missed test indices
+    # test_dist = exp_util.instance_loss(tree.predict_proba(X_test), y_test)
+    # test_dist_ndx = np.argsort(test_dist)[::-1]
+    # test_dist = test_dist[test_dist_ndx]
+    # both_missed_test = test_dist_ndx
 
-    if verbose > 0:
-        print(stats.describe(X_train[pos_ndx][:, feat_ndx]))
-        print(stats.describe(X_train[neg_ndx][:, feat_ndx]))
-
-    bins = np.histogram(X_train[:, feat_ndx], bins=40)[1]  # get the bin edges
-    if verbose > 0:
-        print('bins: {}'.format(bins))
+    # target_ndx = test_dist_ndx[np.where(test_dist >= 0)]
+    # print(target_ndx, target_ndx.shape)
+    # x_target = X_test[target_ndx][:, 16]
+    # print(len(np.where(x_target == -1)[0]), len(x_target))
+    # exit(0)
 
     # show explanations for missed instances
     test_str = '\ntest_{}\npredicted as {}, actual is {}'
     train_str = 'train_{} predicted as {}, actual is {}, contribution={:.3f}'
+    train_str2 = 'train_{}\npredicted as {}, actual is {}'
 
     # explain test instances
     for test_ndx in both_missed_test[:topk_test]:
@@ -152,82 +187,14 @@ def misclassification(model='lgb', encoding='leaf_output', dataset='nc17_mfc18',
         sort_ndx = np.argsort(np.abs(contributions))[::-1]
         contribution_sum = np.abs(contributions).sum()
 
-        # plot the density of the most important featurem weighted by varying levels of explanation
-        fig, axs = plt.subplots(1, 3, figsize=(15, 6))
-
-        # show distribution of most important feature, unweighted
-        pos_ndx = np.where(y_train == 1)[0]
-        neg_ndx = np.where(y_train == 0)[0]
-        axs[0].hist(X_train[pos_ndx][:, feat_ndx], bins=bins, color='g', hatch='.', alpha=alpha)
-        axs[0].hist(X_train[neg_ndx][:, feat_ndx], bins=bins, color='r', hatch='\\', alpha=alpha)
-        axs[0].set_xlabel('value', fontsize=fontsize)
-        axs[0].set_ylabel('density', fontsize=fontsize)
-        axs[0].set_title('Unweighted', fontsize=fontsize)
-        axs[0].set_xlim(-0.25, 1.25)
-        axs[0].tick_params(axis='both', which='major', labelsize=fontsize)
-
-        # show distribution of most important feature weighted by TREX's global weights
-        axs[1].hist(X_train[pos_ndx][:, feat_ndx], bins=bins, color='g', hatch='.',
-                    weights=np.abs(train_weight)[pos_ndx], alpha=alpha)
-        axs[1].hist(X_train[neg_ndx][:, feat_ndx], bins=bins, color='r', hatch='\\',
-                    weights=np.abs(train_weight)[neg_ndx], alpha=alpha)
-        axs[1].set_xlabel('value', fontsize=fontsize)
-        axs[1].set_title(r'|$\alpha$|', fontsize=fontsize)
-        axs[1].set_xlim(-0.25, 1.25)
-        axs[1].tick_params(axis='both', which='major', labelsize=fontsize)
-
-        # show distribution of most important feature, weighted by TREX's local explanation
-        sim = explainer.similarity(x_test)[0]
-        sim_weight = sim * train_weight
-        l1 = axs[2].hist(X_train[pos_ndx][:, feat_ndx], bins=bins, color='g', hatch='.',
-                         weights=np.abs(sim_weight)[pos_ndx], alpha=alpha)
-        l2 = axs[2].hist(X_train[neg_ndx][:, feat_ndx], bins=bins, color='r', hatch='\\',
-                         weights=np.abs(sim_weight)[neg_ndx], alpha=alpha)
-        axs[2].set_xlabel('value', fontsize=fontsize)
-        axs[2].set_title(r'|$\alpha$| * Similarity', fontsize=fontsize)
-        axs[2].set_xlim(-0.25, 1.25)
-        axs[2].tick_params(axis='both', which='major', labelsize=fontsize)
-
-        fig.legend((l1[2][0], l2[2][0]), ('positive instances', 'negative instances'), loc='center', ncol=2,
-                   bbox_to_anchor=(0.46, 0.05), fontsize=fontsize)
-        fig.subplots_adjust(bottom=0.275)
-
-        os.makedirs(out_dir, exist_ok=True)
-        plt.savefig(os.path.join(out_dir, 'feature_distribution.pdf'), bbox_inches='tight')
-        plt.tight_layout()
-
-        if verbose > 0:
-            print(stats.describe(np.abs(contributions)))
-            print(tree.predict_proba(x_test))
-
-        # plot TREX's global weights and similarity vs weight
-        fig, axs = plt.subplots(1, 2, figsize=(15, 6))
-
-        font_increase = 4
-
-        # plot weight distribution for the training samples
-        sns.distplot(train_weight, color='orange', ax=axs[0])
-        axs[0].set_xlabel(r'$\alpha$', fontsize=fontsize + font_increase)
-        axs[0].set_ylabel('density', fontsize=fontsize + font_increase)
-        axs[0].set_title('(a)', fontsize=fontsize + font_increase)
-        axs[0].tick_params(axis='both', which='major', labelsize=fontsize + font_increase)
-
-        # plot similarity x weight for the training samples
-        sim = explainer.similarity(x_test)[0]
-        sns.distplot(sim * train_weight, color='g', ax=axs[1])
-        axs[1].set_xlabel(r'$\alpha$ * similarity', fontsize=fontsize + font_increase)
-        axs[1].set_title('(b)', fontsize=fontsize + font_increase)
-        axs[1].tick_params(axis='both', which='major', labelsize=fontsize + font_increase)
-
-        plt.tight_layout()
-        plt.savefig(os.path.join(out_dir, 'weight_distribution.pdf'), bbox_inches='tight')
-        plt.show()
-
         # display test instance
         test_instance_str = test_str.format(test_ndx, tree_pred_test[test_ndx], y_test[test_ndx])
         print(test_instance_str)
         for feature_name, feature_val, feature_shap in shap_list:
             print('\t{}: val={:.3f}, shap={:.3f}'.format(feature_name, feature_val, feature_shap / shap_sum))
+
+        # fig, axs = plt.subplots(1, 5, figsize=(30, 4))
+        # _plot_instance(test_instance_str, shap_list, shap_sum=shap_sum, ax=axs[0])
 
         # display training instances
         for i, train_ndx in enumerate(sort_ndx[:topk_train]):
@@ -239,9 +206,20 @@ def misclassification(model='lgb', encoding='leaf_output', dataset='nc17_mfc18',
             # display train instance
             train_instance_str = train_str.format(train_ndx, tree_pred_train[train_ndx], y_train[train_ndx],
                                                   contributions[train_ndx] / contribution_sum)
+            train_instance_str2 = train_str2.format(train_ndx, tree_pred_train[train_ndx], y_train[train_ndx])
             print(train_instance_str)
             for feature_name, feature_val, feature_shap in shap_list:
                 print('\t{}: val={:.3f}, shap={:.3f}'.format(feature_name, feature_val, feature_shap / shap_sum))
+
+            # _plot_instance(train_instance_str2, shap_list, shap_sum=shap_sum, ax=axs[i + 1])
+
+        # # adjust spacing of the subplots
+        # plt.subplots_adjust(wspace=0)
+        # _shift_plot_right(axs[0], amt=-0.02)
+
+        # out_dir = os.path.join('output', 'misclassification')
+        # os.makedirs(out_dir, exist_ok=True)
+        # plt.savefig(os.path.join(out_dir, 'misclassification.pdf'), bbox_inches='tight')
 
 
 if __name__ == '__main__':
@@ -249,13 +227,11 @@ if __name__ == '__main__':
                                      formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument('--dataset', type=str, default='nc17_mfc18', help='dataset to explain.')
     parser.add_argument('--model', type=str, default='lgb', help='model to use.')
-    parser.add_argument('--linear_model', type=str, default='lr', help='linear model to use.')
-    parser.add_argument('--true_label', action='store_true', help='train TREX on the true labels.')
+    parser.add_argument('--linear_model', type=str, default='svm', help='linear model to use.')
     parser.add_argument('--encoding', type=str, default='leaf_output', help='type of encoding.')
     parser.add_argument('--kernel', type=str, default='linear', help='similarity kernel.')
     parser.add_argument('--n_estimators', metavar='N', type=int, default=100, help='number of trees in the ensemble.')
     parser.add_argument('--rs', metavar='RANDOM_STATE', type=int, default=69, help='for reproducibility.')
-    parser.add_argument('--verbose', type=int, default=0, help='verbosity.')
     parser.add_argument('--topk_train', metavar='NUM', type=int, default=4, help='train instances to show.')
     parser.add_argument('--topk_test', metavar='NUM', type=int, default=1, help='missed test instances to show.')
     parser.add_argument('--topk_feature', metavar='NUM', type=int, default=5, help='features to show.')
@@ -263,5 +239,4 @@ if __name__ == '__main__':
     print(args)
     misclassification(model=args.model, encoding=args.encoding, dataset=args.dataset, n_estimators=args.n_estimators,
                       random_state=args.rs, topk_train=args.topk_train, topk_test=args.topk_test,
-                      linear_model=args.linear_model, kernel=args.kernel, topk_feature=args.topk_feature,
-                      true_label=args.true_label, verbose=args.verbose)
+                      linear_model=args.linear_model, kernel=args.kernel, topk_feature=args.topk_feature)

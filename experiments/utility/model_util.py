@@ -12,20 +12,28 @@ from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
 from sklearn.metrics import accuracy_score, log_loss, roc_auc_score
 
 
-def get_classifier(model, n_estimators=20, learning_rate=0.03, random_state=69):
+def get_classifier(model, n_estimators=20, max_depth=None, learning_rate=0.03, random_state=69):
     """Returns a tree ensemble classifier."""
 
     # create model
     if model == 'lgb':
-        clf = lightgbm.LGBMClassifier(random_state=random_state, n_estimators=n_estimators)
+        max_depth = -1 if max_depth is None else max_depth
+        clf = lightgbm.LGBMClassifier(random_state=random_state, n_estimators=n_estimators,
+                                      max_depth=max_depth)
     elif model == 'cb':
-        clf = catboost.CatBoostClassifier(random_state=random_state, n_estimators=n_estimators, verbose=False)
+        clf = catboost.CatBoostClassifier(random_state=random_state, n_estimators=n_estimators,
+                                          max_depth=max_depth, verbose=False)
     elif model == 'rf':
-        clf = RandomForestClassifier(random_state=random_state, n_estimators=n_estimators)
+        clf = RandomForestClassifier(random_state=random_state, n_estimators=n_estimators,
+                                     max_depth=max_depth)
     elif model == 'gbm':
-        clf = GradientBoostingClassifier(random_state=random_state, n_estimators=n_estimators)
+        max_depth = 3 if max_depth is None else max_depth  # gbm default
+        clf = GradientBoostingClassifier(random_state=random_state, n_estimators=n_estimators,
+                                         max_depth=max_depth)
     elif model == 'xgb':
-        clf = xgboost.XGBClassifier(random_state=random_state, n_estimators=n_estimators)
+        max_depth = 3 if max_depth is None else max_depth  # xgb default
+        clf = xgboost.XGBClassifier(random_state=random_state, n_estimators=n_estimators,
+                                    max_depth=max_depth)
     else:
         exit('{} model not supported!'.format(model))
 
