@@ -149,7 +149,7 @@ class TreeExplainer:
 
         Return 1 1d array of predicted labels.
         """
-        return self.le.inverse_transform(self.linear_model_.predict(self.transform(X)))
+        return self.le_.inverse_transform(self.linear_model_.predict(self.transform(X)))
 
     # Note: If len(X) is large and the number of training instances is large,
     #       the resulting matrix may be huge.
