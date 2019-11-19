@@ -20,6 +20,7 @@ from sklearn.preprocessing import minmax_scale
 import trex
 from utility import model_util, data_util, exp_util
 from influence_boosting.influence.leaf_influence import CBLeafInfluenceEnsemble
+from maple.MAPLE import MAPLE
 
 
 def _interval_performance(ckpt_ndx, fix_ndx, noisy_ndx, clf, data, acc_test_noisy):
@@ -162,10 +163,30 @@ def _influence_method(explainer, noisy_ndx, X_train, y_train, y_train_noisy, int
     return ckpt_ndx, fix_ndx, influence_scores, train_order
 
 
-def noise_detection(model_type='lgb', encoding='leaf_output', dataset='adult', linear_model='svm',
+def _maple_method(explainer, X_train, noisy_ndx, interval, to_check=1):
+
+    n_train = X_train.shape[0]
+
+    assert to_check <= n_train, 'to_check > n_train!'
+    if isinstance(to_check, int):
+        n_check = to_check
+    else:
+        exit('to_check not int')
+
+    train_weight = np.zeros(X_train.shape[0])
+    for i in tqdm.tqdm(range(X_train.shape[0])):
+        weights = explainer.get_weights(X_train[i])
+        train_weight[i] += np.sum(weights)
+
+    train_order = np.argsort(train_weight)[::-1][:n_check]
+    ckpt_ndx, fix_ndx = _record_fixes(train_order, noisy_ndx, n_train, interval)
+    return ckpt_ndx, fix_ndx, train_weight, train_order
+
+
+def noise_detection(model_type='lgb', encoding='leaf_output', dataset='adult', linear_model='svm', maple=False,
                     n_estimators=100, random_state=69, linear_model_loss=False, inf_k=None, data_dir='data',
                     flip_frac=0.4, true_label=False, kernel='linear', out_dir='output/cleaning',
-                    save_plot=False, save_results=False, alpha=0.69, check_pct=0.3, values_pct=0.1,
+                    save_plot=False, save_results=False, alpha=0.69, check_pct=0.3, verbose=0,
                     max_depth=None, C=0.1):
     """
     Main method that trains a tree ensemble, flips a percentage of train labels, prioritizes train
@@ -232,7 +253,7 @@ def noise_detection(model_type='lgb', encoding='leaf_output', dataset='adult', l
                                                           to_check=n_check)
     tree_loss_results = _interval_performance(ckpt_ndx, fix_ndx, noisy_ndx, clf, data, acc_test_noisy)
 
-    # linear loss method - if smv, squish decision values to between 0 and 1
+    # linear loss method - if svm, squish decision values to between 0 and 1
     if linear_model_loss:
         print('ordering by linear loss...')
         if linear_model == 'svm':
@@ -266,6 +287,12 @@ def noise_detection(model_type='lgb', encoding='leaf_output', dataset='adult', l
                                                                      y_train_noisy, interval, to_check=n_check)
         influence_results = _interval_performance(ckpt_ndx, fix_ndx, noisy_ndx, clf, data, acc_test_noisy)
 
+    # MAPLE method
+    print('ordering by MAPLE...')
+    maple_exp = MAPLE(X_train, y_train_noisy, X_train, y_train_noisy, verbose=verbose, dstump=False)
+    ckpt_ndx, fix_ndx, map_scores, map_order = _maple_method(maple_exp, X_train, noisy_ndx, interval, to_check=n_check)
+    maple_results = _interval_performance(ckpt_ndx, fix_ndx, noisy_ndx, clf, data, acc_test_noisy)
+
     # plot results
     print('plotting...')
     our_check_pct, our_acc, our_fix_pct = our_results
@@ -295,6 +322,10 @@ def noise_detection(model_type='lgb', encoding='leaf_output', dataset='adult', l
                     label='leaf_inf ({})'.format(inf_label))
         axs[1].plot(influence_check_pct, influence_fix_pct, marker='+', color='m',
                     label='leaf_inf ({})'.format(inf_label))
+    if maple:
+        maple_check_pct, maple_acc, maple_fix_pct = maple_results
+        axs[0].plot(maple_check_pct, maple_acc, marker='o', color='orange', label='maple')
+        axs[1].plot(maple_check_pct, maple_fix_pct, marker='o', color='orange', label='maple')
     axs[0].legend()
     axs[1].legend()
 
@@ -349,31 +380,38 @@ def noise_detection(model_type='lgb', encoding='leaf_output', dataset='adult', l
             np.save(os.path.join(effectiveness_dir, 'influence_check_pct.npy'), influence_check_pct)
             np.save(os.path.join(effectiveness_dir, 'influence_acc.npy'), influence_acc)
 
+        if maple:
+            np.save(os.path.join(efficiency_dir, 'maple_check_pct.npy'), maple_check_pct)
+            np.save(os.path.join(efficiency_dir, 'maple_fix_pct.npy'), maple_fix_pct)
+            np.save(os.path.join(effectiveness_dir, 'maple_check_pct.npy'), maple_check_pct)
+            np.save(os.path.join(effectiveness_dir, 'maple_acc.npy'), maple_acc)
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Feature representation extractions for tree ensembles',
                                      formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument('--dataset', type=str, default='adult', help='dataset to explain.')
     parser.add_argument('--model', type=str, default='cb', help='tree model to use.')
-    parser.add_argument('--linear_model', type=str, default='svm', help='linear model to use.')
+    parser.add_argument('--linear_model', type=str, default='lr', help='linear model to use.')
     parser.add_argument('--encoding', type=str, default='leaf_output', help='type of encoding.')
     parser.add_argument('--n_estimators', metavar='N', type=int, default=100, help='number of trees in random forest.')
     parser.add_argument('--max_depth', type=int, default=None, help='maximum depth in tree ensemble.')
     parser.add_argument('--C', type=float, default=0.1, help='kernel model penalty parameter.')
-    parser.add_argument('--kernel', default='rbf', help='Similarity kernel for the linear model.')
+    parser.add_argument('--kernel', default='linear', help='Similarity kernel for the linear model.')
     parser.add_argument('--rs', metavar='RANDOM_STATE', type=int, default=69, help='for reproducibility.')
     parser.add_argument('--linear_model_loss', action='store_true', default=False, help='Include linear loss.')
     parser.add_argument('--save_plot', action='store_true', default=False, help='Save plot results.')
     parser.add_argument('--save_results', action='store_true', default=False, help='Save cleaning results.')
     parser.add_argument('--flip_frac', type=float, default=0.4, help='Fraction of train labels to flip.')
     parser.add_argument('--inf_k', type=int, default=None, help='Number of leaves to use for leafinfluence.')
+    parser.add_argument('--maple', action='store_true', help='Whether to use MAPLE as a baseline.')
     parser.add_argument('--check_pct', type=float, default=0.3, help='Max percentage of train instances to check.')
-    parser.add_argument('--values_pct', type=float, default=0.1, help='Percentage of weights/loss values to compare.')
+    parser.add_argument('--verbose', type=int, default=0, help='Verbosity level.')
     parser.add_argument('--true_label', action='store_true', help='Train the SVM on the true labels.')
     args = parser.parse_args()
     print(args)
-    noise_detection(model_type=args.model, encoding=args.encoding, dataset=args.dataset, values_pct=args.values_pct,
-                    linear_model=args.linear_model, kernel=args.kernel, check_pct=args.check_pct,
+    noise_detection(model_type=args.model, encoding=args.encoding, dataset=args.dataset,
+                    linear_model=args.linear_model, kernel=args.kernel, check_pct=args.check_pct, maple=args.maple,
                     n_estimators=args.n_estimators, random_state=args.rs, linear_model_loss=args.linear_model_loss,
-                    save_plot=args.save_plot, flip_frac=args.flip_frac, inf_k=args.inf_k,
+                    save_plot=args.save_plot, flip_frac=args.flip_frac, inf_k=args.inf_k, verbose=args.verbose,
                     save_results=args.save_results, true_label=args.true_label, max_depth=args.max_depth, C=args.C)

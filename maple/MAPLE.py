@@ -10,7 +10,8 @@ import numpy as np
 
 class MAPLE:
 
-    def __init__(self, X_train, MR_train, X_val, MR_val, fe_type="rf", n_estimators=200, max_features=0.5, min_samples_leaf=10, regularization=0.001):
+    def __init__(self, X_train, MR_train, X_val, MR_val, fe_type="rf", n_estimators=200, max_features=0.5,
+                 min_samples_leaf=10, regularization=0.001, verbose=0, dstump=True):
 
         # Features and the target model response
         self.X_train = X_train
@@ -25,6 +26,10 @@ class MAPLE:
 
         # Local Linear Model Parameters
         self.regularization = regularization
+
+        # Extra settings
+        self.verbose = verbose
+        self.dstump = dstump
 
         # Data parameters
         num_features = X_train.shape[1]
@@ -42,6 +47,10 @@ class MAPLE:
             print("Unknown FE type ", fe)
             import sys
             sys.exit(0)
+
+        if self.verbose > 0:
+            print('fitting FE...')
+
         fe.fit(X_train, MR_train)
         self.fe = fe
 
@@ -49,6 +58,9 @@ class MAPLE:
         self.train_leaf_ids = train_leaf_ids
 
         val_leaf_ids_list = fe.apply(X_val)
+
+        if self.verbose > 0:
+            print('computing feature importances...')
 
         # Compute the feature importances: Non-normalized @ Root
         scores = np.zeros(num_features)
@@ -66,34 +78,42 @@ class MAPLE:
         self.feature_scores = scores
         mostImpFeats = np.argsort(-scores)
 
-        # Find the number of features to use for MAPLE
-        retain_best = 0
-        rmse_best = np.inf
-        for retain in range(1, num_features + 1):
+        if self.dstump:
 
-            # Drop less important features for local regression
-            X_train_p = np.delete(X_train, mostImpFeats[retain:], axis=1)
-            X_val_p = np.delete(X_val, mostImpFeats[retain:], axis=1)
+            if self.verbose > 0:
+                print('DSTUMP...')
 
-            lr_predictions = np.empty([num_val], dtype=float)
+            # Find the number of features to use for MAPLE
+            retain_best = 0
+            rmse_best = np.inf
+            for retain in range(1, num_features + 1):
 
-            for i in range(num_val):
+                # Drop less important features for local regression
+                X_train_p = np.delete(X_train, mostImpFeats[retain:], axis=1)
+                X_val_p = np.delete(X_val, mostImpFeats[retain:], axis=1)
 
-                weights = self.training_point_weights(val_leaf_ids_list[i])
+                lr_predictions = np.empty([num_val], dtype=float)
 
-                # Local linear model
-                lr_model = Ridge(alpha=regularization)
-                lr_model.fit(X_train_p, MR_train, weights)
-                lr_predictions[i] = lr_model.predict(X_val_p[i].reshape(1, -1))
+                for i in range(num_val):
 
-            rmse_curr = np.sqrt(mean_squared_error(lr_predictions, MR_val))
+                    weights = self.training_point_weights(val_leaf_ids_list[i])
 
-            if rmse_curr < rmse_best:
-                rmse_best = rmse_curr
-                retain_best = retain
+                    # Local linear model
+                    lr_model = Ridge(alpha=regularization)
+                    lr_model.fit(X_train_p, MR_train, weights)
+                    lr_predictions[i] = lr_model.predict(X_val_p[i].reshape(1, -1))
 
-        self.retain = retain_best
-        self.X = np.delete(X_train, mostImpFeats[retain_best:], axis=1)
+                rmse_curr = np.sqrt(mean_squared_error(lr_predictions, MR_val))
+
+                if rmse_curr < rmse_best:
+                    rmse_best = rmse_curr
+                    retain_best = retain
+
+            self.retain = retain_best
+            self.X = np.delete(X_train, mostImpFeats[retain_best:], axis=1)
+
+        if self.verbose > 0:
+            print('done fine-tuning.')
 
     def training_point_weights(self, instance_leaf_ids):
         weights = np.zeros(self.num_train)
@@ -103,7 +123,15 @@ class MAPLE:
             weights[PNNs_Leaf_Node] += 1.0 / len(PNNs_Leaf_Node[0])
         return weights
 
+    def get_weights(self, x):
+        x = x.reshape(1, -1)
+        curr_leaf_ids = self.fe.apply(x)[0]
+        weights = self.training_point_weights(curr_leaf_ids)
+        return weights
+
     def explain(self, x):
+
+        assert self.X is not None, 'DSTUMP has not been run!'
 
         x = x.reshape(1, -1)
 
@@ -114,7 +142,7 @@ class MAPLE:
         weights = self.training_point_weights(curr_leaf_ids)
 
         # Local linear model
-        lr_model = Ridge(alpha = self.regularization)
+        lr_model = Ridge(alpha=self.regularization)
         lr_model.fit(self.X, self.MR_train, weights)
 
         # Get the model coeficients
