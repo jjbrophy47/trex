@@ -50,25 +50,24 @@ def _influence_method(model, test_ndx, X_train, y_train, X_test, y_test, inf_k):
     return fine_tune, test_time
 
 
-def _maple_method(model, test_ndx, X_train, y_train, X_test, y_test):
+def _maple_method(model, test_ndx, X_train, y_train, X_test, y_test, dstump=False):
     """
     Produces a train weight distribution for a single test instance.
     """
 
     start = time.time()
-    maple = MAPLE.MAPLE(X_train, y_train, X_train, y_train, dstump=False)
+    maple = MAPLE.MAPLE(X_train, y_train, X_train, y_train, dstump=dstump)
     fine_tune = time.time() - start
 
     start = time.time()
-    # maple.explain(X_test[test_ndx])
-    maple.get_weights(X_test[test_ndx])
+    maple.explain(X_test[test_ndx]) if dstump else maple.get_weights(X_test[test_ndx])
     test_time = time.time() - start
 
     return fine_tune, test_time
 
 
 def runtime(model_type='cb', linear_model='lr', kernel='linear', encoding='leaf_output', dataset='iris',
-            n_estimators=100, max_depth=None, C=0.1, random_state=69, inf_k=None, repeats=10,
+            n_estimators=100, max_depth=None, C=0.1, random_state=69, inf_k=None, repeats=10, dstump=False,
             true_label=False, maple=False, data_dir='data', out_dir='output/runtime', save_results=False):
     """
     Main method that trains a tree ensemble, then compares the runtime of different methods to explain
@@ -133,7 +132,8 @@ def runtime(model_type='cb', linear_model='lr', kernel='linear', encoding='leaf_
 
             if maple:
                 print('maple...')
-                fine_tune, test_time = _maple_method(model, test_ndx, X_train, train_label, X_test, y_test)
+                fine_tune, test_time = _maple_method(model, test_ndx, X_train, train_label, X_test, y_test,
+                                                     dstump=dstump)
                 print('fine tune: {:.3f}s'.format(fine_tune))
                 print('test time: {:.3f}s'.format(test_time))
                 maple_fine_tune.append(fine_tune)
@@ -174,8 +174,9 @@ def runtime(model_type='cb', linear_model='lr', kernel='linear', encoding='leaf_
             np.save(os.path.join(exp_dir, 'influence_test_time.npy'), inf_test_time)
 
             # MAPLE
-            np.save(os.path.join(exp_dir, 'maple_fine_tune.npy'), maple_fine_tune)
-            np.save(os.path.join(exp_dir, 'maple_test_time.npy'), maple_test_time)
+            maple_settings = '' if not dstump else 'dstump_'
+            np.save(os.path.join(exp_dir, 'maple_{}fine_tune.npy'.format(maple_settings)), maple_fine_tune)
+            np.save(os.path.join(exp_dir, 'maple_{}test_time.npy'.format(maple_settings)), maple_test_time)
 
 
 if __name__ == '__main__':
@@ -192,6 +193,7 @@ if __name__ == '__main__':
     parser.add_argument('--rs', metavar='RANDOM_STATE', type=int, default=69, help='for reproducibility.')
     parser.add_argument('--inf_k', default=None, type=int, help='Number of leaves for leafinfluence.')
     parser.add_argument('--maple', action='store_true', help='Run experiment using MAPLE.')
+    parser.add_argument('--dstump', action='store_true', help='Enable DSTUMP with Maple.')
     parser.add_argument('--repeats', default=5, type=int, help='Number of times to repeat the experiment.')
     parser.add_argument('--save_results', action='store_true', default=False, help='Save cleaning results.')
     parser.add_argument('--true_label', action='store_true', help='Train explainers on true labels.')
@@ -200,4 +202,4 @@ if __name__ == '__main__':
     runtime(model_type=args.model, linear_model=args.linear_model, encoding=args.encoding, kernel=args.kernel,
             dataset=args.dataset, n_estimators=args.n_estimators, random_state=args.rs, inf_k=args.inf_k,
             repeats=args.repeats, true_label=args.true_label, maple=args.maple, max_depth=args.max_depth, C=args.C,
-            save_results=args.save_results)
+            save_results=args.save_results, dstump=args.dstump)
