@@ -18,7 +18,6 @@ import trex
 from utility import model_util, data_util, exp_util
 
 ONE_DAY = 86400  # number of seconds in a day
-ONE_DAY = 2  # testing
 maple_limit_reached = False
 
 
