@@ -5,6 +5,7 @@ import time
 import argparse
 import os
 import sys
+import signal
 here = os.path.abspath(os.path.dirname(__file__))
 sys.path.insert(0, here + '/../../')  # for influence_boosting
 sys.path.insert(0, here + '/../')  # for utility
@@ -15,6 +16,30 @@ from maple import MAPLE
 
 import trex
 from utility import model_util, data_util, exp_util
+
+ONE_DAY = 86400  # number of seconds in a day
+ONE_DAY = 2  # testing
+maple_limit_reached = False
+
+
+class timeout:
+    """
+    Timeout class to throw a TimeoutError if a piece of code runs for too long.
+    """
+
+    def __init__(self, seconds=1, error_message='Timeout'):
+        self.seconds = seconds
+        self.error_message = error_message
+
+    def handle_timeout(self, signum, frame):
+        raise TimeoutError(self.error_message)
+
+    def __enter__(self):
+        signal.signal(signal.SIGALRM, self.handle_timeout)
+        signal.alarm(self.seconds)
+
+    def __exit__(self, type, value, traceback):
+        signal.alarm(0)
 
 
 def _our_method(test_ndx, X_test, model, X_train, y_train, encoding='leaf_output', linear_model='svm', C=0.1,
@@ -55,9 +80,16 @@ def _maple_method(model, test_ndx, X_train, y_train, X_test, y_test, dstump=Fals
     Produces a train weight distribution for a single test instance.
     """
 
-    start = time.time()
-    maple = MAPLE.MAPLE(X_train, y_train, X_train, y_train, dstump=dstump)
-    fine_tune = time.time() - start
+    with timeout(seconds=ONE_DAY):
+        try:
+            start = time.time()
+            maple = MAPLE.MAPLE(X_train, y_train, X_train, y_train, dstump=dstump)
+            fine_tune = time.time() - start
+        except:
+            print('maple fine-tuning exceeded 24h!')
+            global maple_limit_reached
+            maple_limit_reached = True
+            return None, None
 
     start = time.time()
     maple.explain(X_test[test_ndx]) if dstump else maple.get_weights(X_test[test_ndx])
@@ -130,14 +162,15 @@ def runtime(model_type='cb', linear_model='lr', kernel='linear', encoding='leaf_
                 inf_fine_tune.append(fine_tune)
                 inf_test_time.append(test_time)
 
-            if maple:
+            if maple and not maple_limit_reached:
                 print('maple...')
                 fine_tune, test_time = _maple_method(model, test_ndx, X_train, train_label, X_test, y_test,
                                                      dstump=dstump)
-                print('fine tune: {:.3f}s'.format(fine_tune))
-                print('test time: {:.3f}s'.format(test_time))
-                maple_fine_tune.append(fine_tune)
-                maple_test_time.append(test_time)
+                if fine_tune is not None and test_time is not None:
+                    print('fine tune: {:.3f}s'.format(fine_tune))
+                    print('test time: {:.3f}s'.format(test_time))
+                    maple_fine_tune.append(fine_tune)
+                    maple_test_time.append(test_time)
 
         # display results
         our_fine_tune = np.array(our_fine_tune)
@@ -153,7 +186,7 @@ def runtime(model_type='cb', linear_model='lr', kernel='linear', encoding='leaf_
             print('fine tuning: {:.3f}s +/- {:.3f}s'.format(inf_fine_tune.mean(), inf_fine_tune.std()))
             print('test time: {:.3f}s +/- {:.3f}s'.format(inf_test_time.mean(), inf_test_time.std()))
 
-        if maple:
+        if maple and not maple_limit_reached:
             maple_fine_tune = np.array(maple_fine_tune)
             maple_test_time = np.array(maple_test_time)
             print('\nmaple')
@@ -170,13 +203,15 @@ def runtime(model_type='cb', linear_model='lr', kernel='linear', encoding='leaf_
             np.save(os.path.join(exp_dir, 'ours_{}_test_time.npy'.format(settings)), our_test_time)
 
             # leafinfluence
-            np.save(os.path.join(exp_dir, 'influence_fine_tune.npy'), inf_fine_tune)
-            np.save(os.path.join(exp_dir, 'influence_test_time.npy'), inf_test_time)
+            if model_type == 'cb' and inf_k is not None:
+                np.save(os.path.join(exp_dir, 'influence_fine_tune.npy'), inf_fine_tune)
+                np.save(os.path.join(exp_dir, 'influence_test_time.npy'), inf_test_time)
 
             # MAPLE
-            maple_settings = '' if not dstump else 'dstump_'
-            np.save(os.path.join(exp_dir, 'maple_{}fine_tune.npy'.format(maple_settings)), maple_fine_tune)
-            np.save(os.path.join(exp_dir, 'maple_{}test_time.npy'.format(maple_settings)), maple_test_time)
+            if maple:
+                maple_settings = '' if not dstump else 'dstump_'
+                np.save(os.path.join(exp_dir, 'maple_{}fine_tune.npy'.format(maple_settings)), maple_fine_tune)
+                np.save(os.path.join(exp_dir, 'maple_{}test_time.npy'.format(maple_settings)), maple_test_time)
 
 
 if __name__ == '__main__':
