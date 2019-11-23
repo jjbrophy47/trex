@@ -210,7 +210,7 @@ def influence_explain_instance(explainer, test_ndx, X_train, X_test, y_test):
     buf = deepcopy(explainer)
     for i in tqdm.tqdm(range(len(X_train))):
         explainer.fit(removed_point_idx=i, destination_model=buf)
-        influence_scores.append(buf.loss_derivative(X_test[test_ndx], y_test[test_ndx])[0])
+        influence_scores.append(buf.loss_derivative(X_test[[test_ndx]], y_test[[test_ndx]])[0])
     influence_scores = np.array(influence_scores)
 
     return influence_scores

@@ -186,7 +186,7 @@ def _maple_method(explainer, X_train, noisy_ndx, interval, to_check=1):
 def noise_detection(model_type='lgb', encoding='leaf_output', dataset='adult', linear_model='svm', maple=False,
                     n_estimators=100, random_state=69, linear_model_loss=False, inf_k=None, data_dir='data',
                     flip_frac=0.4, true_label=False, kernel='linear', out_dir='output/cleaning',
-                    save_plot=False, save_results=False, alpha=0.69, check_pct=0.3, verbose=0,
+                    save_plot=False, save_results=False, alpha=0.69, check_pct=0.3, verbose=0, train_frac=1.0,
                     max_depth=None, C=0.1):
     """
     Main method that trains a tree ensemble, flips a percentage of train labels, prioritizes train
@@ -197,6 +197,12 @@ def noise_detection(model_type='lgb', encoding='leaf_output', dataset='adult', l
     clf = model_util.get_classifier(model_type, n_estimators=n_estimators, max_depth=max_depth,
                                     random_state=random_state)
     X_train, X_test, y_train, y_test, label = data_util.get_data(dataset, random_state=random_state, data_dir=data_dir)
+
+    # reduce trainn size
+    if train_frac < 1.0 and train_frac > 0.0:
+        n_train = int(X_train.shape[0] * train_frac)
+        X_train, y_train = X_train[:n_train], y_train[:n_train]
+        dataset += '_{}'.format(str(train_frac).replace('.', 'p'))
     data = X_train, y_train, X_test, y_test
 
     print('train instances: {}'.format(len(X_train)))
@@ -288,10 +294,12 @@ def noise_detection(model_type='lgb', encoding='leaf_output', dataset='adult', l
         influence_results = _interval_performance(ckpt_ndx, fix_ndx, noisy_ndx, clf, data, acc_test_noisy)
 
     # MAPLE method
-    print('ordering by MAPLE...')
-    maple_exp = MAPLE(X_train, y_train_noisy, X_train, y_train_noisy, verbose=verbose, dstump=False)
-    ckpt_ndx, fix_ndx, map_scores, map_order = _maple_method(maple_exp, X_train, noisy_ndx, interval, to_check=n_check)
-    maple_results = _interval_performance(ckpt_ndx, fix_ndx, noisy_ndx, clf, data, acc_test_noisy)
+    if maple:
+        print('ordering by MAPLE...')
+        maple_exp = MAPLE(X_train, y_train_noisy, X_train, y_train_noisy, verbose=verbose, dstump=False)
+        ckpt_ndx, fix_ndx, map_scores, map_order = _maple_method(maple_exp, X_train, noisy_ndx, interval,
+                                                                 to_check=n_check)
+        maple_results = _interval_performance(ckpt_ndx, fix_ndx, noisy_ndx, clf, data, acc_test_noisy)
 
     # plot results
     print('plotting...')
@@ -391,6 +399,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Feature representation extractions for tree ensembles',
                                      formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument('--dataset', type=str, default='adult', help='dataset to explain.')
+    parser.add_argument('--train_frac', type=float, default=1.0, help='dataset to explain.')
     parser.add_argument('--model', type=str, default='cb', help='tree model to use.')
     parser.add_argument('--linear_model', type=str, default='lr', help='linear model to use.')
     parser.add_argument('--encoding', type=str, default='leaf_output', help='type of encoding.')
@@ -410,7 +419,7 @@ if __name__ == '__main__':
     parser.add_argument('--true_label', action='store_true', help='Train the SVM on the true labels.')
     args = parser.parse_args()
     print(args)
-    noise_detection(model_type=args.model, encoding=args.encoding, dataset=args.dataset,
+    noise_detection(model_type=args.model, encoding=args.encoding, dataset=args.dataset, train_frac=args.train_frac,
                     linear_model=args.linear_model, kernel=args.kernel, check_pct=args.check_pct, maple=args.maple,
                     n_estimators=args.n_estimators, random_state=args.rs, linear_model_loss=args.linear_model_loss,
                     save_plot=args.save_plot, flip_frac=args.flip_frac, inf_k=args.inf_k, verbose=args.verbose,
