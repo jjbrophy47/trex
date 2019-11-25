@@ -99,7 +99,8 @@ def _maple_method(model, test_ndx, X_train, y_train, X_test, y_test, dstump=Fals
 
 def runtime(model_type='cb', linear_model='lr', kernel='linear', encoding='leaf_output', dataset='iris',
             n_estimators=100, max_depth=None, C=0.1, random_state=69, inf_k=None, repeats=10, dstump=False,
-            true_label=False, maple=False, data_dir='data', out_dir='output/runtime', save_results=False):
+            true_label=False, maple=False, data_dir='data', out_dir='output/runtime', save_results=False,
+            start_pct=10):
     """
     Main method that trains a tree ensemble, then compares the runtime of different methods to explain
     a random subset of test instances.
@@ -108,7 +109,7 @@ def runtime(model_type='cb', linear_model='lr', kernel='linear', encoding='leaf_
     settings = '{}_{}'.format(linear_model, kernel)
     settings += '_true_label' if true_label else ''
 
-    for m in range(10, 110, 10):
+    for m in range(start_pct, 110, 10):
         print('\n{}% of the training data:'.format(m))
 
         our_fine_tune, our_test_time = [], []
@@ -228,6 +229,7 @@ if __name__ == '__main__':
     parser.add_argument('--inf_k', default=None, type=int, help='Number of leaves for leafinfluence.')
     parser.add_argument('--maple', action='store_true', help='Run experiment using MAPLE.')
     parser.add_argument('--dstump', action='store_true', help='Enable DSTUMP with Maple.')
+    parser.add_argument('--start_pct', default=10, type=int, help='Percentage of training data to start with.')
     parser.add_argument('--repeats', default=5, type=int, help='Number of times to repeat the experiment.')
     parser.add_argument('--save_results', action='store_true', default=False, help='Save cleaning results.')
     parser.add_argument('--true_label', action='store_true', help='Train explainers on true labels.')
