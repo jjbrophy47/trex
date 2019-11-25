@@ -238,4 +238,4 @@ if __name__ == '__main__':
     runtime(model_type=args.model, linear_model=args.linear_model, encoding=args.encoding, kernel=args.kernel,
             dataset=args.dataset, n_estimators=args.n_estimators, random_state=args.rs, inf_k=args.inf_k,
             repeats=args.repeats, true_label=args.true_label, maple=args.maple, max_depth=args.max_depth, C=args.C,
-            save_results=args.save_results, dstump=args.dstump)
+            save_results=args.save_results, dstump=args.dstump, start_pct=args.start_pct)
