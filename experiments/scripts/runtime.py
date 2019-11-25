@@ -118,8 +118,8 @@ def runtime(model_type='cb', linear_model='lr', kernel='linear', encoding='leaf_
         seed = random_state
 
         for i in range(repeats):
-            print('\nrun {}'.format(i))
             seed += 10
+            print('\nrun {}, seed: {}'.format(i, seed))
 
             # get model and data
             clf = model_util.get_classifier(model_type, n_estimators=n_estimators, max_depth=max_depth,
