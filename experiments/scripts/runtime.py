@@ -115,16 +115,16 @@ def runtime(model_type='cb', linear_model='lr', kernel='linear', encoding='leaf_
         our_fine_tune, our_test_time = [], []
         inf_fine_tune, inf_test_time = [], []
         maple_fine_tune, maple_test_time = [], []
+        seed = random_state
 
         for i in range(repeats):
             print('\nrun {}'.format(i))
-            random_state += 10
+            seed += 10
 
             # get model and data
             clf = model_util.get_classifier(model_type, n_estimators=n_estimators, max_depth=max_depth,
-                                            random_state=random_state)
-            X_train, X_test, y_train, y_test, label = data_util.get_data(dataset, random_state=random_state,
-                                                                         data_dir=data_dir)
+                                            random_state=seed)
+            X_train, X_test, y_train, y_test, label = data_util.get_data(dataset, random_state=seed, data_dir=data_dir)
 
             n_samples = int(X_train.shape[0] * (m / 100))
             X_train, y_train = X_train[:n_samples], y_train[:n_samples]
@@ -138,7 +138,7 @@ def runtime(model_type='cb', linear_model='lr', kernel='linear', encoding='leaf_
             model_util.performance(model, X_test=X_test, y_test=y_test)
 
             # randomly pick test instances to explain
-            np.random.seed(random_state)
+            np.random.seed(seed)
             test_ndx = np.random.choice(len(y_test), size=1, replace=False)
 
             # train on predicted labels (ours and maple methods only)
@@ -147,7 +147,7 @@ def runtime(model_type='cb', linear_model='lr', kernel='linear', encoding='leaf_
             # our method
             print('ours...')
             fine_tune, test_time = _our_method(test_ndx, X_test, model, X_train, train_label, encoding=encoding, C=C,
-                                               linear_model=linear_model, kernel=kernel, random_state=random_state)
+                                               linear_model=linear_model, kernel=kernel, random_state=seed)
             print('fine tune: {:.3f}s'.format(fine_tune))
             print('test time: {:.3f}s'.format(test_time))
             our_fine_tune.append(fine_tune)
