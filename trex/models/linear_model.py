@@ -326,7 +326,7 @@ class BinaryKernelLogisticRegression(BaseEstimator, ClassifierMixin):
         self.pred_size = pred_size
         self.temp_dir = temp_dir
 
-    def fit(self, X, y, n_check=10, atol=1e-5):
+    def fit(self, X, y, n_check=10, atol=1e-4):
 
         # store training instances for later use
         self.X_train_ = X
@@ -353,13 +353,13 @@ class BinaryKernelLogisticRegression(BaseEstimator, ClassifierMixin):
         liblinear_util.predict(train_data_path, model_path, prediction_path)
         pred_label, pred_proba = liblinear_util.parse_prediction_file(prediction_path, minus_to_zeros=True)
         assert np.allclose(pred_label[:n_check], self.predict(X[:n_check]))
-        assert np.allclose(pred_proba.flatten()[:n_check * 2], self.predict_proba(X[:n_check]).flatten(), atol=atol)
+        assert np.allclose(pred_proba[:n_check][:, 1], self.predict_proba(X[:n_check])[:, 1], atol=atol)
 
         return self
 
     def predict_proba(self, X):
         """
-        Returns a 2d array of probabilities of shape (n_classes, len(X)).
+        Returns a 2d array of probabilities of shape (len(X), n_classes).
         """
         assert X.ndim == 2
 

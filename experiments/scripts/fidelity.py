@@ -76,8 +76,8 @@ def _plot_predictions(tree, explainer, data, ax=None, use_sigmoid=False):
     return res
 
 
-def fidelity(model='lgb', encoding='leaf_path', dataset='iris', n_estimators=100, C=0.1, random_state=69,
-             true_label=False, data_dir='data', linear_model='svm', kernel='rbf', use_sigmoid=False,
+def fidelity(model='lgb', encoding='leaf_output', dataset='iris', n_estimators=100, C=0.1, random_state=69,
+             true_label=False, data_dir='data', linear_model='lr', kernel='linear', use_sigmoid=False,
              out_dir='output/fidelity/', flip_frac=None, max_depth=None):
 
     # get model and data
@@ -128,9 +128,9 @@ if __name__ == '__main__':
                                      formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument('--dataset', type=str, default='iris', help='dataset to explain.')
     parser.add_argument('--model', type=str, default='lgb', help='model to use.')
-    parser.add_argument('--linear_model', type=str, default='svm', help='linear model to use.')
+    parser.add_argument('--linear_model', type=str, default='lr', help='linear model to use.')
     parser.add_argument('--kernel', type=str, default='linear', help='Similarity kernel.')
-    parser.add_argument('--encoding', type=str, default='leaf_path', help='type of encoding.')
+    parser.add_argument('--encoding', type=str, default='leaf_output', help='type of encoding.')
     parser.add_argument('--n_estimators', metavar='N', type=int, default=100, help='number of trees in tree ensemble.')
     parser.add_argument('--max_depth', type=int, default=None, help='maximum depth in tree ensemble.')
     parser.add_argument('--C', type=float, default=0.1, help='kernel model penalty parameter.')
