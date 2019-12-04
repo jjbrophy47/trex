@@ -83,11 +83,34 @@ def kde(model='lgb', encoding='leaf_output', dataset='nc17_mfc18', n_estimators=
     pos_cumsum = np.cumsum(pos_label_contribs[pos_sort_ndx])
     neg_cumsum = np.cumsum(neg_label_contribs[neg_sort_ndx])
 
-    fig, (ax1, ax2, ax3) = plt.subplots(1, 3, figsize=(10, 4))
+    contribs_sum = np.sum(contributions)
 
+    # trajectory when using KNN distances
+    euclidean_sim = 1 / np.linalg.norm(X_train - x_test, axis=1)
+    euclidean_sim_pos = euclidean_sim[pos_indices]
+    euclidean_sim_neg = -euclidean_sim[neg_indices]
+    euclidean_sim_sum = np.sum(euclidean_sim_pos) + np.sum(euclidean_sim_neg)
+
+    euclid_pos_sort_ndx = np.argsort(np.abs(euclidean_sim_pos))[::-1]
+    euclid_neg_sort_ndx = np.argsort(np.abs(euclidean_sim_neg))[::-1]
+
+    euclid_cumsum_pos = np.cumsum(euclidean_sim_pos[euclid_pos_sort_ndx])
+    euclid_cumsum_neg = np.cumsum(euclidean_sim_neg[euclid_neg_sort_ndx])
+
+    fig, (ax0, ax1, ax2, ax3) = plt.subplots(1, 4, figsize=(14, 4))
+
+    ax0.axhline(euclidean_sim_sum, linestyle='--', color='k')
+    ax0.plot(np.arange(len(euclid_cumsum_pos)), euclid_cumsum_pos, label='y={}'.format(pos_label), color='g')
+    ax0.plot(np.arange(len(euclid_cumsum_neg)), euclid_cumsum_neg, label='y!={}'.format(pos_label), color='cyan')
+    ax0.set_title('KNN')
+    ax0.set_xlabel('# train instances')
+    ax0.set_ylabel('1 / euclidean_dist')
+    ax0.legend()
+
+    ax1.axhline(contribs_sum, linestyle='--', color='k')
     ax1.plot(np.arange(len(pos_cumsum)), pos_cumsum, label='y={}'.format(pos_label), color='g')
     ax1.plot(np.arange(len(neg_cumsum)), neg_cumsum, label='y!={}'.format(pos_label), color='cyan')
-    ax1.set_title('trajectory')
+    ax1.set_title('TREX')
     ax1.set_xlabel('# train instances')
     ax1.set_ylabel('contribution')
     ax1.legend()

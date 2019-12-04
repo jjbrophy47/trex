@@ -61,59 +61,90 @@ def missed_instances(y1, y2, y_true):
     return both_ndx
 
 
-def performance(model, X_train=None, y_train=None, X_test=None, y_test=None):
+def performance(model, X_train=None, y_train=None, X_test=None, y_test=None, validate=False, logger=None):
     """Displays train and test performance for a learned model."""
 
-    model_type = validate_model(model)
+    if validate:
+        model_type = validate_model(model)
+
+        if logger:
+            logger.info('model ({})'.format(model_type))
+        else:
+            print('model ({})'.format(model_type))
 
     result = tuple()
-    print('model ({})'.format(model_type))
 
     if X_train is not None and y_train is not None:
         y_hat_pred = model.predict(X_train).flatten()
-        # tree_missed_train = np.where(y_hat_pred != y_train)[0]
         acc_train = accuracy_score(y_train, y_hat_pred)
 
-        print('train set acc: {:4f}'.format(acc_train))
-        # print('missed train instances ({})'.format(len(tree_missed_train)))
+        if logger:
+            logger.info('train set acc: {:4f}'.format(acc_train))
+        else:
+            print('train set acc: {:4f}'.format(acc_train))
 
         if hasattr(model, 'predict_proba'):
             y_hat_proba = model.predict_proba(X_train)
             ll_train = log_loss(y_train, y_hat_proba)
-            print('train log loss: {:.5f}'.format(ll_train))
+
+            if logger:
+                logger.info('train log loss: {:.5f}'.format(ll_train))
+            else:
+                print('train log loss: {:.5f}'.format(ll_train))
 
             if len(np.unique(y_train)) == 2:
                 auroc_train = roc_auc_score(y_train, y_hat_proba[:, 1])
-                print('train auroc: {:.3f}'.format(auroc_train))
+
+                if logger:
+                    logger.info('train log loss: {:.5f}'.format(ll_train))
+                else:
+                    print('train auroc: {:.3f}'.format(auroc_train))
 
         if hasattr(model, 'decision_function') and len(np.unique(y_train)) == 2:
             y_hat_proba = model.decision_function(X_train)
             auroc_train = roc_auc_score(y_train, y_hat_proba)
-            print('train auroc: {:.3f}'.format(auroc_train))
+
+            if logger:
+                logger.info('train auroc: {:.3f}'.format(auroc_train))
+            else:
+                print('train auroc: {:.3f}'.format(auroc_train))
 
         result += (y_hat_pred,)
 
     if X_test is not None and y_test is not None:
         y_hat_pred = model.predict(X_test).flatten()
-        # tree_missed_test = np.where(y_hat_pred != y_test)[0]
         acc_test = accuracy_score(y_test, y_hat_pred)
 
-        print('test set acc: {:4f}'.format(acc_test))
-        # print('missed test instances ({})'.format(len(tree_missed_test)))
+        if logger:
+            logger.info('test set acc: {:4f}'.format(acc_test))
+        else:
+            print('test set acc: {:4f}'.format(acc_test))
 
         if hasattr(model, 'predict_proba'):
             y_hat_proba = model.predict_proba(X_test)
             ll_test = log_loss(y_test, y_hat_proba)
-            print('test log loss: {:.5f}'.format(ll_test))
+
+            if logger:
+                logger.info('test log loss: {:.5f}'.format(ll_test))
+            else:
+                print('test log loss: {:.5f}'.format(ll_test))
 
             if len(np.unique(y_test)) == 2:
                 auroc = roc_auc_score(y_test, y_hat_proba[:, 1])
-                print('test auroc: {:.3f}'.format(auroc))
+
+                if logger:
+                    logger.info('test auroc: {:.3f}'.format(auroc))
+                else:
+                    logger.info('test auroc: {:.3f}'.format(auroc))
 
         if hasattr(model, 'decision_function') and len(np.unique(y_test)) == 2:
             y_hat_proba = model.decision_function(X_test)
             auroc = roc_auc_score(y_test, y_hat_proba)
-            print('test auroc: {:.3f}'.format(auroc))
+
+            if logger:
+                logger.info('test auroc: {:.3f}'.format(auroc))
+            else:
+                print('test auroc: {:.3f}'.format(auroc))
 
         result += (y_hat_pred,)
 
