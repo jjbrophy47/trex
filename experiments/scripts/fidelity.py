@@ -134,7 +134,7 @@ def fidelity(args, model='lgb', encoding='leaf_output', dataset='iris', n_estima
 
         # write output to logs
         if gridsearch:
-            setting = '{}_knn_gs_t{}_md{}'.format(model, n_estimators, max_depth)
+            setting = '{}_knn_gs_{}_t{}_md{}'.format(model, encoding, n_estimators, max_depth)
         else:
             setting = '{}_{}_{}_t{}_md{}'.format(model, knn_neighbors, knn_weights, n_estimators, max_depth)
 
