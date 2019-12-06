@@ -24,7 +24,7 @@ def performance(args, model_type='cb', encoding='leaf_output', dataset='adult', 
 
     # write output to logs
     os.makedirs(out_dir, exist_ok=True)
-    logger = print_util.get_logger(os.path.join(out_dir, '{}.txt'.format(dataset)))
+    logger = print_util.get_logger(os.path.join(out_dir, '{}_{}.txt'.format(dataset, model_type)))
     logger.info(args)
 
     # get model and data

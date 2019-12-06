@@ -96,7 +96,7 @@ def performance(model, X_train=None, y_train=None, X_test=None, y_test=None, val
                 auroc_train = roc_auc_score(y_train, y_hat_proba[:, 1])
 
                 if logger:
-                    logger.info('train log loss: {:.5f}'.format(ll_train))
+                    logger.info('train auroc: {:.3f}'.format(auroc_train))
                 else:
                     print('train auroc: {:.3f}'.format(auroc_train))
 
