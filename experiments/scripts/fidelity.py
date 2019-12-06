@@ -151,7 +151,7 @@ def fidelity(args, model='lgb', encoding='leaf_output', dataset='iris', n_estima
         if gridsearch:
             clf = KNeighborsClassifier()
             param_grid = {'n_neighbors': [3, 5, 7, 9, 11, 13, 15, 31, 45, 61], 'weights': ['uniform', 'distance']}
-            gs = GridSearchCV(clf, param_grid, cv=2, verbose=verbose).fit(X_train_alt, y_train)
+            gs = GridSearchCV(clf, param_grid, cv=5, verbose=verbose).fit(X_train_alt, y_train)
             knn_clf = gs.best_estimator_
         else:
             logger.info('fitting knn...')
