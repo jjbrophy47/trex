@@ -64,6 +64,9 @@ class SVM(BaseEstimator, ClassifierMixin):
     def decision_function(self, X):
         return self.ovr_.decision_function(X)
 
+    def decision_proba(self, X):
+        return self._sigmoid(self.decision_function(X))
+
     def predict(self, X):
         return self.ovr_.predict(X)
 
@@ -106,6 +109,10 @@ class SVM(BaseEstimator, ClassifierMixin):
             result[np.where(y == 0)] *= -1
 
         return result
+
+    # private
+    def _sigmoid(self, x):
+        return 1 / (1 + np.exp(-x))
 
     def _create_kernel_callable(self):
         assert self.kernel in ['rbf', 'poly', 'sigmoid', 'linear']
