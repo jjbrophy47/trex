@@ -331,7 +331,7 @@ def noise_detection(args, logger, out_dir, seed=1):
         else:
             update_set = 'TopKLeaves'
 
-        leaf_influence = CBLeafInfluenceEnsemble(model_path, X_train, y_train_noisy, k=args.ink_k,
+        leaf_influence = CBLeafInfluenceEnsemble(model_path, X_train, y_train_noisy, k=args.inf_k,
                                                  learning_rate=model.learning_rate_, update_set=update_set)
         ckpt_ndx, fix_ndx, _, _ = _influence_method(leaf_influence, noisy_ndx, X_train, y_train, y_train_noisy,
                                                     interval, to_check=n_check)
