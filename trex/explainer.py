@@ -1,5 +1,5 @@
 """
-Instance-based explainer for a tree ensemble using an SVM or LR.
+Instance-based explainer for a tree ensemble using an SVM or KLR.
 Currently supports: sklearn's RandomForestClassifier and GBMClassifier, lightgbm, xgboost, and catboost.
     Is also only compatible with dense dataset inputs.
 """
@@ -14,9 +14,10 @@ from .models.linear_model import SVM, KernelLogisticRegression
 
 class TreeExplainer:
 
-    def __init__(self, tree, X_train, y_train, linear_model='svm', encoding='leaf_output', C=0.1,
+    def __init__(self, tree, X_train, y_train, linear_model='svm', encoding='leaf_output', C=1.0,
                  kernel='linear', gamma='scale', coef0=0.0, degree=3, dense_output=False,
-                 use_predicted_labels=True, random_state=None, X_val=None, verbose=0):
+                 use_predicted_labels=True, random_state=None, X_val=None, verbose=0,
+                 C_grid=[1e-2, 1e-1, 1e0, 1e1, 1e2]):
         """
         Trains an svm on feature representations from a learned tree ensemble.
 
@@ -98,7 +99,6 @@ class TreeExplainer:
         # train the linear model on the tree ensemble feature representation
         if X_val is not None:
             assert X_val.shape[1] == X_train.shape[1]
-            C_grid = [1e-2, 1e-1, 1e0, 1e1, 1e2]
             best_score = 0
             best_C = None
 
@@ -122,8 +122,9 @@ class TreeExplainer:
                     best_score = pearson_corr
                     best_C = C
 
-            self.linear_model_ = self._get_linear_model(model_type=self.linear_model, C=best_C)
-            self.linear_model_ = self.linear_model_.fit(self.train_feature_, train_label)
+            self.C_ = best_C
+            clf = self._get_linear_model(model_type=self.linear_model, C=best_C)
+            self.linear_model_ = clf.fit(self.train_feature_, train_label)
         else:
             self.linear_model_ = clf.fit(self.train_feature_, train_label)
 

@@ -18,7 +18,7 @@ from sklearn.base import clone
 from sklearn.metrics import accuracy_score
 from sklearn.preprocessing import minmax_scale
 from sklearn.neighbors import KNeighborsClassifier
-from sklearn.model_selection import GridSearchCV
+from scipy.stats import pearsonr
 
 import trex
 from utility import model_util, data_util, exp_util, print_util
@@ -186,10 +186,10 @@ def _maple_method(explainer, X_train, noisy_ndx, interval, to_check=1):
     return ckpt_ndx, fix_ndx, train_weight, train_order
 
 
-def _knn_method(knn_clf, X_train, noisy_ndx, interval, to_check=1):
+def _knn_method(knn_clf, weights, X_train, noisy_ndx, interval, to_check=1):
     """
-    TODO: count impact by the number of times a training sample shows up in
-    one another's neighborhoods, this can be weighted by distance.
+    Count impact by the number of times a training sample shows up in
+    one another's neighborhoods, this can be weighted by 1 / distance.
     """
 
     n_train = X_train.shape[0]
@@ -200,11 +200,16 @@ def _knn_method(knn_clf, X_train, noisy_ndx, interval, to_check=1):
     else:
         exit('to_check not int')
 
-    train_probas = knn_clf.predict_proba(X_train)[:, 1]
-    certainties = np.abs(0.5 - train_probas)
-    train_order = np.argsort(certainties)[:n_check]
-    # train_order = np.argsort(certainties)[::-1][:n_check]
+    train_impact = np.zeros(X_train.shape[0])
+    distances, neighbor_ids = knn_clf.kneighbors(X_train)
 
+    for i in tqdm.tqdm(range(neighbor_ids.shape[0])):
+        if weights == 'uniform':
+            train_impact[neighbor_ids[i]] += 1
+        else:
+            train_impact[neighbor_ids[i]] += 1 / distances[i]
+
+    train_order = np.argsort(train_impact)[::-1][:n_check]
     ckpt_ndx, fix_ndx = _record_fixes(train_order, noisy_ndx, n_train, interval)
     return ckpt_ndx, fix_ndx, train_order
 
@@ -274,6 +279,7 @@ def noise_detection(args, logger, out_dir, seed=1):
                                    random_state=seed, use_predicted_labels=not args.true_label,
                                    kernel=args.kernel, linear_model=args.linear_model, C=args.C,
                                    verbose=args.verbose, X_val=X_val)
+    logger.info('C: {}'.format(explainer.C_))
     ckpt_ndx, fix_ndx, interval, n_check, _ = _our_method(explainer, noisy_ndx, y_train, cutoff_pct=args.check_pct)
     check_pct, our_res = _interval_performance(ckpt_ndx, fix_ndx, noisy_ndx, clf, data, acc_test_noisy)
     settings = '{}_{}'.format(args.linear_model, args.kernel)
@@ -349,19 +355,42 @@ def noise_detection(args, logger, out_dir, seed=1):
         X_train_alt = explainer.transform(X_train)
         X_test_alt = explainer.transform(X_test)
 
-        if args.gridsearch:
+        if args.knn_gridsearch:
             clf = KNeighborsClassifier()
-            param_grid = {'n_neighbors': [3, 5, 7, 9, 11, 13, 15, 31, 45, 61], 'weights': ['uniform', 'distance']}
-            gs = GridSearchCV(clf, param_grid, cv=5, verbose=args.verbose).fit(X_train_alt, y_train)
-            knn_clf = gs.best_estimator_
-        else:
-            logger.info('fitting knn...')
-            knn_clf = KNeighborsClassifier(n_neighbors=args.knn_neighbors, weights=args.knn_weights)
-            knn_clf = knn_clf.fit(X_train_alt, y_train)
+            # knn_n = np.sqrt(X_train.shape[0])
+            # knn_n += 1 if knn_n % 2 == 0 else 0
+            knn_n_neighbors_grid = [15, 31, 45, 61, 88, 121, 151, 201, 301, 401]
+            knn_weights_grid = ['uniform', 'distance']
 
-        ckpt_ndx, fix_ndx, map_order = _knn_method(knn_clf, X_train_alt, noisy_ndx, interval, to_check=n_check)
-        knn_data = X_train_alt, y_train, X_test_alt, y_test
-        _, knn_res = _interval_performance(ckpt_ndx, fix_ndx, noisy_ndx, clf, knn_data, acc_test_noisy)
+            best_score = 0
+            best_n_neighbors = None
+            best_weights = None
+
+            for n_neighbors in knn_n_neighbors_grid:
+                for weights in knn_weights_grid:
+                    knn_model = KNeighborsClassifier(n_neighbors=n_neighbors, weights=weights)
+                    knn_model = knn_model.fit(X_train_alt, y_train_noisy)
+                    tree_val_proba = model_noisy.predict_proba(X_test)[:, 1]
+                    knn_val_proba = knn_model.predict_proba(X_test_alt)[:, 1]
+                    pearson_corr = pearsonr(tree_val_proba, knn_val_proba)[0]
+                    print(n_neighbors, weights, pearson_corr)
+
+                    if pearson_corr > best_score:
+                        best_score = pearson_corr
+                        best_n_neighbors = n_neighbors
+                        best_weights = weights
+
+            logger.info('n_neighbors: {}, weights: {}'.format(best_n_neighbors, best_weights))
+            knn_clf = KNeighborsClassifier(n_neighbors=best_n_neighbors, weights=best_weights)
+            knn_clf = knn_clf.fit(X_train_alt, y_train_noisy)
+            weights = best_weights
+        else:
+            knn_clf = KNeighborsClassifier(n_neighbors=args.knn_neighbors, weights=args.knn_weights)
+            knn_clf = knn_clf.fit(X_train_alt, y_train_noisy)
+            weights = args.knn_weights
+
+        ckpt_ndx, fix_ndx, _ = _knn_method(knn_clf, weights, X_train_alt, noisy_ndx, interval, to_check=n_check)
+        _, knn_res = _interval_performance(ckpt_ndx, fix_ndx, noisy_ndx, clf, data, acc_test_noisy)
         logger.info('time: {:3f}s'.format(time.time() - start))
 
     # plot results
@@ -465,7 +494,7 @@ if __name__ == '__main__':
     parser.add_argument('--verbose', type=int, default=0, help='Verbosity level.')
     parser.add_argument('--true_label', action='store_true', help='Train the SVM on the true labels.')
     parser.add_argument('--knn', action='store_true', default=False, help='Use KNN on top of TREX features.')
-    parser.add_argument('--gridsearch', action='store_true', default=False, help='Use gridsearch to tune KNN.')
+    parser.add_argument('--knn_gridsearch', action='store_true', default=False, help='Use gridsearch to tune KNN.')
     parser.add_argument('--knn_neighbors', type=int, default=5, help='Use KNN on top of TREX features.')
     parser.add_argument('--knn_weights', type=str, default='uniform', help='Use KNN on top of TREX features.')
     args = parser.parse_args()
