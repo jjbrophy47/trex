@@ -13,10 +13,9 @@ import numpy as np
 import matplotlib.pyplot as plt
 from scipy.stats import spearmanr
 from sklearn.neighbors import KNeighborsClassifier
-from sklearn.model_selection import GridSearchCV
 
 import trex
-from utility import model_util, data_util, print_util
+from utility import model_util, data_util, print_util, exp_util
 
 
 def _sigmoid(x):
@@ -114,7 +113,7 @@ def _plot_predictions(tree, explainer, data, ax=None, use_sigmoid=False):
 def fidelity(args, model='lgb', encoding='leaf_output', dataset='iris', n_estimators=100, C=0.1, random_state=69,
              true_label=False, data_dir='data', linear_model='lr', kernel='linear', use_sigmoid=False,
              out_dir='output/fidelity/', flip_frac=None, max_depth=None, knn=False, verbose=0,
-             gridsearch=False, knn_neighbors=5, knn_weights='uniform'):
+             tune_knn=False, knn_neighbors=5, knn_weights='uniform'):
 
     # get model and data
     clf = model_util.get_classifier(model, n_estimators=n_estimators, max_depth=max_depth, random_state=random_state)
@@ -133,10 +132,10 @@ def fidelity(args, model='lgb', encoding='leaf_output', dataset='iris', n_estima
     if knn:
 
         # write output to logs
-        if gridsearch:
-            setting = '{}_knn_gs_{}_t{}_md{}'.format(model, encoding, n_estimators, max_depth)
+        if tune_knn:
+            setting = '{}_{}_knn_gs'.format(model, encoding)
         else:
-            setting = '{}_{}_{}_t{}_md{}'.format(model, knn_neighbors, knn_weights, n_estimators, max_depth)
+            setting = '{}_{}_{}_{}'.format(model, encoding, knn_neighbors, knn_weights)
 
         out_dir = os.path.join(out_dir, dataset, setting)
         os.makedirs(out_dir, exist_ok=True)
@@ -148,11 +147,9 @@ def fidelity(args, model='lgb', encoding='leaf_output', dataset='iris', n_estima
         X_test_alt = extractor.transform(X_test)
         knn_data = X_train_alt, y_train, X_test_alt, y_test
 
-        if gridsearch:
-            clf = KNeighborsClassifier()
-            param_grid = {'n_neighbors': [3, 5, 7, 9, 11, 13, 15, 31, 45, 61], 'weights': ['uniform', 'distance']}
-            gs = GridSearchCV(clf, param_grid, cv=5, verbose=verbose).fit(X_train_alt, y_train)
-            knn_clf = gs.best_estimator_
+        if tune_knn:
+            knn_clf, params = exp_util.tune_knn(X_train_alt, y_train, tree, X_val_tree=X_test, X_val_knn=X_test_alt)
+            logger.info('n_neighbors: {}, weights: {}'.format(params['n_neighbors'], params['weights']))
         else:
             logger.info('fitting knn...')
             knn_clf = KNeighborsClassifier(n_neighbors=knn_neighbors, weights=knn_weights).fit(X_train_alt, y_train)

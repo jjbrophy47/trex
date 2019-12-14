@@ -1,65 +1,48 @@
 """
 Utility methods used by different experiments.
 """
-import tqdm
-import numpy as np
 import os
 import sys
 sys.path.insert(0, os.getcwd())  # for influence_boosting
-from collections import defaultdict
 from copy import deepcopy
+
+import tqdm
+import numpy as np
+from scipy.stats import pearsonr
+from sklearn.neighbors import KNeighborsClassifier
 
 from influence_boosting.influence.leaf_influence import CBLeafInfluenceEnsemble
 
 
-def sort_impact(sv_ndx, impact, ascending=False):
-    """Sorts support vectors by absolute impact values in descending order."""
-
-    if impact.ndim == 2:
-        impact = np.sum(impact, axis=1)
-    impact_list = zip(sv_ndx, impact)
-    impact_list = sorted(impact_list, key=lambda tup: abs(tup[1]), reverse=not ascending)
-
-    sv_ndx, impact = zip(*impact_list)
-    sv_ndx = np.array(sv_ndx)
-    return sv_ndx, impact
-
-
-# TODO: not really needed anymore
-def avg_impact(explainer, X_test, test_indices=None, progress=False):
+def tune_knn(X_train, y_train, tree, X_val_tree, X_val_knn):
     """
-    Returns avg impacts of train instances over a given set of test instances.
-    Parameters
-    ----------
-    explainer : sexee.TreeExplainer
-        SVM explainer for the tree ensemble.
-    X_test : 2d array-like
-        Test instances in original feature space.
-    test_indices : 1d array-like
-        Indexes to compute the average impact over.
+    Tunes KNN by choosing hyperparameters that give the best pearson
+    correlation to the tree predictions.
     """
+    knn_n_neighbors_grid = sorted([5, 17, 45, 91] + [int(np.sqrt(X_train.shape[0]))])
+    knn_weights_grid = ['uniform', 'distance']
 
-    result = defaultdict(float)
+    best_score = 0
+    best_n_neighbors = None
+    best_weights = None
 
-    if test_indices is not None:
-        X_test_instances = X_test[test_indices]
-    else:
-        X_test_instances = X_test
+    for n_neighbors in knn_n_neighbors_grid:
+        for weights in knn_weights_grid:
+            knn_model = KNeighborsClassifier(n_neighbors=n_neighbors, weights=weights)
+            knn_model = knn_model.fit(X_train, y_train)
+            tree_val_proba = tree.predict_proba(X_val_tree)[:, 1]
+            knn_val_proba = knn_model.predict_proba(X_val_knn)[:, 1]
+            pearson_corr = pearsonr(tree_val_proba, knn_val_proba)[0]
 
-    # compute average impact of support vectors over test indices
-    for x_test in tqdm.tqdm(X_test_instances, disable=not progress):
-        impact_list = explainer.train_impact(x_test)
+            if pearson_corr > best_score:
+                best_score = pearson_corr
+                best_n_neighbors = n_neighbors
+                best_weights = weights
 
-        # update the train instance impacts
-        for train_ndx, train_impact in impact_list:
-            result[train_ndx] += train_impact
-
-    # divide by the number of test instances
-    for train_ndx, train_val in result.items():
-        result[train_ndx] = train_val / len(X_test_instances)
-
-    result = list(result.items())
-    return result
+    knn_clf = KNeighborsClassifier(n_neighbors=best_n_neighbors, weights=best_weights)
+    knn_clf = knn_clf.fit(X_train, y_train)
+    params = {'n_neighbors': best_n_neighbors, 'weights': best_weights}
+    return knn_clf, params
 
 
 def log_loss_increase(yhat1, yhat2, y_true, sort='ascending', k=50):

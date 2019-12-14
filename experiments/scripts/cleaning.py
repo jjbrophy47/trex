@@ -18,7 +18,6 @@ from sklearn.base import clone
 from sklearn.metrics import accuracy_score
 from sklearn.preprocessing import minmax_scale
 from sklearn.neighbors import KNeighborsClassifier
-from scipy.stats import pearsonr
 
 import trex
 from utility import model_util, data_util, exp_util, print_util
@@ -78,16 +77,13 @@ def _record_fixes(train_order, noisy_ndx, train_len, interval):
     return ckpt_ndx, fix_ndx
 
 
-def _our_method(explainer, noisy_ndx, y_train, points=10, cutoff_pct=0.3):
+def _our_method(explainer, noisy_ndx, y_train, n_check, interval):
 
     train_weight = explainer.get_weight()[0]
-    n_check = int(len(y_train) * cutoff_pct)
-
     train_order = np.argsort(np.abs(train_weight))[::-1][:n_check]
-    interval = (n_check / len(y_train)) / points
     ckpt_ndx, fix_ndx = _record_fixes(train_order, noisy_ndx, len(y_train), interval)
 
-    return ckpt_ndx, fix_ndx, interval, n_check, train_weight
+    return ckpt_ndx, fix_ndx, train_weight
 
 
 def _random_method(noisy_ndx, y_train, interval, to_check=1, random_state=1):
@@ -272,25 +268,15 @@ def noise_detection(args, logger, out_dir, seed=1):
         logger.info('incorrectly predicted corrupted labels: {}'.format(incorrect_corrupted_ndx.shape[0]))
         logger.info('total number of incorrectly predicted labels: {}'.format(incorrect_ndx.shape[0]))
 
-    # our method
-    logger.info('\nordering by our method...')
-    start = time.time()
-    explainer = trex.TreeExplainer(model_noisy, X_train, y_train_noisy, encoding=args.encoding, dense_output=True,
-                                   random_state=seed, use_predicted_labels=not args.true_label,
-                                   kernel=args.kernel, linear_model=args.linear_model, C=args.C,
-                                   verbose=args.verbose, X_val=X_val)
-    logger.info('C: {}'.format(explainer.C_))
-    ckpt_ndx, fix_ndx, interval, n_check, _ = _our_method(explainer, noisy_ndx, y_train, cutoff_pct=args.check_pct)
-    check_pct, our_res = _interval_performance(ckpt_ndx, fix_ndx, noisy_ndx, clf, data, acc_test_noisy)
-    settings = '{}_{}'.format(args.linear_model, args.kernel)
-    settings += '_true_label' if args.true_label else ''
-    logger.info('time: {:3f}s'.format(time.time() - start))
+    # number of checkpoints to record
+    n_check = int(len(y_train) * args.check_pct)
+    interval = (n_check / len(y_train)) / args.n_plot_points
 
     # random method
     logger.info('ordering by random...')
     start = time.time()
     ckpt_ndx, fix_ndx = _random_method(noisy_ndx, y_train, interval, to_check=n_check, random_state=seed)
-    _, random_res = _interval_performance(ckpt_ndx, fix_ndx, noisy_ndx, clf, data, acc_test_noisy)
+    check_pct, random_res = _interval_performance(ckpt_ndx, fix_ndx, noisy_ndx, clf, data, acc_test_noisy)
     logger.info('time: {:3f}s'.format(time.time() - start))
 
     # tree loss method
@@ -301,8 +287,23 @@ def noise_detection(args, logger, out_dir, seed=1):
     _, tree_loss_res = _interval_performance(ckpt_ndx, fix_ndx, noisy_ndx, clf, data, acc_test_noisy)
     logger.info('time: {:3f}s'.format(time.time() - start))
 
+    # our method
+    if args.trex:
+        logger.info('\nordering by our method...')
+        start = time.time()
+        explainer = trex.TreeExplainer(model_noisy, X_train, y_train_noisy, encoding=args.encoding, dense_output=True,
+                                       random_state=seed, use_predicted_labels=not args.true_label,
+                                       kernel=args.kernel, linear_model=args.linear_model, C=args.C,
+                                       verbose=args.verbose, X_val=X_val)
+        logger.info('C: {}'.format(explainer.C_))
+        ckpt_ndx, fix_ndx, _ = _our_method(explainer, noisy_ndx, y_train, n_check, interval)
+        check_pct, our_res = _interval_performance(ckpt_ndx, fix_ndx, noisy_ndx, clf, data, acc_test_noisy)
+        settings = '{}_{}'.format(args.linear_model, args.kernel)
+        settings += '_true_label' if args.true_label else ''
+        logger.info('time: {:3f}s'.format(time.time() - start))
+
     # linear loss method - if svm, squish decision values to between 0 and 1
-    if args.linear_model_loss:
+    if args.trex and args.linear_model_loss:
         logger.info('ordering by linear loss...')
         start = time.time()
         if args.linear_model == 'svm':
@@ -352,38 +353,16 @@ def noise_detection(args, logger, out_dir, seed=1):
     if args.knn:
         logger.info('ordering by knn...')
         start = time.time()
-        X_train_alt = explainer.transform(X_train)
-        X_test_alt = explainer.transform(X_test)
+
+        # transform the data
+        extractor = trex.TreeExtractor(model_noisy, encoding=args.encoding)
+        X_train_alt = extractor.fit_transform(X_train)
+        X_test_alt = extractor.transform(X_test)
 
         if args.knn_gridsearch:
-            clf = KNeighborsClassifier()
-            # knn_n = np.sqrt(X_train.shape[0])
-            # knn_n += 1 if knn_n % 2 == 0 else 0
-            knn_n_neighbors_grid = [15, 31, 45, 61, 88, 121, 151, 201, 301, 401]
-            knn_weights_grid = ['uniform', 'distance']
-
-            best_score = 0
-            best_n_neighbors = None
-            best_weights = None
-
-            for n_neighbors in knn_n_neighbors_grid:
-                for weights in knn_weights_grid:
-                    knn_model = KNeighborsClassifier(n_neighbors=n_neighbors, weights=weights)
-                    knn_model = knn_model.fit(X_train_alt, y_train_noisy)
-                    tree_val_proba = model_noisy.predict_proba(X_test)[:, 1]
-                    knn_val_proba = knn_model.predict_proba(X_test_alt)[:, 1]
-                    pearson_corr = pearsonr(tree_val_proba, knn_val_proba)[0]
-                    print(n_neighbors, weights, pearson_corr)
-
-                    if pearson_corr > best_score:
-                        best_score = pearson_corr
-                        best_n_neighbors = n_neighbors
-                        best_weights = weights
-
-            logger.info('n_neighbors: {}, weights: {}'.format(best_n_neighbors, best_weights))
-            knn_clf = KNeighborsClassifier(n_neighbors=best_n_neighbors, weights=best_weights)
-            knn_clf = knn_clf.fit(X_train_alt, y_train_noisy)
-            weights = best_weights
+            knn_clf, params = exp_util.tune_knn(X_train_alt, y_train_noisy, model_noisy, X_test, X_test_alt)
+            logger.info('n_neighbors: {}, weights: {}'.format(params['n_neighbors'], params['weights']))
+            weights = params['weights']
         else:
             knn_clf = KNeighborsClassifier(n_neighbors=args.knn_neighbors, weights=args.knn_weights)
             knn_clf = knn_clf.fit(X_train_alt, y_train_noisy)
@@ -393,16 +372,26 @@ def noise_detection(args, logger, out_dir, seed=1):
         _, knn_res = _interval_performance(ckpt_ndx, fix_ndx, noisy_ndx, clf, data, acc_test_noisy)
         logger.info('time: {:3f}s'.format(time.time() - start))
 
+    # knn loss method
+    if args.knn and args.knn_loss:
+        logger.info('ordering by knn loss...')
+        start = time.time()
+        y_train_proba = knn_clf.predict_proba(X_train_alt)
+        ckpt_ndx, fix_ndx, _, _ = _loss_method(noisy_ndx, y_train_proba, y_train_noisy, interval, to_check=n_check)
+        _, knn_loss_res = _interval_performance(ckpt_ndx, fix_ndx, noisy_ndx, clf, data, acc_test_noisy)
+        logger.info('time: {:3f}s'.format(time.time() - start))
+
     # plot results
     logger.info('plotting...')
     fig, ax = plt.subplots(figsize=(7, 4))
-    ax.plot(check_pct, our_res, marker='.', color='g', label='ours')
     ax.plot(check_pct, random_res, marker='^', color='r', label='random')
     ax.plot(check_pct, tree_loss_res, marker='p', color='c', label='tree_loss')
     ax.axhline(acc_test_clean, color='k', linestyle='--')
     ax.set_xlabel('fraction of train data checked')
     ax.set_ylabel('test accuracy')
-    if args.linear_model_loss:
+    if args.trex:
+        ax.plot(check_pct, our_res, marker='.', color='g', label='ours')
+    if args.trex and args.linear_model_loss:
         ax.plot(check_pct, linear_loss_res, marker='*', color='y', label='linear_loss')
     if args.model_type == 'cb' and args.inf_k is not None:
         ax.plot(check_pct, leafinfluence_res, marker='+', color='m', label='leafinfluence')
@@ -410,6 +399,8 @@ def noise_detection(args, logger, out_dir, seed=1):
         ax.plot(check_pct, maple_res, marker='o', color='orange', label='maple')
     if args.knn:
         ax.plot(check_pct, knn_res, marker='D', color='magenta', label='knn')
+    if args.knn and args.knn_loss:
+        ax.plot(check_pct, knn_loss_res, marker='h', color='#EEC64F', label='knn_loss')
     ax.legend()
 
     if args.save_results:
@@ -427,12 +418,15 @@ def noise_detection(args, logger, out_dir, seed=1):
         np.save(os.path.join(rs_dir, 'check_pct.npy'), check_pct)
 
         # ours, random, and tree loss
-        np.save(os.path.join(rs_dir, 'our_{}.npy'.format(settings)), our_res)
         np.save(os.path.join(rs_dir, 'random.npy'), random_res)
         np.save(os.path.join(rs_dir, 'tree_loss.npy'), tree_loss_res)
 
+        # trex
+        if args.trex:
+            np.save(os.path.join(rs_dir, 'our_{}.npy'.format(settings)), our_res)
+
         # linear model loss
-        if args.linear_model_loss:
+        if args.trex and args.linear_model_loss:
             np.save(os.path.join(rs_dir, '{}_loss.npy'.format(settings)), linear_loss_res)
 
         # leaf influence
@@ -446,6 +440,10 @@ def noise_detection(args, logger, out_dir, seed=1):
         # knn
         if args.knn:
             np.save(os.path.join(rs_dir, 'knn.npy'), knn_res)
+
+        # knn loss
+        if args.knn and args.knn_loss:
+            np.save(os.path.join(rs_dir, 'knn_loss.npy'), knn_loss_res)
 
     if args.show_plot:
         plt.show()
@@ -476,6 +474,7 @@ if __name__ == '__main__':
     parser.add_argument('--val_frac', type=float, default=1.0, help='amount of training data to use for validation.')
     parser.add_argument('--repeats', type=int, default=1, help='repeats of the experiment.')
     parser.add_argument('--model_type', type=str, default='cb', help='tree model to use.')
+    parser.add_argument('--trex', action='store_true', help='Use TREX.')
     parser.add_argument('--linear_model', type=str, default='lr', help='linear model to use.')
     parser.add_argument('--encoding', type=str, default='leaf_output', help='type of encoding.')
     parser.add_argument('--n_estimators', metavar='N', type=int, default=100, help='number of trees in random forest.')
@@ -491,9 +490,11 @@ if __name__ == '__main__':
     parser.add_argument('--inf_k', type=int, default=None, help='Number of leaves to use for leafinfluence.')
     parser.add_argument('--maple', action='store_true', help='Whether to use MAPLE as a baseline.')
     parser.add_argument('--check_pct', type=float, default=0.3, help='Max percentage of train instances to check.')
+    parser.add_argument('--n_plot_points', type=int, default=10, help='Number of points to plot.')
     parser.add_argument('--verbose', type=int, default=0, help='Verbosity level.')
     parser.add_argument('--true_label', action='store_true', help='Train the SVM on the true labels.')
     parser.add_argument('--knn', action='store_true', default=False, help='Use KNN on top of TREX features.')
+    parser.add_argument('--knn_loss', action='store_true', default=False, help='Use KNN loss method.')
     parser.add_argument('--knn_gridsearch', action='store_true', default=False, help='Use gridsearch to tune KNN.')
     parser.add_argument('--knn_neighbors', type=int, default=5, help='Use KNN on top of TREX features.')
     parser.add_argument('--knn_weights', type=str, default='uniform', help='Use KNN on top of TREX features.')
