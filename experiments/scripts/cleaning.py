@@ -226,7 +226,6 @@ def noise_detection(args, logger, out_dir, seed=1):
     if args.train_frac < 1.0 and args.train_frac > 0.0:
         n_train = int(X_train.shape[0] * args.train_frac)
         X_train, y_train = X_train[:n_train], y_train[:n_train]
-        args.dataset += '_{}'.format(str(args.train_frac).replace('.', 'p'))
     data = X_train, y_train, X_test, y_test
 
     logger.info('train instances: {}'.format(len(X_train)))
@@ -452,7 +451,9 @@ def noise_detection(args, logger, out_dir, seed=1):
 def main(args):
 
     # make logger
-    out_dir = os.path.join(args.out_dir, args.dataset)
+    if args.train_frac < 1.0 and args.train_frac > 0.0:
+        dataset = '{}_{}'.format(args.dataset, str(args.train_frac).replace('.', 'p'))
+    out_dir = os.path.join(args.out_dir, dataset)
     os.makedirs(out_dir, exist_ok=True)
     logger = print_util.get_logger(os.path.join(out_dir, '{}.txt'.format(args.dataset)))
     logger.info(args)
