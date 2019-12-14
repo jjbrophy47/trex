@@ -17,7 +17,6 @@ import numpy as np
 from sklearn.base import clone
 from sklearn.metrics import accuracy_score
 from sklearn.preprocessing import minmax_scale
-from sklearn.neighbors import KNeighborsClassifier
 
 import trex
 from utility import model_util, data_util, exp_util, print_util
@@ -197,13 +196,12 @@ def _knn_method(knn_clf, weights, X_train, noisy_ndx, interval, to_check=1):
         exit('to_check not int')
 
     train_impact = np.zeros(X_train.shape[0])
-    distances, neighbor_ids = knn_clf.kneighbors(X_train)
-
-    for i in tqdm.tqdm(range(neighbor_ids.shape[0])):
+    for i in tqdm.tqdm(range(X_train.shape[0])):
+        distances, neighbor_ids = knn_clf.kneighbors([X_train[i]])
         if weights == 'uniform':
-            train_impact[neighbor_ids[i]] += 1
+            train_impact[neighbor_ids[0]] += 1
         else:
-            train_impact[neighbor_ids[i]] += 1 / distances[i]
+            train_impact[neighbor_ids[0]] += 1 / distances[0]
 
     train_order = np.argsort(train_impact)[::-1][:n_check]
     ckpt_ndx, fix_ndx = _record_fixes(train_order, noisy_ndx, n_train, interval)
@@ -285,7 +283,7 @@ def noise_detection(args, logger, out_dir, seed=1):
 
     # our method
     if args.trex:
-        logger.info('\nordering by our method...')
+        logger.info('ordering by our method...')
         start = time.time()
         explainer = trex.TreeExplainer(model_noisy, X_train, y_train_noisy, encoding=args.encoding, dense_output=True,
                                        random_state=seed, use_predicted_labels=not args.true_label,
@@ -353,16 +351,13 @@ def noise_detection(args, logger, out_dir, seed=1):
         # transform the data
         extractor = trex.TreeExtractor(model_noisy, encoding=args.encoding)
         X_train_alt = extractor.fit_transform(X_train)
-        X_test_alt = extractor.transform(X_test)
+        X_val_alt = extractor.transform(X_val)
+        train_label = y_train if args.true_label else model_noisy.predict(X_train)
 
-        if args.knn_gridsearch:
-            knn_clf, params = exp_util.tune_knn(X_train_alt, y_train_noisy, model_noisy, X_test, X_test_alt)
-            logger.info('n_neighbors: {}, weights: {}'.format(params['n_neighbors'], params['weights']))
-            weights = params['weights']
-        else:
-            knn_clf = KNeighborsClassifier(n_neighbors=args.knn_neighbors, weights=args.knn_weights)
-            knn_clf = knn_clf.fit(X_train_alt, y_train_noisy)
-            weights = args.knn_weights
+        # tune and train teknn
+        knn_clf, params = exp_util.tune_knn(X_train_alt, train_label, model_noisy, X_val, X_val_alt)
+        logger.info('n_neighbors: {}, weights: {}'.format(params['n_neighbors'], params['weights']))
+        weights = params['weights']
 
         ckpt_ndx, fix_ndx, _ = _knn_method(knn_clf, weights, X_train_alt, noisy_ndx, interval, to_check=n_check)
         _, knn_res = _interval_performance(ckpt_ndx, fix_ndx, noisy_ndx, clf, data, acc_test_noisy)
@@ -448,8 +443,9 @@ def noise_detection(args, logger, out_dir, seed=1):
 def main(args):
 
     # make logger
+    dataset = args.dataset
     if args.train_frac < 1.0 and args.train_frac > 0.0:
-        dataset = '{}_{}'.format(args.dataset, str(args.train_frac).replace('.', 'p'))
+        dataset += '_{}'.format(args.dataset, str(args.train_frac).replace('.', 'p'))
     out_dir = os.path.join(args.out_dir, dataset)
     os.makedirs(out_dir, exist_ok=True)
     logger = print_util.get_logger(os.path.join(out_dir, '{}.txt'.format(args.dataset)))
@@ -478,7 +474,6 @@ if __name__ == '__main__':
     parser.add_argument('--n_estimators', metavar='N', type=int, default=100, help='number of trees in random forest.')
     parser.add_argument('--max_depth', type=int, default=None, help='maximum depth in tree ensemble.')
     parser.add_argument('--C', type=float, default=0.1, help='kernel model penalty parameter.')
-    parser.add_argument('--cv', type=int, default=None, help='Number of cross-val folds to use for tuning.')
     parser.add_argument('--kernel', default='linear', help='Similarity kernel for the linear model.')
     parser.add_argument('--rs', metavar='RANDOM_STATE', type=int, default=1, help='for reproducibility.')
     parser.add_argument('--linear_model_loss', action='store_true', default=False, help='Include linear loss.')
@@ -493,8 +488,5 @@ if __name__ == '__main__':
     parser.add_argument('--true_label', action='store_true', help='Train the SVM on the true labels.')
     parser.add_argument('--knn', action='store_true', default=False, help='Use KNN on top of TREX features.')
     parser.add_argument('--knn_loss', action='store_true', default=False, help='Use KNN loss method.')
-    parser.add_argument('--knn_gridsearch', action='store_true', default=False, help='Use gridsearch to tune KNN.')
-    parser.add_argument('--knn_neighbors', type=int, default=5, help='Use KNN on top of TREX features.')
-    parser.add_argument('--knn_weights', type=str, default='uniform', help='Use KNN on top of TREX features.')
     args = parser.parse_args()
     main(args)

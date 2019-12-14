@@ -15,7 +15,7 @@ from sklearn.base import clone
 from maple import MAPLE
 
 import trex
-from utility import model_util, data_util, exp_util
+from utility import model_util, data_util, exp_util, print_util
 
 ONE_DAY = 86400  # number of seconds in a day
 maple_limit_reached = False
@@ -41,14 +41,17 @@ class timeout:
         signal.alarm(0)
 
 
-def _our_method(test_ndx, X_test, model, X_train, y_train, encoding='leaf_output', linear_model='svm', C=0.1,
-                kernel='rbf', random_state=69):
+def _our_method(test_ndx, X_test, model, X_train, y_train, encoding='leaf_output', linear_model='svm', C=1.0,
+                kernel='rbf', random_state=69, X_val=None, logger=None):
     """Explains the predictions of each test instance."""
 
     start = time.time()
     explainer = trex.TreeExplainer(model, X_train, y_train, encoding=encoding, random_state=random_state,
-                                   linear_model=linear_model, kernel=kernel, C=C)
+                                   linear_model=linear_model, kernel=kernel, C=C, X_val=X_val)
     fine_tune = time.time() - start
+
+    if logger:
+        logger.info('C: {}'.format(explainer.C))
 
     start = time.time()
     explainer.explain(X_test[test_ndx].reshape(1, -1))
@@ -74,7 +77,7 @@ def _influence_method(model, test_ndx, X_train, y_train, X_test, y_test, inf_k):
     return fine_tune, test_time
 
 
-def _maple_method(model, test_ndx, X_train, y_train, X_test, y_test, dstump=False):
+def _maple_method(model, test_ndx, X_train, y_train, X_test, y_test, dstump=False, logger=None):
     """
     Produces a train weight distribution for a single test instance.
     """
@@ -85,7 +88,8 @@ def _maple_method(model, test_ndx, X_train, y_train, X_test, y_test, dstump=Fals
             maple = MAPLE.MAPLE(X_train, y_train, X_train, y_train, dstump=dstump)
             fine_tune = time.time() - start
         except:
-            print('maple fine-tuning exceeded 24h!')
+            if logger:
+                logger.info('maple fine-tuning exceeded 24h!')
             global maple_limit_reached
             maple_limit_reached = True
             return None, None
@@ -97,41 +101,79 @@ def _maple_method(model, test_ndx, X_train, y_train, X_test, y_test, dstump=Fals
     return fine_tune, test_time
 
 
-def runtime(model_type='cb', linear_model='lr', kernel='linear', encoding='leaf_output', dataset='iris',
-            n_estimators=100, max_depth=None, C=0.1, random_state=69, inf_k=None, repeats=10, dstump=False,
-            true_label=False, maple=False, data_dir='data', out_dir='output/runtime', save_results=False,
-            start_pct=10):
+def _knn_method(tree, encoding, test_ndx, X_train, y_train, X_val, X_test, logger=None):
+
+    with timeout(seconds=ONE_DAY):
+        try:
+            start = time.time()
+            extractor = trex.TreeExtractor(tree, encoding=args.encoding)
+            X_train_alt = extractor.fit_transform(X_train)
+            X_val_alt = extractor.transform(X_val)
+            train_label = y_train if args.true_label else tree.predict(X_train)
+
+            knn_clf, params = exp_util.tune_knn(X_train_alt, train_label, tree, X_val, X_val_alt)
+            fine_tune = time.time() - start
+
+            if logger:
+                logger.info('n_neighbors: {}, weights: {}'.format(params['n_neighbors'], params['weights']))
+        except:
+            if logger:
+                logger.info('knn fine-tuning exceeded 24h!')
+            global knn_limit_reached
+            knn_limit_reached = True
+            return None, None
+
+    start = time.time()
+    distances, neighbor_ids = knn_clf.kneighbors([X_test[test_ndx]])
+    test_time = time.time() - start
+
+    return fine_tune, test_time
+
+
+def runtime(args):
     """
     Main method that trains a tree ensemble, then compares the runtime of different methods to explain
     a random subset of test instances.
     """
 
-    settings = '{}_{}'.format(linear_model, kernel)
-    settings += '_true_label' if true_label else ''
+    # write output to logs
+    out_dir = os.path.join(args.out_dir, args.dataset)
+    os.makedirs(out_dir, exist_ok=True)
+    logger = print_util.get_logger(os.path.join(out_dir, '{}.txt'.format(args.dataset)))
+    logger.info(args)
 
-    for m in range(start_pct, 110, 10):
-        print('\n{}% of the training data:'.format(m))
+    for m in range(args.start_pct, 110, 10):
+        logger.info('\n{}% of the training data:'.format(m))
 
         our_fine_tune, our_test_time = [], []
         inf_fine_tune, inf_test_time = [], []
         maple_fine_tune, maple_test_time = [], []
-        seed = random_state
+        knn_fine_tune, knn_test_time = [], []
+        seed = args.random_state
 
-        for i in range(repeats):
+        for i in range(args.repeats):
             seed += 10
-            print('\nrun {}, seed: {}'.format(i, seed))
+            logger.info('\nrun {}, seed: {}'.format(i, seed))
 
             # get model and data
-            clf = model_util.get_classifier(model_type, n_estimators=n_estimators, max_depth=max_depth,
-                                            random_state=seed)
-            X_train, X_test, y_train, y_test, label = data_util.get_data(dataset, random_state=seed, data_dir=data_dir)
+            clf = model_util.get_classifier(args.model_type, n_estimators=args.n_estimators,
+                                            max_depth=args.max_depth, random_state=seed)
+            X_train, X_test, y_train, y_test, label = data_util.get_data(args.dataset, random_state=seed,
+                                                                         data_dir=args.data_dir)
 
             n_samples = int(X_train.shape[0] * (m / 100))
             X_train, y_train = X_train[:n_samples], y_train[:n_samples]
             X_test, y_test = X_test[:n_samples], y_test[:n_samples]
 
-            print('train instances: {}'.format(len(X_train)))
-            print('num features: {}'.format(X_train.shape[1]))
+            # use part of the test data as validation data
+            X_val = X_test.copy()
+            if args.val_frac < 1.0 and args.val_frac > 0.0:
+                X_val = X_val[int(X_val.shape[0] * args.val_frac):]
+
+            logger.info('train instances: {}'.format(len(X_train)))
+            logger.info('val instances: {}'.format(len(X_test)))
+            logger.info('test instances: {}'.format(len(X_val)))
+            logger.info('num features: {}'.format(X_train.shape[1]))
 
             # train a tree ensemble
             model = clone(clf).fit(X_train, y_train)
@@ -142,76 +184,103 @@ def runtime(model_type='cb', linear_model='lr', kernel='linear', encoding='leaf_
             test_ndx = np.random.choice(len(y_test), size=1, replace=False)
 
             # train on predicted labels (ours and maple methods only)
-            train_label = y_train if true_label else model.predict(X_train)
+            train_label = y_train if args.true_label else model.predict(X_train)
 
             # our method
-            print('ours...')
-            fine_tune, test_time = _our_method(test_ndx, X_test, model, X_train, train_label, encoding=encoding, C=C,
-                                               linear_model=linear_model, kernel=kernel, random_state=seed)
-            print('fine tune: {:.3f}s'.format(fine_tune))
-            print('test time: {:.3f}s'.format(test_time))
-            our_fine_tune.append(fine_tune)
-            our_test_time.append(test_time)
+            if args.trex:
+                logger.info('ours...')
+                fine_tune, test_time = _our_method(test_ndx, X_test, model, X_train, train_label,
+                                                   encoding=args.encoding, C=args.C, linear_model=args.linear_model,
+                                                   kernel=args.kernel, random_state=seed, X_val=X_val, logger=logger)
+                logger.info('fine tune: {:.3f}s'.format(fine_tune))
+                logger.info('test time: {:.3f}s'.format(test_time))
+                our_fine_tune.append(fine_tune)
+                our_test_time.append(test_time)
 
             # influence method
-            if model_type == 'cb' and inf_k is not None:
-                print('leafinfluence...')
-                fine_tune, test_time = _influence_method(model, test_ndx, X_train, y_train, X_test, y_test, inf_k)
-                print('fine tune: {:.3f}s'.format(fine_tune))
-                print('test time: {:.3f}s'.format(test_time))
+            if args.model_type == 'cb' and args.inf_k is not None:
+                logger.info('leafinfluence...')
+                fine_tune, test_time = _influence_method(model, test_ndx, X_train, y_train, X_test, y_test, args.inf_k)
+                logger.info('fine tune: {:.3f}s'.format(fine_tune))
+                logger.info('test time: {:.3f}s'.format(test_time))
                 inf_fine_tune.append(fine_tune)
                 inf_test_time.append(test_time)
 
-            if maple and not maple_limit_reached:
-                print('maple...')
+            if args.maple and not maple_limit_reached:
+                logger.info('maple...')
                 fine_tune, test_time = _maple_method(model, test_ndx, X_train, train_label, X_test, y_test,
-                                                     dstump=dstump)
+                                                     dstump=args.dstump, logger=logger)
                 if fine_tune is not None and test_time is not None:
-                    print('fine tune: {:.3f}s'.format(fine_tune))
-                    print('test time: {:.3f}s'.format(test_time))
+                    logger.info('fine tune: {:.3f}s'.format(fine_tune))
+                    logger.info('test time: {:.3f}s'.format(test_time))
                     maple_fine_tune.append(fine_tune)
                     maple_test_time.append(test_time)
 
-        # display results
-        our_fine_tune = np.array(our_fine_tune)
-        our_test_time = np.array(our_test_time)
-        print('\nour')
-        print('fine tuning: {:.3f}s +/- {:.3f}s'.format(our_fine_tune.mean(), our_fine_tune.std()))
-        print('test time: {:.3f}s +/- {:.3f}s'.format(our_test_time.mean(), our_test_time.std()))
+            if args.knn and not knn_limit_reached:
+                logger.info('knn...')
+                fine_tune, test_time = _knn_method(model, args.encoding, test_ndx, X_train, train_label,
+                                                   X_val, X_test, logger=logger)
+                if fine_tune is not None and test_time is not None:
+                    logger.info('fine tune: {:.3f}s'.format(fine_tune))
+                    logger.info('test time: {:.3f}s'.format(test_time))
+                    knn_fine_tune.append(fine_tune)
+                    knn_test_time.append(test_time)
 
-        if model_type == 'cb' and inf_k is not None:
+        # display results
+        if args.trex:
+            our_fine_tune = np.array(our_fine_tune)
+            our_test_time = np.array(our_test_time)
+            logger.info('\nour')
+            logger.info('fine tuning: {:.3f}s +/- {:.3f}s'.format(our_fine_tune.mean(), our_fine_tune.std()))
+            logger.info('test time: {:.3f}s +/- {:.3f}s'.format(our_test_time.mean(), our_test_time.std()))
+
+        if args.model_type == 'cb' and args.inf_k is not None:
             inf_fine_tune = np.array(inf_fine_tune)
             inf_test_time = np.array(inf_test_time)
-            print('\nleafinfluence')
-            print('fine tuning: {:.3f}s +/- {:.3f}s'.format(inf_fine_tune.mean(), inf_fine_tune.std()))
-            print('test time: {:.3f}s +/- {:.3f}s'.format(inf_test_time.mean(), inf_test_time.std()))
+            logger.info('\nleafinfluence')
+            logger.info('fine tuning: {:.3f}s +/- {:.3f}s'.format(inf_fine_tune.mean(), inf_fine_tune.std()))
+            logger.info('test time: {:.3f}s +/- {:.3f}s'.format(inf_test_time.mean(), inf_test_time.std()))
 
-        if maple and not maple_limit_reached:
+        if args.maple and not maple_limit_reached:
             maple_fine_tune = np.array(maple_fine_tune)
             maple_test_time = np.array(maple_test_time)
-            print('\nmaple')
-            print('fine tuning: {:.3f}s +/- {:.3f}s'.format(maple_fine_tune.mean(), maple_fine_tune.std()))
-            print('test time: {:.3f}s +/- {:.3f}s'.format(maple_test_time.mean(), maple_test_time.std()))
+            logger.info('\nmaple')
+            logger.info('fine tuning: {:.3f}s +/- {:.3f}s'.format(maple_fine_tune.mean(), maple_fine_tune.std()))
+            logger.info('test time: {:.3f}s +/- {:.3f}s'.format(maple_test_time.mean(), maple_test_time.std()))
+
+        if args.knn and not knn_limit_reached:
+            knn_fine_tune = np.array(knn_fine_tune)
+            knn_test_time = np.array(knn_test_time)
+            logger.info('\nknn')
+            logger.info('fine tuning: {:.3f}s +/- {:.3f}s'.format(knn_fine_tune.mean(), knn_fine_tune.std()))
+            logger.info('test time: {:.3f}s +/- {:.3f}s'.format(knn_test_time.mean(), knn_test_time.std()))
 
         # save results
-        if save_results:
-            exp_dir = os.path.join(out_dir, dataset, '{}_percent'.format(m))
+        if args.save_results:
+            exp_dir = os.path.join(args.out_dir, args.dataset, '{}_percent'.format(m))
             os.makedirs(exp_dir, exist_ok=True)
 
             # ours
-            np.save(os.path.join(exp_dir, 'ours_{}_fine_tune.npy'.format(settings)), our_fine_tune)
-            np.save(os.path.join(exp_dir, 'ours_{}_test_time.npy'.format(settings)), our_test_time)
+            if args.trex:
+                setting = '{}_{}'.format(args.linear_model, args.encoding)
+            np.save(os.path.join(exp_dir, 'ours_{}_fine_tune.npy'.format(setting)), our_fine_tune)
+            np.save(os.path.join(exp_dir, 'ours_{}_test_time.npy'.format(setting)), our_test_time)
 
             # leafinfluence
-            if model_type == 'cb' and inf_k is not None:
+            if args.model_type == 'cb' and args.inf_k is not None:
                 np.save(os.path.join(exp_dir, 'influence_fine_tune.npy'), inf_fine_tune)
                 np.save(os.path.join(exp_dir, 'influence_test_time.npy'), inf_test_time)
 
             # MAPLE
-            if maple:
-                maple_settings = '' if not dstump else 'dstump_'
+            if args.maple:
+                maple_settings = '' if not args.dstump else 'dstump_'
                 np.save(os.path.join(exp_dir, 'maple_{}fine_tune.npy'.format(maple_settings)), maple_fine_tune)
                 np.save(os.path.join(exp_dir, 'maple_{}test_time.npy'.format(maple_settings)), maple_test_time)
+
+            # KNN
+            if args.knn:
+                np.save(os.path.join(exp_dir, 'teknn_fine_tune.npy'), knn_fine_tune)
+                np.save(os.path.join(exp_dir, 'teknn_test_time.npy'), knn_test_time)
 
 
 if __name__ == '__main__':
@@ -229,13 +298,11 @@ if __name__ == '__main__':
     parser.add_argument('--inf_k', default=None, type=int, help='Number of leaves for leafinfluence.')
     parser.add_argument('--maple', action='store_true', help='Run experiment using MAPLE.')
     parser.add_argument('--dstump', action='store_true', help='Enable DSTUMP with Maple.')
-    parser.add_argument('--start_pct', default=10, type=int, help='Percentage of training data to start with.')
+    parser.add_argument('--start_pct', default=100, type=int, help='Percentage of training data to start with.')
     parser.add_argument('--repeats', default=5, type=int, help='Number of times to repeat the experiment.')
     parser.add_argument('--save_results', action='store_true', default=False, help='Save cleaning results.')
     parser.add_argument('--true_label', action='store_true', help='Train explainers on true labels.')
+    parser.add_argument('--knn', action='store_true', default=False, help='Use KNN on top of TREX features.')
+    parser.add_argument('--trex', action='store_true', default=False, help='TREX method.')
     args = parser.parse_args()
-    print(args)
-    runtime(model_type=args.model, linear_model=args.linear_model, encoding=args.encoding, kernel=args.kernel,
-            dataset=args.dataset, n_estimators=args.n_estimators, random_state=args.rs, inf_k=args.inf_k,
-            repeats=args.repeats, true_label=args.true_label, maple=args.maple, max_depth=args.max_depth, C=args.C,
-            save_results=args.save_results, dstump=args.dstump, start_pct=args.start_pct)
+    runtime(args)

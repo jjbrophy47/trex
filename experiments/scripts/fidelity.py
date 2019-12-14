@@ -12,7 +12,6 @@ sys.path.insert(0, here + '/../../')  # for libliner; TODO: remove this dependen
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.stats import spearmanr
-from sklearn.neighbors import KNeighborsClassifier
 
 import trex
 from utility import model_util, data_util, print_util, exp_util
@@ -22,10 +21,8 @@ def _sigmoid(x):
     return 1 / (1 + np.exp(-x))
 
 
-def _plot_knn_predictions(tree, knn_clf, data, knn_data, ax=None):
+def _plot_knn_predictions(tree, knn_clf, X_test, X_test_alt, y_train, ax=None):
 
-    X_train, y_train, X_test, y_test = data
-    X_train_alt, y_train, X_test_alt, y_test = knn_data
     multiclass = True if len(np.unique(y_train)) > 2 else False
 
     # tree ensemble predictions
@@ -110,60 +107,59 @@ def _plot_predictions(tree, explainer, data, ax=None, use_sigmoid=False):
     return res
 
 
-def fidelity(args, model='lgb', encoding='leaf_output', dataset='iris', n_estimators=100, C=0.1, random_state=69,
-             true_label=False, data_dir='data', linear_model='lr', kernel='linear', use_sigmoid=False,
-             out_dir='output/fidelity/', flip_frac=None, max_depth=None, knn=False, verbose=0,
-             tune_knn=False, knn_neighbors=5, knn_weights='uniform'):
+def fidelity(args):
 
     # get model and data
-    clf = model_util.get_classifier(model, n_estimators=n_estimators, max_depth=max_depth, random_state=random_state)
-    X_train, X_test, y_train, y_test, label = data_util.get_data(dataset, random_state=random_state, data_dir=data_dir)
+    clf = model_util.get_classifier(args.model, n_estimators=args.n_estimators, max_depth=args.max_depth,
+                                    random_state=args.random_state)
+    X_train, X_test, y_train, y_test, label = data_util.get_data(args.dataset, random_state=args.random_state,
+                                                                 data_dir=args.data_dir)
     data = X_train, y_train, X_test, y_test
 
     # corrupt the data if specified
-    if flip_frac is not None:
-        y_train, noisy_ndx = data_util.flip_labels(y_train, k=flip_frac, random_state=random_state)
+    if args.flip_frac is not None:
+        y_train, noisy_ndx = data_util.flip_labels(y_train, k=args.flip_frac, random_state=args.random_state)
         noisy_ndx = np.array(sorted(noisy_ndx))
         print('num noisy labels: {}'.format(len(noisy_ndx)))
+
+    # use part of the test data as validation data
+    X_val = X_test.copy()
+    if args.val_frac < 1.0 and args.val_frac > 0.0:
+        X_val = X_val[int(X_val.shape[0] * args.val_frac):]
 
     # train a tree ensemble
     tree = clf.fit(X_train, y_train)
 
-    if knn:
+    if args.knn:
 
         # write output to logs
-        if tune_knn:
-            setting = '{}_{}_knn_gs'.format(model, encoding)
-        else:
-            setting = '{}_{}_{}_{}'.format(model, encoding, knn_neighbors, knn_weights)
-
-        out_dir = os.path.join(out_dir, dataset, setting)
+        setting = '{}_{}_teknn_gs'.format(args.model, args.encoding)
+        out_dir = os.path.join(args.out_dir, args.dataset, setting)
         os.makedirs(out_dir, exist_ok=True)
-        logger = print_util.get_logger(os.path.join(out_dir, '{}.txt'.format(dataset)))
+        logger = print_util.get_logger(os.path.join(out_dir, '{}.txt'.format(args.dataset)))
         logger.info(args)
 
-        extractor = trex.TreeExtractor(tree, encoding=encoding)
+        # transform data
+        extractor = trex.TreeExtractor(tree, encoding=args.encoding)
         X_train_alt = extractor.fit_transform(X_train)
         X_test_alt = extractor.transform(X_test)
-        knn_data = X_train_alt, y_train, X_test_alt, y_test
+        X_val_alt = extractor.transform(X_val)
+        train_label = y_train if args.true_label else tree.predict(X_train)
 
-        if tune_knn:
-            knn_clf, params = exp_util.tune_knn(X_train_alt, y_train, tree, X_val_tree=X_test, X_val_knn=X_test_alt)
-            logger.info('n_neighbors: {}, weights: {}'.format(params['n_neighbors'], params['weights']))
-        else:
-            logger.info('fitting knn...')
-            knn_clf = KNeighborsClassifier(n_neighbors=knn_neighbors, weights=knn_weights).fit(X_train_alt, y_train)
+        # tune and train teknn
+        knn_clf, params = exp_util.tune_knn(X_train_alt, train_label, tree, X_val_tree=X_test, X_val_knn=X_val_alt)
+        logger.info('n_neighbors: {}, weights: {}'.format(params['n_neighbors'], params['weights']))
 
         fig, ax = plt.subplots()
 
         start = time.time()
         logger.info('generating predictions...')
-        results = _plot_knn_predictions(tree, knn_clf, data, knn_data, ax=ax)
+        results = _plot_knn_predictions(tree, knn_clf, X_test, X_test_alt, y_train, ax=ax)
         logger.info('time: {:.3f}s'.format(time.time() - start))
 
         ax.set_xlabel('knn')
-        ax.set_ylabel('{}'.format(model))
-        ax.set_title('{}, {}\n{}, {}'.format(dataset, model, knn_clf.n_neighbors, knn_clf.weights))
+        ax.set_ylabel('{}'.format(args.model))
+        ax.set_title('{}, {}\n{}, {}'.format(args.dataset, args.model, knn_clf.n_neighbors, knn_clf.weights))
         ax.legend()
         plt.tight_layout()
 
@@ -173,25 +169,25 @@ def fidelity(args, model='lgb', encoding='leaf_output', dataset='iris', n_estima
     else:
 
         # make logger
-        true_label_str = 'true_label' if true_label else ''
-        sigmoid_str = 'sigmoid' if use_sigmoid else ''
-        setting = '{}_{}_{}_{}_{}_{}_t{}_md{}'.format(model, linear_model, kernel, encoding, true_label_str,
-                                                      sigmoid_str, n_estimators, max_depth)
-        out_dir = os.path.join(out_dir, dataset, setting)
+        true_label_str = 'true_label' if args.true_label else ''
+        setting = '{}_{}_{}_{}_{}'.format(args.model, args.linear_model, args.kernel, args.encoding, true_label_str)
+        out_dir = os.path.join(out_dir, args.dataset, setting)
         os.makedirs(out_dir, exist_ok=True)
-        logger = print_util.get_logger(os.path.join(out_dir, '{}.txt'.format(dataset)))
+        logger = print_util.get_logger(os.path.join(out_dir, '{}.txt'.format(args.dataset)))
         logger.info(args)
 
         # plot fidelity
         fig, ax = plt.subplots()
         start = time.time()
-        explainer = trex.TreeExplainer(tree, X_train, y_train, encoding=encoding, linear_model=linear_model, C=C,
-                                       kernel=kernel, random_state=random_state, use_predicted_labels=not true_label)
-        results = _plot_predictions(tree, explainer, data, ax=ax, use_sigmoid=use_sigmoid)
+        explainer = trex.TreeExplainer(tree, X_train, y_train, encoding=args.encoding, linear_model=args.linear_model,
+                                       C=args.C, kernel=args.kernel, random_state=args.random_state,
+                                       use_predicted_labels=not args.true_label, X_val=X_val)
+        results = _plot_predictions(tree, explainer, data, ax=ax, use_sigmoid=args.use_sigmoid)
         logger.info('time: {:.3f}s'.format(time.time() - start))
-        ax.set_xlabel('{}'.format(linear_model))
-        ax.set_ylabel('{}'.format(model))
-        ax.set_title('{}, {}\n{}, {}, {}, {}'.format(dataset, model, linear_model, kernel, encoding, true_label_str))
+        ax.set_xlabel('{}'.format(args.linear_model))
+        ax.set_ylabel('{}'.format(args.model))
+        ax.set_title('{}, {}\n{}, {}, {}, {}'.format(args.dataset, args.model, args.linear_model, args.kernel,
+                                                     args.encoding, true_label_str))
         ax.legend()
         plt.tight_layout()
 
@@ -209,6 +205,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Feature representation extractions for tree ensembles',
                                      formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument('--dataset', type=str, default='iris', help='dataset to explain.')
+    parser.add_argument('--val_frac', type=float, default=0.1, help='amount of training data to use for validation.')
     parser.add_argument('--model', type=str, default='lgb', help='model to use.')
     parser.add_argument('--linear_model', type=str, default='lr', help='linear model to use.')
     parser.add_argument('--kernel', type=str, default='linear', help='Similarity kernel.')
@@ -221,12 +218,5 @@ if __name__ == '__main__':
     parser.add_argument('--true_label', action='store_true', default=False, help='Use true labels for explainer.')
     parser.add_argument('--use_sigmoid', action='store_true', default=False, help='Run svm results through sigmoid.')
     parser.add_argument('--knn', action='store_true', default=False, help='Use KNN on top of TREX features.')
-    parser.add_argument('--gridsearch', action='store_true', default=False, help='Use gridsearch to tune KNN.')
-    parser.add_argument('--knn_neighbors', type=int, default=5, help='Use KNN on top of TREX features.')
-    parser.add_argument('--knn_weights', type=str, default='uniform', help='Use KNN on top of TREX features.')
     args = parser.parse_args()
-    fidelity(args, model=args.model, encoding=args.encoding, dataset=args.dataset, n_estimators=args.n_estimators,
-             random_state=args.rs, true_label=args.true_label, linear_model=args.linear_model, knn=args.knn,
-             kernel=args.kernel, use_sigmoid=args.use_sigmoid, C=args.C, max_depth=args.max_depth,
-             verbose=args.verbose, gridsearch=args.gridsearch, knn_neighbors=args.knn_neighbors,
-             knn_weights=args.knn_weights)
+    fidelity(args)
