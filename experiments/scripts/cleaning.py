@@ -236,13 +236,10 @@ def noise_detection(args, logger, out_dir, seed=1):
     noisy_ndx = np.array(sorted(noisy_ndx))
     logger.info('num noisy labels: {}'.format(len(noisy_ndx)))
 
-    # use part of the training data as validation data
+    # use part of the test data as validation data
     X_val = X_test.copy()
     if args.val_frac < 1.0 and args.val_frac > 0.0:
-        n_train = X_train.shape[0] - int(X_train.shape[0] * args.val_frac)
-        X_val = X_train[n_train:]
-        X_train, y_train = X_train[:n_train], y_train[:n_train]
-        y_train_noisy = y_train_noisy[:n_train]
+        X_val = X_val[int(X_val.shape[0] * args.val_frac):]
 
     # train a tree ensemble on the clean and noisy labels
     model = clone(clf).fit(X_train, y_train)
@@ -472,7 +469,7 @@ if __name__ == '__main__':
     parser.add_argument('--data_dir', type=str, default='data', help='data directory.')
     parser.add_argument('--out_dir', type=str, default='output/cleaning', help='output directory.')
     parser.add_argument('--train_frac', type=float, default=1.0, help='amount of training data to use.')
-    parser.add_argument('--val_frac', type=float, default=1.0, help='amount of training data to use for validation.')
+    parser.add_argument('--val_frac', type=float, default=0.1, help='amount of training data to use for validation.')
     parser.add_argument('--repeats', type=int, default=1, help='repeats of the experiment.')
     parser.add_argument('--model_type', type=str, default='cb', help='tree model to use.')
     parser.add_argument('--trex', action='store_true', help='Use TREX.')
