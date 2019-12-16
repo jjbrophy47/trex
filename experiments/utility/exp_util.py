@@ -1,6 +1,7 @@
 """
 Utility methods used by different experiments.
 """
+import time
 import os
 import sys
 sys.path.insert(0, os.getcwd())  # for influence_boosting
@@ -14,12 +15,14 @@ from sklearn.neighbors import KNeighborsClassifier
 from influence_boosting.influence.leaf_influence import CBLeafInfluenceEnsemble
 
 
-def tune_knn(X_train, y_train, tree, X_val_tree, X_val_knn):
+def tune_knn(X_train, y_train, tree, X_val_tree, X_val_knn, logger=None):
     """
     Tunes KNN by choosing hyperparameters that give the best pearson
     correlation to the tree predictions.
     """
-    knn_n_neighbors_grid = sorted([5, 17, 45, 91] + [int(np.sqrt(X_train.shape[0]))])
+    bootstrap_n = int(np.sqrt(X_train.shape[0]))
+    bootstrap_n += 1 if bootstrap_n % 2 == 0 else 0
+    knn_n_neighbors_grid = sorted([5, 17, 45, 91] + [bootstrap_n])
     knn_weights_grid = ['uniform', 'distance']
 
     best_score = 0
@@ -28,6 +31,7 @@ def tune_knn(X_train, y_train, tree, X_val_tree, X_val_knn):
 
     for n_neighbors in knn_n_neighbors_grid:
         for weights in knn_weights_grid:
+            start = time.time()
             knn_model = KNeighborsClassifier(n_neighbors=n_neighbors, weights=weights)
             knn_model = knn_model.fit(X_train, y_train)
             tree_val_proba = tree.predict_proba(X_val_tree)[:, 1]
@@ -38,6 +42,10 @@ def tune_knn(X_train, y_train, tree, X_val_tree, X_val_knn):
                 best_score = pearson_corr
                 best_n_neighbors = n_neighbors
                 best_weights = weights
+
+            if logger:
+                log_str = 'n_neighbors={}, weights={}: {:.3f}s; corr={}'
+                logger.info(log_str.format(n_neighbors, weights, time.time() - start, pearson_corr))
 
     knn_clf = KNeighborsClassifier(n_neighbors=best_n_neighbors, weights=best_weights)
     knn_clf = knn_clf.fit(X_train, y_train)

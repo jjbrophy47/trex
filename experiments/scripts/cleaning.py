@@ -337,7 +337,8 @@ def noise_detection(args, logger, out_dir, seed=1):
     if args.maple:
         logger.info('ordering by MAPLE...')
         start = time.time()
-        maple_exp = MAPLE(X_train, y_train_noisy, X_train, y_train_noisy, verbose=args.verbose, dstump=False)
+        train_label = y_train if args.true_label else model_noisy.predict(X_train)
+        maple_exp = MAPLE(X_train, train_label, X_train, y_train_noisy, verbose=args.verbose, dstump=False)
         ckpt_ndx, fix_ndx, map_scores, map_order = _maple_method(maple_exp, X_train, noisy_ndx, interval,
                                                                  to_check=n_check)
         _, maple_res = _interval_performance(ckpt_ndx, fix_ndx, noisy_ndx, clf, data, acc_test_noisy)

@@ -3,6 +3,8 @@ Instance-based explainer for a tree ensemble using an SVM or KLR.
 Currently supports: sklearn's RandomForestClassifier and GBMClassifier, lightgbm, xgboost, and catboost.
     Is also only compatible with dense dataset inputs.
 """
+import time
+
 import numpy as np
 from sklearn.utils.validation import check_X_y
 from sklearn.preprocessing import LabelEncoder
@@ -17,7 +19,7 @@ class TreeExplainer:
     def __init__(self, tree, X_train, y_train, linear_model='svm', encoding='leaf_output', C=1.0,
                  kernel='linear', gamma='scale', coef0=0.0, degree=3, dense_output=False,
                  use_predicted_labels=True, random_state=None, X_val=None, verbose=0,
-                 C_grid=[1e-2, 1e-1, 1e0, 1e1, 1e2]):
+                 C_grid=[1e-2, 1e-1, 1e0, 1e1, 1e2], logger=None):
         """
         Trains an svm on feature representations from a learned tree ensemble.
 
@@ -77,6 +79,7 @@ class TreeExplainer:
         self.use_predicted_labels = use_predicted_labels
         self.random_state = random_state
         self.verbose = verbose
+        self.logger = logger
         self._validate()
 
         # extract feature representations from the tree ensemble
@@ -103,6 +106,8 @@ class TreeExplainer:
             best_C = None
 
             for C in C_grid:
+                start = time.time()
+
                 clf = self._get_linear_model(model_type=self.linear_model, C=C)
                 clf.fit(self.train_feature_, train_label)
 
@@ -116,13 +121,16 @@ class TreeExplainer:
                 else:
                     trex_proba = clf.predict_proba(X_val_feature)[:, 1]
 
-                # keep model with the bes
+                # keep model with the best
                 pearson_corr = pearsonr(tree_val_proba, trex_proba)[0]
                 if pearson_corr > best_score:
                     best_score = pearson_corr
                     best_C = C
 
-            self.C_ = best_C
+                if self.logger:
+                    self.logger.info('C={}: {:.3f}s; corr={:.3f}'.format(C, time.time() - start, pearson_corr))
+
+            self.C = best_C
             clf = self._get_linear_model(model_type=self.linear_model, C=best_C)
             self.linear_model_ = clf.fit(self.train_feature_, train_label)
         else:

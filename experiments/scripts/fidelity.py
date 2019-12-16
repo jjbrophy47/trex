@@ -109,16 +109,29 @@ def _plot_predictions(tree, explainer, data, ax=None, use_sigmoid=False):
 
 def fidelity(args):
 
+    # create directory
+    if args.knn:
+        setting = '{}_teknn_{}'.format(args.model, args.encoding)
+    else:
+        setting = '{}_{}_{}_{}'.format(args.model, args.linear_model, args.kernel, args.encoding)
+
+    # write output to logs
+    out_dir = os.path.join(args.out_dir, args.dataset, setting)
+    os.makedirs(out_dir, exist_ok=True)
+    logger = print_util.get_logger(os.path.join(out_dir, '{}.txt'.format(args.dataset)))
+    logger.info(args)
+    logger.info(time.ctime(time.time()))
+
     # get model and data
     clf = model_util.get_classifier(args.model, n_estimators=args.n_estimators, max_depth=args.max_depth,
-                                    random_state=args.random_state)
-    X_train, X_test, y_train, y_test, label = data_util.get_data(args.dataset, random_state=args.random_state,
+                                    random_state=args.rs)
+    X_train, X_test, y_train, y_test, label = data_util.get_data(args.dataset, random_state=args.rs,
                                                                  data_dir=args.data_dir)
     data = X_train, y_train, X_test, y_test
 
     # corrupt the data if specified
     if args.flip_frac is not None:
-        y_train, noisy_ndx = data_util.flip_labels(y_train, k=args.flip_frac, random_state=args.random_state)
+        y_train, noisy_ndx = data_util.flip_labels(y_train, k=args.flip_frac, random_state=args.rs)
         noisy_ndx = np.array(sorted(noisy_ndx))
         print('num noisy labels: {}'.format(len(noisy_ndx)))
 
@@ -127,17 +140,15 @@ def fidelity(args):
     if args.val_frac < 1.0 and args.val_frac > 0.0:
         X_val = X_val[int(X_val.shape[0] * args.val_frac):]
 
+    logger.info('train instances: {}'.format(len(X_train)))
+    logger.info('val instances: {}'.format(len(X_test)))
+    logger.info('test instances: {}'.format(len(X_val)))
+    logger.info('num features: {}'.format(X_train.shape[1]))
+
     # train a tree ensemble
     tree = clf.fit(X_train, y_train)
 
     if args.knn:
-
-        # write output to logs
-        setting = '{}_{}_teknn_gs'.format(args.model, args.encoding)
-        out_dir = os.path.join(args.out_dir, args.dataset, setting)
-        os.makedirs(out_dir, exist_ok=True)
-        logger = print_util.get_logger(os.path.join(out_dir, '{}.txt'.format(args.dataset)))
-        logger.info(args)
 
         # transform data
         extractor = trex.TreeExtractor(tree, encoding=args.encoding)
@@ -147,8 +158,11 @@ def fidelity(args):
         train_label = y_train if args.true_label else tree.predict(X_train)
 
         # tune and train teknn
-        knn_clf, params = exp_util.tune_knn(X_train_alt, train_label, tree, X_val_tree=X_test, X_val_knn=X_val_alt)
+        start = time.time()
+        logger.info('tuning TE-KNN...')
+        knn_clf, params = exp_util.tune_knn(X_train_alt, train_label, tree, X_val, X_val_alt, logger=logger)
         logger.info('n_neighbors: {}, weights: {}'.format(params['n_neighbors'], params['weights']))
+        logger.info('time: {:.3f}s'.format(time.time() - start))
 
         fig, ax = plt.subplots()
 
@@ -165,29 +179,27 @@ def fidelity(args):
 
         plt.savefig(os.path.join(out_dir, 'fidelity.pdf'), format='pdf', bbox_inches='tight')
         np.save(os.path.join(out_dir, 'ours_test.npy'), results['ours']['test'])
+        np.save(os.path.join(out_dir, 'tree_test.npy'), results['tree']['test'])
 
     else:
-
-        # make logger
-        true_label_str = 'true_label' if args.true_label else ''
-        setting = '{}_{}_{}_{}_{}'.format(args.model, args.linear_model, args.kernel, args.encoding, true_label_str)
-        out_dir = os.path.join(out_dir, args.dataset, setting)
-        os.makedirs(out_dir, exist_ok=True)
-        logger = print_util.get_logger(os.path.join(out_dir, '{}.txt'.format(args.dataset)))
-        logger.info(args)
 
         # plot fidelity
         fig, ax = plt.subplots()
         start = time.time()
+        logger.info('tuning TREX-{}...'.format(args.linear_model))
         explainer = trex.TreeExplainer(tree, X_train, y_train, encoding=args.encoding, linear_model=args.linear_model,
-                                       C=args.C, kernel=args.kernel, random_state=args.random_state,
+                                       C=args.C, kernel=args.kernel, random_state=args.rs, logger=logger,
                                        use_predicted_labels=not args.true_label, X_val=X_val)
+        logger.info('C: {}'.format(explainer.C))
+        logger.info('time: {:.3f}s'.format(time.time() - start))
+
+        logger.info('generating predictions...')
         results = _plot_predictions(tree, explainer, data, ax=ax, use_sigmoid=args.use_sigmoid)
         logger.info('time: {:.3f}s'.format(time.time() - start))
         ax.set_xlabel('{}'.format(args.linear_model))
         ax.set_ylabel('{}'.format(args.model))
-        ax.set_title('{}, {}\n{}, {}, {}, {}'.format(args.dataset, args.model, args.linear_model, args.kernel,
-                                                     args.encoding, true_label_str))
+        ax.set_title('{}, {}\n{}, {}, {}'.format(args.dataset, args.model, args.linear_model, args.kernel,
+                                                 args.encoding))
         ax.legend()
         plt.tight_layout()
 
@@ -205,7 +217,10 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Feature representation extractions for tree ensembles',
                                      formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument('--dataset', type=str, default='iris', help='dataset to explain.')
+    parser.add_argument('--data_dir', type=str, default='data', help='data directory.')
+    parser.add_argument('--out_dir', type=str, default='output/fidelity', help='output directory.')
     parser.add_argument('--val_frac', type=float, default=0.1, help='amount of training data to use for validation.')
+    parser.add_argument('--flip_frac', type=float, default=None, help='Fraction of train labels to flip.')
     parser.add_argument('--model', type=str, default='lgb', help='model to use.')
     parser.add_argument('--linear_model', type=str, default='lr', help='linear model to use.')
     parser.add_argument('--kernel', type=str, default='linear', help='Similarity kernel.')
