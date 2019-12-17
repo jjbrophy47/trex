@@ -446,7 +446,7 @@ def main(args):
     # make logger
     dataset = args.dataset
     if args.train_frac < 1.0 and args.train_frac > 0.0:
-        dataset += '_{}'.format(args.dataset, str(args.train_frac).replace('.', 'p'))
+        dataset += '_{}'.format(str(args.train_frac).replace('.', 'p'))
     out_dir = os.path.join(args.out_dir, dataset)
     os.makedirs(out_dir, exist_ok=True)
     logger = print_util.get_logger(os.path.join(out_dir, '{}.txt'.format(args.dataset)))
