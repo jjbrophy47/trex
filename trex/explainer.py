@@ -102,20 +102,23 @@ class TreeExplainer:
         # train the linear model on the tree ensemble feature representation
         if X_val is not None:
             assert X_val.shape[1] == X_train.shape[1]
+            X_val_feature = self.extractor_.transform(X_val)
+
+            # get tree predictions on validation data
+            tree_val_proba = self.tree.predict_proba(X_val)[:, 1]
+
             best_score = 0
             best_C = None
 
+            # gridsearch on C values
             for C in C_grid:
                 start = time.time()
 
+                # fit a surrogate model
                 clf = self._get_linear_model(model_type=self.linear_model, C=C)
                 clf.fit(self.train_feature_, train_label)
 
-                # get tree predictions on validation data
-                tree_val_proba = self.tree.predict_proba(X_val)[:, 1]
-
                 # get surrogate model predictions on validation data
-                X_val_feature = self.extractor_.transform(X_val)
                 if self.linear_model == 'svm':
                     trex_proba = clf.decision_proba(X_val_feature)
                 else:

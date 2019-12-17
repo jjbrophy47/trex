@@ -19,6 +19,7 @@ from utility import model_util, data_util, exp_util, print_util
 
 ONE_DAY = 86400  # number of seconds in a day
 maple_limit_reached = False
+knn_limit_reached = False
 
 
 class timeout:
@@ -47,7 +48,7 @@ def _our_method(test_ndx, X_test, model, X_train, y_train, encoding='leaf_output
 
     start = time.time()
     explainer = trex.TreeExplainer(model, X_train, y_train, encoding=encoding, random_state=random_state,
-                                   linear_model=linear_model, kernel=kernel, C=C, X_val=X_val)
+                                   linear_model=linear_model, kernel=kernel, C=C, X_val=X_val, logger=logger)
     fine_tune = time.time() - start
 
     if logger:
@@ -111,7 +112,7 @@ def _knn_method(tree, encoding, test_ndx, X_train, y_train, X_val, X_test, logge
             X_val_alt = extractor.transform(X_val)
             train_label = y_train if args.true_label else tree.predict(X_train)
 
-            knn_clf, params = exp_util.tune_knn(X_train_alt, train_label, tree, X_val, X_val_alt)
+            knn_clf, params = exp_util.tune_knn(X_train_alt, train_label, tree, X_val, X_val_alt, logger=logger)
             fine_tune = time.time() - start
 
             if logger:
@@ -124,7 +125,8 @@ def _knn_method(tree, encoding, test_ndx, X_train, y_train, X_val, X_test, logge
             return None, None
 
     start = time.time()
-    distances, neighbor_ids = knn_clf.kneighbors([X_test[test_ndx]])
+    x_test_alt = extractor.transform(X_test[test_ndx])
+    distances, neighbor_ids = knn_clf.kneighbors(x_test_alt)
     test_time = time.time() - start
 
     return fine_tune, test_time
@@ -149,8 +151,7 @@ def runtime(args):
     seed = args.rs
 
     for i in range(args.repeats):
-        seed += 1
-        logger.info('\nrun {}, seed: {}'.format(i, seed))
+        logger.info('\nrun {}, seed: {}'.format(i + 1, seed))
 
         # get model and data
         clf = model_util.get_classifier(args.model_type, n_estimators=args.n_estimators,
@@ -170,7 +171,7 @@ def runtime(args):
 
         # train a tree ensemble
         model = clone(clf).fit(X_train, y_train)
-        model_util.performance(model, X_test=X_test, y_test=y_test)
+        model_util.performance(model, X_test=X_test, y_test=y_test, logger=logger)
 
         # randomly pick test instances to explain
         np.random.seed(seed)
@@ -219,6 +220,8 @@ def runtime(args):
                 knn_fine_tune.append(fine_tune)
                 knn_test_time.append(test_time)
 
+        seed += 1
+
     # display results
     if args.trex:
         our_fine_tune = np.array(our_fine_tune)
@@ -250,12 +253,12 @@ def runtime(args):
 
     # save results
     if args.save_results:
-        exp_dir = os.path.join(args.out_dir, args.dataset, '{}_percent'.format(m))
+        exp_dir = os.path.join(args.out_dir, args.dataset)
         os.makedirs(exp_dir, exist_ok=True)
 
         # ours
         if args.trex:
-            setting = '{}_{}'.format(args.linear_model, args.encoding)
+            setting = '{}'.format(args.linear_model)
         np.save(os.path.join(exp_dir, 'ours_{}_fine_tune.npy'.format(setting)), our_fine_tune)
         np.save(os.path.join(exp_dir, 'ours_{}_test_time.npy'.format(setting)), our_test_time)
 
@@ -283,14 +286,14 @@ if __name__ == '__main__':
     parser.add_argument('--data_dir', type=str, default='data', help='data directory.')
     parser.add_argument('--out_dir', type=str, default='output/runtime', help='output directory.')
     parser.add_argument('--val_frac', type=float, default=0.1, help='amount of training data to use for validation.')
-    parser.add_argument('--model', type=str, default='cb', help='model to use.')
+    parser.add_argument('--model_type', type=str, default='cb', help='model to use.')
     parser.add_argument('--linear_model', type=str, default='lr', help='linear model to use.')
     parser.add_argument('--encoding', type=str, default='leaf_output', help='type of encoding.')
     parser.add_argument('--kernel', type=str, default='linear', help='Similarity kernel.')
     parser.add_argument('--n_estimators', metavar='N', type=int, default=100, help='number of trees in tree ensemble.')
     parser.add_argument('--max_depth', type=int, default=None, help='maximum depth in tree ensemble.')
     parser.add_argument('--C', type=float, default=0.1, help='kernel model penalty parameter.')
-    parser.add_argument('--rs', metavar='RANDOM_STATE', type=int, default=69, help='for reproducibility.')
+    parser.add_argument('--rs', metavar='RANDOM_STATE', type=int, default=1, help='for reproducibility.')
     parser.add_argument('--inf_k', default=None, type=int, help='Number of leaves for leafinfluence.')
     parser.add_argument('--maple', action='store_true', help='Run experiment using MAPLE.')
     parser.add_argument('--dstump', action='store_true', help='Enable DSTUMP with Maple.')
