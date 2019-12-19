@@ -48,7 +48,8 @@ def _our_method(test_ndx, X_test, model, X_train, y_train, encoding='leaf_output
 
     start = time.time()
     explainer = trex.TreeExplainer(model, X_train, y_train, encoding=encoding, random_state=random_state,
-                                   linear_model=linear_model, kernel=kernel, C=C, X_val=X_val, logger=logger)
+                                   linear_model=linear_model, kernel=kernel, C=C, X_val=X_val, logger=logger,
+                                   dense_output=False)
     fine_tune = time.time() - start
 
     if logger:

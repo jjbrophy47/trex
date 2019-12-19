@@ -5,6 +5,7 @@ Currently supports: sklearn's RandomForestClassifier and GBMClassifier, lightgbm
 """
 import time
 
+import pickle
 import numpy as np
 from sklearn.utils.validation import check_X_y
 from sklearn.preprocessing import LabelEncoder
@@ -141,15 +142,33 @@ class TreeExplainer:
 
     def __str__(self):
         s = '\nTree Explainer:'
-        s += '\ntrain shape: {}'.format(self.X_train.shape)
-        s += '\nclasses: {}'.format(self.le_.classes_)
-        s += '\nlinear_model: {}'.format(self.linear_model_)
-        s += '\nencoding: {}'.format(self.encoding)
-        s += '\ndense_output: {}'.format(self.dense_output)
-        s += '\nfit predicted labels: {}'.format(self.use_predicted_labels)
-        s += '\nrandom state: {}'.format(self.random_state)
+        s += '\nextractor: {}'.format(self.extractor_)
+        s += '\ntrain_feature: {}'.format(self.train_feature_)
+        s += '\nlabel encoder: {}'.format(self.le_)
+        s += '\nlinear model: {}'.format(self.linear_model_)
+        s += '\nn_samples: {}'.format(self.n_samples_)
+        s += '\nn_feats: {}'.format(self.n_feats_)
+        s += '\nn_classes: {}'.format(self.n_classes_)
         s += '\n'
         return s
+
+    def save(self, fn):
+        """
+        Stores the model for later use.
+        Save: extractor_, train_feature_, le_, linear_model_, dense_output, linear_model,
+        n_samples_, n_feats_, n_classes_
+        """
+        with open(fn, 'wb') as f:
+            f.write(pickle.dumps(self))
+
+    def load(fn):
+        """
+        Stores the model for later use.
+        Save: extractor_, train_feature_, le_, linear_model_, dense_output, linear_model,
+        n_samples_, n_feats_, n_classes_
+        """
+        with open(fn, 'rb') as f:
+            return pickle.loads(f.read())
 
     def decision_function(self, X):
         """

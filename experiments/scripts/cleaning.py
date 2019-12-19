@@ -154,7 +154,7 @@ def _influence_method(explainer, noisy_ndx, X_train, y_train, y_train_noisy, int
         influence_scores.append(buf.loss_derivative(X_train[[i]], y_train_noisy[[i]])[0])
     influence_scores = np.array(influence_scores)
 
-    # sort by descending order; the most negative train instances
+    # sort by ascending order; the most negative train instances
     # are the ones that increase the log loss the most, and are the most harmful
     train_order = np.argsort(influence_scores)[:n_check]
     ckpt_ndx, fix_ndx = _record_fixes(train_order, noisy_ndx, n_train, interval)
@@ -288,8 +288,8 @@ def noise_detection(args, logger, out_dir, seed=1):
         explainer = trex.TreeExplainer(model_noisy, X_train, y_train_noisy, encoding=args.encoding, dense_output=True,
                                        random_state=seed, use_predicted_labels=not args.true_label,
                                        kernel=args.kernel, linear_model=args.linear_model, C=args.C,
-                                       verbose=args.verbose, X_val=X_val)
-        logger.info('C: {}'.format(explainer.C_))
+                                       verbose=args.verbose, X_val=X_val, logger=logger)
+        logger.info('C: {}'.format(explainer.C))
         ckpt_ndx, fix_ndx, _ = _our_method(explainer, noisy_ndx, y_train, n_check, interval)
         check_pct, our_res = _interval_performance(ckpt_ndx, fix_ndx, noisy_ndx, clf, data, acc_test_noisy)
         settings = '{}_{}'.format(args.linear_model, args.kernel)
@@ -337,8 +337,8 @@ def noise_detection(args, logger, out_dir, seed=1):
     if args.maple:
         logger.info('ordering by MAPLE...')
         start = time.time()
-        train_label = y_train if args.true_label else model_noisy.predict(X_train)
-        maple_exp = MAPLE(X_train, train_label, X_train, y_train_noisy, verbose=args.verbose, dstump=False)
+        train_label = y_train_noisy if args.true_label else model_noisy.predict(X_train)
+        maple_exp = MAPLE(X_train, train_label, X_train, train_label, verbose=args.verbose, dstump=False)
         ckpt_ndx, fix_ndx, map_scores, map_order = _maple_method(maple_exp, X_train, noisy_ndx, interval,
                                                                  to_check=n_check)
         _, maple_res = _interval_performance(ckpt_ndx, fix_ndx, noisy_ndx, clf, data, acc_test_noisy)
@@ -356,7 +356,7 @@ def noise_detection(args, logger, out_dir, seed=1):
         train_label = y_train if args.true_label else model_noisy.predict(X_train)
 
         # tune and train teknn
-        knn_clf, params = exp_util.tune_knn(X_train_alt, train_label, model_noisy, X_val, X_val_alt)
+        knn_clf, params = exp_util.tune_knn(X_train_alt, train_label, model_noisy, X_val, X_val_alt, logger=logger)
         logger.info('n_neighbors: {}, weights: {}'.format(params['n_neighbors'], params['weights']))
         weights = params['weights']
 
@@ -397,7 +397,7 @@ def noise_detection(args, logger, out_dir, seed=1):
 
     if args.save_results:
 
-        # save plot
+        # make seed directory
         rs_dir = os.path.join(out_dir, 'rs{}'.format(seed))
         os.makedirs(rs_dir, exist_ok=True)
 
