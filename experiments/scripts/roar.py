@@ -78,10 +78,22 @@ def _our_method(x_test, tree, args, X_train, y_train, X_val, seed, logger, model
     return train_order
 
 
-def _maple_method(x_test, args, model, X_train, y_train):
+def _maple_method(x_test, args, model, X_train, y_train, logger, model_dir):
 
-    train_label = y_train if args.true_label else model.predict(X_train)
-    explainer = MAPLE(X_train, train_label, X_train, train_label, verbose=args.verbose, dstump=False)
+    # load previously saved model
+    model_path = os.path.join(model_dir, 'maple.pkl')
+
+    if os.path.exists(model_path):
+        logger.info('loading model from: {}'.format(model_path))
+        explainer = MAPLE.load(model_path)
+
+    else:
+        train_label = y_train if args.true_label else model.predict(X_train)
+        explainer = MAPLE(X_train, train_label, X_train, train_label, verbose=args.verbose, dstump=False)
+        logger.info('saving model to: {}'.format(model_path))
+        explainer.save(model_path)
+
+    # order the training instances
     train_weight = explainer.get_weights(x_test)
     train_order = np.argsort(train_weight)[::-1]
     return train_order
@@ -202,7 +214,7 @@ def roar(args, logger, out_dir, seed):
     if args.maple:
         logger.info('ordering by MAPLE...')
         start = time.time()
-        train_order = _maple_method(x_test, args, model, X_train, y_train)
+        train_order = _maple_method(x_test, args, model, X_train, y_train, logger, model_dir)
         maple_res = measure_loglosses(train_order, pcts, x_test, x_test_label, X_train, y_train, clf)
         logger.info('time: {:3f}s'.format(time.time() - start))
 

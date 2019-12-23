@@ -1,7 +1,9 @@
 # Notes:
 # -  Assumes any required data normalization has already been done
 # -  Can pass Y (desired response) instead of MR (model fit to Y) to make fitting MAPLE to datasets easy
+import os
 
+import pickle
 from sklearn.ensemble import RandomForestRegressor, GradientBoostingRegressor
 from sklearn.linear_model import Ridge
 from sklearn.metrics import mean_squared_error
@@ -114,6 +116,23 @@ class MAPLE:
 
         if self.verbose > 0:
             print('done fine-tuning.')
+
+    def save(self, fn):
+        """
+        Stores the model for later use.
+        Save: extractor_, train_feature_, le_, linear_model_, dense_output, linear_model,
+        n_samples_, n_feats_, n_classes_
+        """
+        with open(fn, 'wb') as f:
+            f.write(pickle.dumps(self))
+
+    def load(fn):
+        """
+        Loads a previously saved model.
+        """
+        assert os.path.exists(fn)
+        with open(fn, 'rb') as f:
+            return pickle.loads(f.read())
 
     def training_point_weights(self, instance_leaf_ids):
         weights = np.zeros(self.num_train)

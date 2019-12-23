@@ -3,6 +3,7 @@ Instance-based explainer for a tree ensemble using an SVM or KLR.
 Currently supports: sklearn's RandomForestClassifier and GBMClassifier, lightgbm, xgboost, and catboost.
     Is also only compatible with dense dataset inputs.
 """
+import os
 import time
 
 import pickle
@@ -155,18 +156,15 @@ class TreeExplainer:
     def save(self, fn):
         """
         Stores the model for later use.
-        Save: extractor_, train_feature_, le_, linear_model_, dense_output, linear_model,
-        n_samples_, n_feats_, n_classes_
         """
         with open(fn, 'wb') as f:
             f.write(pickle.dumps(self))
 
     def load(fn):
         """
-        Stores the model for later use.
-        Save: extractor_, train_feature_, le_, linear_model_, dense_output, linear_model,
-        n_samples_, n_feats_, n_classes_
+        Loads a previously saved model.
         """
+        assert os.path.exists(fn)
         with open(fn, 'rb') as f:
             return pickle.loads(f.read())
 
