@@ -4,6 +4,7 @@ Utility methods used by different experiments.
 import time
 import os
 import sys
+import pickle
 sys.path.insert(0, os.getcwd())  # for influence_boosting
 from copy import deepcopy
 
@@ -13,6 +14,23 @@ from scipy.stats import pearsonr
 from sklearn.neighbors import KNeighborsClassifier
 
 from influence_boosting.influence.leaf_influence import CBLeafInfluenceEnsemble
+
+
+def save_model(model, model_path):
+    """
+    Saves model for later use.
+    """
+    with open(model_path, 'wb') as f:
+        f.write(pickle.dumps(model))
+
+
+def load_model(model_path):
+    """
+    Loads a previously saved model.
+    """
+    assert os.path.exists(model_path)
+    with open(model_path, 'rb') as f:
+        return pickle.loads(f.read())
 
 
 def tune_knn(X_train, y_train, tree, X_val_tree, X_val_knn, logger=None):
