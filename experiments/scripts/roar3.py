@@ -67,8 +67,8 @@ def _maple_method(X_test, args, model, X_train, y_train, logger, model_dir):
     # else:
     train_label = y_train if args.true_label else model.predict(X_train)
     explainer = MAPLE(X_train, train_label, X_train, train_label, verbose=args.verbose, dstump=False)
-    logger.info('saving model to: {}'.format(model_path))
-    explainer.save(model_path)
+    # logger.info('saving model to: {}'.format(model_path))
+    # explainer.save(model_path)
 
     # order the training instances
     train_weights = []
