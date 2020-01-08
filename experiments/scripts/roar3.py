@@ -23,20 +23,20 @@ from maple.MAPLE import MAPLE
 def _our_method(X_test, tree, args, X_train, y_train, X_val, seed, logger, model_dir):
 
     # load previously saved model
-    model_path = os.path.join(model_dir, 'ours_{}.pkl'.format(args.linear_model))
+    # model_path = os.path.join(model_dir, 'ours_{}.pkl'.format(args.linear_model))
 
-    if os.path.exists(model_path):
-        logger.info('loading model from: {}'.format(model_path))
-        explainer = trex.TreeExplainer.load(model_path)
+    # if os.path.exists(model_path):
+    #     logger.info('loading model from: {}'.format(model_path))
+    #     explainer = trex.TreeExplainer.load(model_path)
 
-    else:
-        explainer = trex.TreeExplainer(tree, X_train, y_train, encoding=args.encoding,
-                                       dense_output=True, logger=logger, X_val=X_val,
-                                       random_state=seed, use_predicted_labels=not args.true_label,
-                                       kernel=args.kernel, linear_model=args.linear_model,
-                                       verbose=args.verbose)
-        logger.info('saving model to: {}'.format(model_path))
-        explainer.save(model_path)
+    # else:
+    explainer = trex.TreeExplainer(tree, X_train, y_train, encoding=args.encoding,
+                                   dense_output=True, logger=logger, X_val=X_val,
+                                   random_state=seed, use_predicted_labels=not args.true_label,
+                                   kernel=args.kernel, linear_model=args.linear_model,
+                                   verbose=args.verbose)
+        # logger.info('saving model to: {}'.format(model_path))
+        # explainer.save(model_path)
 
     # sort instanes with highest positive influence first
     contributions_sum = np.zeros(X_train.shape[0])
@@ -58,17 +58,17 @@ def _our_method(X_test, tree, args, X_train, y_train, X_val, seed, logger, model
 def _maple_method(X_test, args, model, X_train, y_train, logger, model_dir):
 
     # load previously saved model
-    model_path = os.path.join(model_dir, 'maple.pkl')
+    # model_path = os.path.join(model_dir, 'maple.pkl')
 
-    if os.path.exists(model_path):
-        logger.info('loading model from: {}'.format(model_path))
-        explainer = MAPLE.load(model_path)
+    # if os.path.exists(model_path):
+    #     logger.info('loading model from: {}'.format(model_path))
+    #     explainer = MAPLE.load(model_path)
 
-    else:
-        train_label = y_train if args.true_label else model.predict(X_train)
-        explainer = MAPLE(X_train, train_label, X_train, train_label, verbose=args.verbose, dstump=False)
-        logger.info('saving model to: {}'.format(model_path))
-        explainer.save(model_path)
+    # else:
+    train_label = y_train if args.true_label else model.predict(X_train)
+    explainer = MAPLE(X_train, train_label, X_train, train_label, verbose=args.verbose, dstump=False)
+    logger.info('saving model to: {}'.format(model_path))
+    explainer.save(model_path)
 
     # order the training instances
     train_weights = []
