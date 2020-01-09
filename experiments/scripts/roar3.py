@@ -151,7 +151,8 @@ def roar(args, logger, out_dir, seed):
 
     # use part of the train data
     if args.train_frac < 1.0 and args.train_frac > 0.0:
-        X_train = X_train[int(X_train.shape[0] * args.train_frac):]
+        n_train_samples = int(X_train.shape[0] * args.train_frac)
+        X_train, y_train = X_train[:n_train_samples], y_train[:n_train_samples]
 
     # use part of the test data as validation data
     X_val = X_test.copy()
