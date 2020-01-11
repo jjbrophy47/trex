@@ -106,11 +106,11 @@ def _maple_method(X_test, args, model, X_train, y_train, logger, model_dir):
         explainer.save(model_path)
 
     # order the training instances
-    train_weights = []
+    contributions_sum = np.zeros(X_train.shape[0])
     for i in tqdm.tqdm(range(X_test.shape[0])):
-        train_weights.append(explainer.get_weights(X_test[i]))
-    train_weight = np.sum(np.vstack(train_weights), axis=0)
-    train_order = np.argsort(train_weight)[::-1]
+        contributions = explainer.get_weights(X_test[i])
+        contributions_sum += contributions
+    train_order = np.argsort(contributions_sum)[::-1]
     return train_order
 
 
@@ -191,7 +191,8 @@ def roar(args, logger, out_dir, seed):
 
     # use part of the train data
     if args.train_frac < 1.0 and args.train_frac > 0.0:
-        X_train = X_train[int(X_train.shape[0] * args.train_frac):]
+        n_samples = int(X_train.shape[0] * args.train_frac)
+        X_train, y_train = X_train[:n_samples], y_train[:n_samples]
 
     # use part of the test data as validation data
     X_val = X_test.copy()
