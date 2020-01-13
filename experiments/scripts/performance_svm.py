@@ -16,20 +16,20 @@ from sklearn.model_selection import GridSearchCV
 from utility import model_util, data_util, print_util
 
 
-def performance(args, model_type='cb', encoding='leaf_output', dataset='adult', n_estimators=100, random_state=69,
-                gridsearch=False, verbose=0, data_dir='data', out_dir='output/performance_svm'):
+def performance(args):
     """
     Main method comparing performance of tree ensembles and svm models.
     """
 
     # write output to logs
-    os.makedirs(out_dir, exist_ok=True)
-    logger = print_util.get_logger(os.path.join(out_dir, '{}.txt'.format(dataset)))
+    os.makedirs(args.out_dir, exist_ok=True)
+    logger = print_util.get_logger(os.path.join(args.out_dir, '{}.txt'.format(args.dataset)))
     logger.info(args)
 
     # get model and data
-    clf = model_util.get_classifier(model_type, n_estimators=n_estimators, random_state=random_state)
-    X_train, X_test, y_train, y_test, label = data_util.get_data(dataset, random_state=random_state, data_dir=data_dir)
+    clf = model_util.get_classifier(args.model, n_estimators=args.n_estimators, random_state=args.rs)
+    X_train, X_test, y_train, y_test, label = data_util.get_data(args.dataset, random_state=args.rs,
+                                                                 data_dir=args.data_dir)
 
     logger.info('train instances: {}'.format(len(X_train)))
     logger.info('num features: {}'.format(X_train.shape[1]))
@@ -42,9 +42,9 @@ def performance(args, model_type='cb', encoding='leaf_output', dataset='adult', 
     # train an svm
     logger.info('\nsvm')
     clf = SVC(gamma='auto')
-    if gridsearch:
+    if args.gs:
         param_grid = {'C': [0.1, 1.0, 10.0], 'kernel': ['linear', 'rbf']}
-        gs = GridSearchCV(clf, param_grid, cv=5, verbose=verbose).fit(X_train, y_train)
+        gs = GridSearchCV(clf, param_grid, cv=5, verbose=args.verbose).fit(X_train, y_train)
         svm = gs.best_estimator_
         logger.info(gs.best_params_)
     else:
@@ -56,12 +56,13 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Feature representation extractions for tree ensembles',
                                      formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument('--dataset', type=str, default='adult', help='dataset to explain.')
-    parser.add_argument('--model', type=str, default='lgb', help='model to use.')
+    parser.add_argument('--data_dir', type=str, default='data', help='data directory.')
+    parser.add_argument('--our_dir', type=str, default='output/performance_svm', help='output directory.')
+    parser.add_argument('--model', type=str, default='cb', help='model to use.')
     parser.add_argument('--encoding', type=str, default='leaf_output', help='type of encoding.')
     parser.add_argument('--n_estimators', metavar='N', type=int, default=100, help='number of trees in random forest.')
-    parser.add_argument('--rs', metavar='RANDOM_STATE', type=int, default=69, help='for reproducibility.')
-    parser.add_argument('--gridsearch', action='store_true', default=False, help='gridsearch for SVM model.')
+    parser.add_argument('--rs', metavar='RANDOM_STATE', type=int, default=1, help='for reproducibility.')
+    parser.add_argument('--gs', action='store_true', default=False, help='gridsearch for SVM model.')
     parser.add_argument('--verbose', metavar='LEVEL', default=0, type=int, help='verbosity of gridsearch output.')
     args = parser.parse_args()
-    performance(args, args.model, args.encoding, args.dataset, args.n_estimators, args.rs, args.gridsearch,
-                args.verbose)
+    performance(args)
