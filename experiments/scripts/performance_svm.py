@@ -57,7 +57,7 @@ if __name__ == '__main__':
                                      formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument('--dataset', type=str, default='adult', help='dataset to explain.')
     parser.add_argument('--data_dir', type=str, default='data', help='data directory.')
-    parser.add_argument('--our_dir', type=str, default='output/performance_svm', help='output directory.')
+    parser.add_argument('--out_dir', type=str, default='output/performance_svm', help='output directory.')
     parser.add_argument('--model', type=str, default='cb', help='model to use.')
     parser.add_argument('--encoding', type=str, default='leaf_output', help='type of encoding.')
     parser.add_argument('--n_estimators', metavar='N', type=int, default=100, help='number of trees in random forest.')
