@@ -44,7 +44,7 @@ def performance(args):
     clf = SVC(gamma='auto')
     if args.gs:
         param_grid = {'C': [0.1, 1.0, 10.0], 'kernel': ['linear', 'rbf']}
-        gs = GridSearchCV(clf, param_grid, cv=5, verbose=args.verbose).fit(X_train, y_train)
+        gs = GridSearchCV(clf, param_grid, cv=2, verbose=args.verbose).fit(X_train, y_train)
         svm = gs.best_estimator_
         logger.info(gs.best_params_)
     else:
