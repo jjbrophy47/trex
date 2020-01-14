@@ -10,7 +10,7 @@ sys.path.insert(0, here + '/../')  # for utility
 sys.path.insert(0, here + '/../../')  # for libliner; TODO: remove this dependency
 
 from sklearn.base import clone
-from sklearn.svm import SVC
+from sklearn.linear_model import LogisticRegression
 from sklearn.model_selection import GridSearchCV
 
 from utility import model_util, data_util, print_util
@@ -40,15 +40,15 @@ def performance(args):
     model_util.performance(tree, X_train, y_train, X_test=X_test, y_test=y_test, logger=logger)
 
     # train an svm
-    logger.info('\nsvm')
-    clf = SVC(gamma='auto')
+    logger.info('\nlr')
+    clf = LogisticRegression()
     if args.gs:
-        param_grid = {'C': [0.1, 1.0, 10.0], 'kernel': ['linear', 'rbf']}
+        param_grid = {'penalty': ['l1', 'l2'], 'C': [0.1, 1.0, 10.0]}
         gs = GridSearchCV(clf, param_grid, cv=2, verbose=args.verbose).fit(X_train, y_train)
         svm = gs.best_estimator_
         logger.info(gs.best_params_)
     else:
-        svm = SVC(C=args.C, kernel=args.kernel, gamma='auto').fit(X_train, y_train)
+        svm = LogisticRegression(penalty=args.penalty, C=args.C).fit(X_train, y_train)
     model_util.performance(svm, X_train, y_train, X_test=X_test, y_test=y_test, logger=logger)
 
 
@@ -57,13 +57,13 @@ if __name__ == '__main__':
                                      formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument('--dataset', type=str, default='adult', help='dataset to explain.')
     parser.add_argument('--data_dir', type=str, default='data', help='data directory.')
-    parser.add_argument('--out_dir', type=str, default='output/performance_svm', help='output directory.')
+    parser.add_argument('--out_dir', type=str, default='output/performance_lr', help='output directory.')
     parser.add_argument('--model', type=str, default='cb', help='model to use.')
     parser.add_argument('--encoding', type=str, default='leaf_output', help='type of encoding.')
     parser.add_argument('--n_estimators', metavar='N', type=int, default=100, help='number of trees in random forest.')
+    parser.add_argument('--penalty', type=str, default='l1', help='LR kernel.')
+    parser.add_argument('--C', type=float, default=0.1, help='LR penalty.')
     parser.add_argument('--rs', metavar='RANDOM_STATE', type=int, default=1, help='for reproducibility.')
-    parser.add_argument('--C', type=float, default=0.1, help='SVM penalty.')
-    parser.add_argument('--kernel', type=str, default='linear', help='SVM kernel.')
     parser.add_argument('--gs', action='store_true', default=False, help='gridsearch for SVM model.')
     parser.add_argument('--verbose', metavar='LEVEL', default=0, type=int, help='verbosity of gridsearch output.')
     args = parser.parse_args()
