@@ -45,11 +45,11 @@ def performance(args):
     if args.gs:
         param_grid = {'penalty': ['l1', 'l2'], 'C': [0.1, 1.0, 10.0]}
         gs = GridSearchCV(clf, param_grid, cv=2, verbose=args.verbose).fit(X_train, y_train)
-        svm = gs.best_estimator_
+        linear_model = gs.best_estimator_
         logger.info(gs.best_params_)
     else:
-        svm = LogisticRegression(penalty=args.penalty, C=args.C).fit(X_train, y_train)
-    model_util.performance(svm, X_train, y_train, X_test=X_test, y_test=y_test, logger=logger)
+        linear_model = LogisticRegression(penalty=args.penalty, C=args.C).fit(X_train, y_train)
+    model_util.performance(linear_model, X_train, y_train, X_test=X_test, y_test=y_test, logger=logger)
 
 
 if __name__ == '__main__':
@@ -65,6 +65,7 @@ if __name__ == '__main__':
     parser.add_argument('--C', type=float, default=0.1, help='LR penalty.')
     parser.add_argument('--rs', metavar='RANDOM_STATE', type=int, default=1, help='for reproducibility.')
     parser.add_argument('--gs', action='store_true', default=False, help='gridsearch for SVM model.')
+    parser.add_argument('--cv', type=int, default=2, help='number of cross-validation folds.')
     parser.add_argument('--verbose', metavar='LEVEL', default=0, type=int, help='verbosity of gridsearch output.')
     args = parser.parse_args()
     performance(args)

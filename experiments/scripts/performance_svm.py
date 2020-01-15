@@ -10,7 +10,7 @@ sys.path.insert(0, here + '/../')  # for utility
 sys.path.insert(0, here + '/../../')  # for libliner; TODO: remove this dependency
 
 from sklearn.base import clone
-from sklearn.svm import SVC
+from sklearn.svm import LinearSVC, SVC
 from sklearn.model_selection import GridSearchCV
 
 from utility import model_util, data_util, print_util
@@ -41,14 +41,24 @@ def performance(args):
 
     # train an svm
     logger.info('\nsvm')
-    clf = SVC(gamma='auto')
     if args.gs:
-        param_grid = {'C': [0.1, 1.0, 10.0], 'kernel': ['linear', 'rbf']}
-        gs = GridSearchCV(clf, param_grid, cv=2, verbose=args.verbose).fit(X_train, y_train)
+
+        if args.linear_svc:
+            clf = LinearSVC(dual=False)
+            param_grid = {'penalty': ['l1', 'l2'], 'C': [0.1, 1.0, 10.0]}
+            gs = GridSearchCV(clf, param_grid, cv=args.cv, verbose=args.verbose).fit(X_train, y_train)
+
+        else:
+            clf = SVC(gamma='auto')
+            param_grid = {'C': [0.1, 1.0, 10.0], 'kernel': ['linear', 'rbf']}
+            gs = GridSearchCV(clf, param_grid, cv=args.cv, verbose=args.verbose).fit(X_train, y_train)
+
         svm = gs.best_estimator_
         logger.info(gs.best_params_)
+
     else:
         svm = SVC(C=args.C, kernel=args.kernel, gamma='auto').fit(X_train, y_train)
+
     model_util.performance(svm, X_train, y_train, X_test=X_test, y_test=y_test, logger=logger)
 
 
@@ -62,9 +72,11 @@ if __name__ == '__main__':
     parser.add_argument('--encoding', type=str, default='leaf_output', help='type of encoding.')
     parser.add_argument('--n_estimators', metavar='N', type=int, default=100, help='number of trees in random forest.')
     parser.add_argument('--rs', metavar='RANDOM_STATE', type=int, default=1, help='for reproducibility.')
+    parser.add_argument('--linear_svc', action='store_true', default=True, help='Linear SVM.')
     parser.add_argument('--C', type=float, default=0.1, help='SVM penalty.')
     parser.add_argument('--kernel', type=str, default='linear', help='SVM kernel.')
     parser.add_argument('--gs', action='store_true', default=False, help='gridsearch for SVM model.')
+    parser.add_argument('--cv', type=int, default=2, help='number of cross-validation folds.')
     parser.add_argument('--verbose', metavar='LEVEL', default=0, type=int, help='verbosity of gridsearch output.')
     args = parser.parse_args()
     performance(args)
