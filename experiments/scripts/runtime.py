@@ -259,7 +259,7 @@ def runtime(args):
 
         # ours
         if args.trex:
-            setting = '{}'.format(args.linear_model)
+            setting = '{}_{}'.format(args.linear_model, args.encoding)
         np.save(os.path.join(exp_dir, 'ours_{}_fine_tune.npy'.format(setting)), our_fine_tune)
         np.save(os.path.join(exp_dir, 'ours_{}_test_time.npy'.format(setting)), our_test_time)
 
