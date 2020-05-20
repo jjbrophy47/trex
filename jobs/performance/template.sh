@@ -1,8 +1,8 @@
 #!/bin/bash
 #SBATCH --partition=long
 #SBATCH --job-name=performance
-#SBATCH --output=jobs/logs/addition/performance
-#SBATCH --error=jobs/errors/addition/performance
+#SBATCH --output=jobs/logs/performance
+#SBATCH --error=jobs/errors/performance
 #SBATCH --time=1-00:00:00
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1
