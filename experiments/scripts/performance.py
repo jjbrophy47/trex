@@ -42,7 +42,7 @@ def _get_classifier(args):
         params = {'penalty': ['l1', 'l2'], 'C': [0.1, 1.0, 10.0]}
 
     elif args.model == 'svm_rbf':
-        clf = SVC(gamma='auto', penalty=args.penalty, C=args.C, kernel=args.kernel)
+        clf = SVC(gamma='auto', C=args.C, kernel=args.kernel)
         params = {'penalty': ['l1', 'l2'], 'C': [0.1, 1.0, 10.0]}
 
     elif args.model == 'knn':
