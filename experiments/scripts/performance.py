@@ -115,7 +115,7 @@ if __name__ == '__main__':
     parser.add_argument('--out_dir', type=str, default='output/performance/', help='output directory.')
 
     parser.add_argument('--model', type=str, default='cb', help='model to use.')
-    parser.add_argument('--tune', action='store_true', default=False, help='whether to tune the model.')
+    parser.add_argument('--tune', action='store_true', default=True, help='whether to tune the model.')
     parser.add_argument('--cv', type=int, default=3, help='number of cross-val folds.')
 
     # tree hyperparameters
