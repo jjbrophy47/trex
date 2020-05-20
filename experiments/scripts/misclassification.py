@@ -4,26 +4,30 @@ MFC18_EvalPart1 (test) dataset using TREX. Visualizes the most important feature
 from the raw data perspective (positive vs negative), then weighting it using the weights
 for a global explanation then weighting it using similarity x abs(weight) for a local explanation.
 This also plots the weight distribution, as well as thr similarity vs weight distribution
-for a single tst instance.
+for a single test instance.
 """
 import os
 import sys
 import argparse
+import warnings
+warnings.simplefilter(action='ignore', category=UserWarning)  # lgb compiler warning
 here = os.path.abspath(os.path.dirname(__file__))
 sys.path.insert(0, here + '/../')  # for utility
-sys.path.insert(0, here + '/../../')  # for libliner; TODO: remove this dependency
+sys.path.insert(0, here + '/../../')  # for libliner
 
 import shap
 import numpy as np
 import seaborn as sns
 import matplotlib.pyplot as plt
-from scipy import stats
 
-from trex.explainer import TreeExplainer
-from utility import model_util, data_util, exp_util
+import trex
+from utility import model_util
+from utility import data_util
+from utility import print_util
+from utility import exp_util
 
 
-def _get_top_features(x, shap_vals, feature, k=5):
+def _get_top_features(x, shap_vals, feature_list, k=5):
     """
     Parameters
     ----------
@@ -38,230 +42,267 @@ def _get_top_features(x, shap_vals, feature, k=5):
 
     Returns a list of (feature_name, feature_value, feature_shap) tuples.
     """
-    assert len(x) == len(shap_vals) == len(feature)
+    assert len(x) == len(shap_vals) == len(feature_list)
     shap_sort_ndx = np.argsort(np.abs(shap_vals))[::-1]
-    return list(zip(feature[shap_sort_ndx], x[shap_sort_ndx], shap_vals[shap_sort_ndx]))[:k]
+    return list(zip(feature_list[shap_sort_ndx], x[shap_sort_ndx],
+                    shap_vals[shap_sort_ndx]))[:k]
 
 
-def _shift_plot_right(ax, amt=0.02):
+def _plot_feature_histograms(args, results, out_dir):
     """
-    Shifts the subplot to the right by a specified amount.
+    Plot the density of the most important feature weighted
+    by training instance importance and similarity to the test instance.
     """
-    box = ax.get_position()
-    box.x0 += amt
-    box.x1 += amt
-    ax.set_position(box)
+
+    train_feature_vals = results['train_feature_vals']
+    train_feature_bins = results['train_feature_bins']
+    train_pos_ndx = results['train_pos_ndx']
+    train_neg_ndx = results['train_neg_ndx']
+    train_weight = results['train_weight']
+    train_sim = results['train_sim']
+
+    # plot
+    fig, axs = plt.subplots(1, 3, figsize=(15, 5))
+
+    # unweighted
+    ax = axs[0]
+    ax.hist(train_feature_vals[train_pos_ndx], bins=train_feature_bins,
+            color='g', hatch='.', alpha=args.alpha, label='positive instances')
+    ax.hist(train_feature_vals[train_neg_ndx], bins=train_feature_bins,
+            color='r', hatch='\\', alpha=args.alpha, label='negative instances')
+    ax.set_xlabel('value')
+    ax.set_ylabel('density')
+    ax.set_title('Unweighted')
+    ax.set_xlim(-0.25, 1.25)
+    ax.legend()
+    ax.tick_params(axis='both', which='major')
+
+    # weighted by TREX's global weights
+    ax = axs[1]
+    ax.hist(train_feature_vals[train_pos_ndx], bins=train_feature_bins,
+            color='g', hatch='.', alpha=args.alpha,
+            weights=np.abs(train_weight)[train_pos_ndx])
+
+    ax.hist(train_feature_vals[train_neg_ndx], bins=train_feature_bins,
+            color='r', hatch='\\', alpha=args.alpha,
+            weights=np.abs(train_weight)[train_neg_ndx])
+
+    ax.set_xlabel('value')
+    ax.set_title(r'|$\alpha$|',)
+    ax.set_xlim(-0.25, 1.25)
+    ax.tick_params(axis='both', which='major')
+
+    # weighted by TREX's global weights * similarity to the test instance
+    train_sim_weight = train_weight * train_sim
+    ax = axs[2]
+    ax.hist(train_feature_vals[train_pos_ndx], bins=train_feature_bins,
+            color='g', hatch='.', alpha=args.alpha,
+            weights=np.abs(train_sim_weight)[train_pos_ndx])
+
+    ax.hist(train_feature_vals[train_neg_ndx], bins=train_feature_bins,
+            color='r', hatch='\\', alpha=args.alpha,
+            weights=np.abs(train_sim_weight)[train_neg_ndx])
+    ax.set_xlabel('value')
+    ax.set_title(r'|$\alpha$| * Similarity')
+    ax.set_xlim(-0.25, 1.25)
+    ax.tick_params(axis='both', which='major')
+
+    os.makedirs(out_dir, exist_ok=True)
+    plt.tight_layout()
+    plt.savefig(os.path.join(out_dir, 'feature_distribution.png'))
+    plt.show()
 
 
-def _get_short_names(feature):
-    replace = {}
-    replace['p_fibberinh_1_0_mediforsystem'] = 'fibberinh'
-    replace['p_kitwaredartmouthjpegdimples_0db8e4c_mediforsystem'] = 'jpegdimples'
-    replace['dct03_a_baseline_ta1'] = 'dct03'
-    replace['block02_baseline_ta1'] = 'block02'
-    replace['p_ucrlstmwresamplingwcmm2_1_0_mediforsystem'] = 'lstmwresampling'
-    replace['p_uscisigradbased02a_0_2a_mediforsystem'] = 'gradbased'
-    replace['p_purdueta11adoublejpegdetection_2_0_mediforsystem'] = 'doublejpeg'
-    replace['p_purdueta11acontrastenhancementdetection_1_0_mediforsystem'] = 'contrast_enhance'
-    replace['p_sriprita1imgmdlprnubased_1_0_mediforsystem'] = 'prnubased'
-    replace['p_ta11c_1_0_mediforsystem'] = 'tallc'
+def _plot_instance_histograms(args, results, out_dir):
+    """
+    Plot TREX's:
+      weight distribution and
+      similarity * weight distribution.
+    """
+    train_weight = results['train_weight']
+    train_sim = results['train_sim']
 
-    feature = np.array([replace.get(f) if replace.get(f) is not None else f for f in feature])
-    return feature
+    fig, axs = plt.subplots(1, 2, figsize=(10, 5))
+
+    # plot weight distribution for the training samples
+    ax = axs[0]
+    sns.distplot(train_weight, color='orange', ax=axs[0])
+    ax.set_xlabel(r'$\alpha$')
+    ax.set_ylabel('density')
+    ax.set_title('(a)')
+    ax.tick_params(axis='both', which='major')
+    if args.xlim:
+        ax.set_xlim(-args.xlim, args.xlim)
+
+    # plot similarity x weight for the training samples
+    ax = axs[1]
+    sns.distplot(train_sim * train_weight, color='green', ax=ax)
+    ax.set_xlabel(r'$\alpha$ * similarity')
+    ax.set_title('(b)')
+    ax.tick_params(axis='both', which='major')
+    if args.xlim:
+        ax.set_xlim(-args.xlim, args.xlim)
+
+    plt.tight_layout()
+    plt.savefig(os.path.join(out_dir, 'weight_distribution.png'))
+    plt.show()
 
 
-def misclassification(model='lgb', encoding='leaf_output', dataset='nc17_mfc18', n_estimators=100, random_state=69,
-                      topk_train=4, topk_test=1, data_dir='data', verbose=0, linear_model='lr', kernel='linear',
-                      topk_feature=5, true_label=False, alpha=0.5, fontsize=24, out_dir='output/misclassification'):
+def experiment(args, logger, out_dir, seed):
 
     # get model and data
-    clf = model_util.get_classifier(model, n_estimators=n_estimators, random_state=random_state)
-    data = data_util.get_data(dataset, random_state=random_state, data_dir=data_dir, return_feature=True)
+    clf = model_util.get_classifier(args.tree_type,
+                                    n_estimators=args.n_estimators,
+                                    random_state=seed)
+    data = data_util.get_data(args.dataset,
+                              random_state=seed,
+                              data_dir=args.data_dir,
+                              return_feature=True)
     X_train, X_test, y_train, y_test, label, feature = data
 
-    # shorten feature names
-    feature = _get_short_names(feature)
-
-    # get index of specified feature
-    target_feature = 'lstmwresampling'
-    feat_ndx = np.where(feature == target_feature)[0]
-
-    X_train = np.delete(X_train, feat_ndx, axis=1)
-    X_test = np.delete(X_test, feat_ndx, axis=1)
+    logger.info('train instances: {:,}'.format(len(X_train)))
+    logger.info('test instances: {:,}'.format(len(X_test)))
+    logger.info('no. features: {:,}'.format(X_train.shape[1]))
 
     # train a tree ensemble
     tree = clf.fit(X_train, y_train)
-    tree_yhat = model_util.performance(tree, X_train, y_train, X_test, y_test)
+    model_util.performance(tree, X_train, y_train, X_test, y_test, logger=logger)
 
-    # train an svm on learned representations from the tree ensemble
-    explainer = TreeExplainer(tree, X_train, y_train, encoding=encoding, random_state=random_state,
-                              dense_output=True, linear_model=linear_model, kernel=kernel,
-                              use_predicted_labels=not true_label)
-    train_weight = explainer.get_weight()[0]
-
-    if verbose > 0:
-        print(explainer)
-
-    shap_explainer = shap.TreeExplainer(tree)
-    test_shap = shap_explainer.shap_values(X_test)
-    train_shap = shap_explainer.shap_values(X_train)
+    # train TREX
+    logger.info('building TREX...')
+    explainer = trex.TreeExplainer(tree, X_train, y_train,
+                                   tree_kernel=args.tree_kernel,
+                                   random_state=seed,
+                                   kernel_model=args.kernel_model,
+                                   kernel_model_kernel=args.kernel_model_kernel)
 
     # extract predictions
-    tree_yhat_train, tree_yhat_test = tree_yhat
-    tree_pred_train = tree.predict(X_train)
-    tree_pred_test = tree.predict(X_test)
+    logger.info('generating predictions...')
+    y_test_pred_tree = tree.predict(X_test)
+    y_test_pred_trex = explainer.predict(X_test)
 
-    # get worst missed test indices
+    logger.info('generating probabilities...')
+    y_test_proba_tree = tree.predict_proba(X_test)[:, 1]
+    y_test_proba_trex = explainer.predict_proba(X_test)[:, 1]
+
+    # get worst missed test index
     test_dist = exp_util.instance_loss(tree.predict_proba(X_test), y_test)
     test_dist_ndx = np.argsort(test_dist)[::-1]
-    test_dist = test_dist[test_dist_ndx]
-    both_missed_test = test_dist_ndx
-
-    test_dist_ndx1 = np.where((y_test == 1) & (tree.predict(X_test) == 0))[0]
-    test_dist_ndx2 = np.where((y_test == 0) & (tree.predict(X_test) == 1))[0]
-
-    if verbose > 0:
-        print(test_dist_ndx1, test_dist_ndx1.shape)
-        print(test_dist_ndx2, test_dist_ndx2.shape)
-
-    pos_ndx = np.where(y_train == 1)[0]
-    neg_ndx = np.where(y_train == 0)[0]
-
-    if verbose > 0:
-        print(stats.describe(X_train[pos_ndx][:, feat_ndx]))
-        print(stats.describe(X_train[neg_ndx][:, feat_ndx]))
-
-    bins = np.histogram(X_train[:, feat_ndx], bins=40)[1]  # get the bin edges
-    if verbose > 0:
-        print('bins: {}'.format(bins))
+    test_ndx = test_dist_ndx[args.rs - 1]
+    x_test = X_test[[test_ndx]]
 
     # show explanations for missed instances
-    test_str = '\ntest_{}\npredicted as {}, actual is {}'
-    train_str = 'train_{} predicted as {}, actual is {}, contribution={:.3f}'
+    logger.info('\ntest index: {}, label: {}'.format(test_ndx, y_test[test_ndx]))
+    print(y_test_pred_tree)
+    print(y_test_proba_tree)
+    print(y_test_pred_trex)
+    print(y_test_proba_trex)
+    logger.info('tree pred: {} ({:.3f})'.format(y_test_pred_tree[test_ndx],
+                                                y_test_proba_tree[test_ndx]))
+    logger.info('TREX pred: {} ({:.3f})'.format(y_test_pred_trex[test_ndx],
+                                                y_test_proba_trex[test_ndx]))
 
-    # explain test instances
-    for test_ndx in both_missed_test[:topk_test]:
-        x_test = X_test[[test_ndx]]
+    # obtain most important features
+    logger.info('\ncomputing most influential features...')
+    shap_explainer = shap.TreeExplainer(tree)
+    test_shap = shap_explainer.shap_values(x_test)
+    top_features = _get_top_features(x_test[0], test_shap[0], feature)
 
-        # find the most impactful features
-        shap_list = _get_top_features(x_test[0], test_shap[test_ndx], feature, k=topk_feature)
-        shap_sum = np.sum(np.abs(test_shap[test_ndx]))
+    # get positive and negative training samples
+    train_pos_ndx = np.where(y_train == 1)[0]
+    train_neg_ndx = np.where(y_train == 0)[0]
 
-        # find the most impactful training instances
-        contributions = explainer.explain(x_test)[0]
-        sort_ndx = np.argsort(np.abs(contributions))[::-1]
-        contribution_sum = np.abs(contributions).sum()
+    # get global weights and similarity to the test instance
+    train_weight = explainer.get_weight()[0]
+    sim = explainer.similarity(X_test[[test_ndx]])[0]
 
-        # plot the density of the most important featurem weighted by varying levels of explanation
-        fig, axs = plt.subplots(1, 3, figsize=(15, 6))
+    results = explainer.get_params()
+    results['test_ndx'] = test_ndx
+    results['train_pos_ndx'] = train_pos_ndx
+    results['train_neg_ndx'] = train_neg_ndx
+    results['train_weight'] = train_weight
+    results['train_sim'] = sim
 
-        # show distribution of most important feature, unweighted
-        pos_ndx = np.where(y_train == 1)[0]
-        neg_ndx = np.where(y_train == 0)[0]
-        axs[0].hist(X_train[pos_ndx][:, feat_ndx], bins=bins, color='g', hatch='.', alpha=alpha)
-        axs[0].hist(X_train[neg_ndx][:, feat_ndx], bins=bins, color='r', hatch='\\', alpha=alpha)
-        axs[0].set_xlabel('value', fontsize=fontsize)
-        axs[0].set_ylabel('density', fontsize=fontsize)
-        axs[0].set_title('Unweighted', fontsize=fontsize)
-        axs[0].set_xlim(-0.25, 1.25)
-        axs[0].tick_params(axis='both', which='major', labelsize=fontsize)
+    # explain features
+    for target_feature, val, shap_val in top_features:
+        feat_ndx = np.where(target_feature == feature)[0][0]
+        logger.info('{}, index: {}, val: {}, shap val: {}'.format(
+                    target_feature, feat_ndx, val, shap_val))
 
-        # show distribution of most important feature weighted by TREX's global weights
-        axs[1].hist(X_train[pos_ndx][:, feat_ndx], bins=bins, color='g', hatch='.',
-                    weights=np.abs(train_weight)[pos_ndx], alpha=alpha)
-        axs[1].hist(X_train[neg_ndx][:, feat_ndx], bins=bins, color='r', hatch='\\',
-                    weights=np.abs(train_weight)[neg_ndx], alpha=alpha)
-        axs[1].set_xlabel('value', fontsize=fontsize)
-        axs[1].set_title(r'|$\alpha$|', fontsize=fontsize)
-        axs[1].set_xlim(-0.25, 1.25)
-        axs[1].tick_params(axis='both', which='major', labelsize=fontsize)
+        train_feature_bins = np.histogram(X_train[:, feat_ndx], bins=args.max_bins)[1]
 
-        # show distribution of most important feature, weighted by TREX's local explanation
-        sim = explainer.similarity(x_test)[0]
-        sim_weight = sim * train_weight
-        l1 = axs[2].hist(X_train[pos_ndx][:, feat_ndx], bins=bins, color='g', hatch='.',
-                         weights=np.abs(sim_weight)[pos_ndx], alpha=alpha)
-        l2 = axs[2].hist(X_train[neg_ndx][:, feat_ndx], bins=bins, color='r', hatch='\\',
-                         weights=np.abs(sim_weight)[neg_ndx], alpha=alpha)
-        axs[2].set_xlabel('value', fontsize=fontsize)
-        axs[2].set_title(r'|$\alpha$| * Similarity', fontsize=fontsize)
-        axs[2].set_xlim(-0.25, 1.25)
-        axs[2].tick_params(axis='both', which='major', labelsize=fontsize)
+        results['target_feature'] = target_feature
+        results['train_feature_vals'] = X_train[:, feat_ndx]
+        results['train_feature_bins'] = train_feature_bins
 
-        fig.legend((l1[2][0], l2[2][0]), ('positive instances', 'negative instances'), loc='center', ncol=2,
-                   bbox_to_anchor=(0.46, 0.05), fontsize=fontsize)
-        fig.subplots_adjust(bottom=0.275)
+        _plot_feature_histograms(args, results, out_dir)
 
-        os.makedirs(out_dir, exist_ok=True)
-        plt.savefig(os.path.join(out_dir, 'feature_distribution.pdf'), bbox_inches='tight')
-        plt.tight_layout()
+    _plot_instance_histograms(args, results, out_dir)
 
-        if verbose > 0:
-            print(stats.describe(np.abs(contributions)))
-            print(tree.predict_proba(x_test))
+    np.save(os.path.join(out_dir, 'results.npy'), results)
 
-        # plot TREX's global weights and similarity vs weight
-        fig, axs = plt.subplots(1, 2, figsize=(15, 6))
 
-        font_increase = 4
+def main(args):
 
-        # plot weight distribution for the training samples
-        sns.distplot(train_weight, color='orange', ax=axs[0])
-        axs[0].set_xlabel(r'$\alpha$', fontsize=fontsize + font_increase)
-        axs[0].set_ylabel('density', fontsize=fontsize + font_increase)
-        axs[0].set_title('(a)', fontsize=fontsize + font_increase)
-        axs[0].tick_params(axis='both', which='major', labelsize=fontsize + font_increase)
+    # make logger
+    dataset = args.dataset
 
-        # plot similarity x weight for the training samples
-        sim = explainer.similarity(x_test)[0]
-        sns.distplot(sim * train_weight, color='g', ax=axs[1])
-        axs[1].set_xlabel(r'$\alpha$ * similarity', fontsize=fontsize + font_increase)
-        axs[1].set_title('(b)', fontsize=fontsize + font_increase)
-        axs[1].tick_params(axis='both', which='major', labelsize=fontsize + font_increase)
+    out_dir = os.path.join(args.out_dir, dataset, 'rs{}'.format(args.rs))
+    os.makedirs(out_dir, exist_ok=True)
 
-        plt.tight_layout()
-        plt.savefig(os.path.join(out_dir, 'weight_distribution.pdf'), bbox_inches='tight')
-        plt.show()
+    logger = print_util.get_logger(os.path.join(out_dir, '{}.txt'.format(args.dataset)))
+    logger.info(args)
 
-        # display test instance
-        test_instance_str = test_str.format(test_ndx, tree_pred_test[test_ndx], y_test[test_ndx])
-        print(test_instance_str)
-        for feature_name, feature_val, feature_shap in shap_list:
-            print('\t{}: val={:.3f}, shap={:.3f}'.format(feature_name, feature_val, feature_shap / shap_sum))
+    experiment(args, logger, out_dir, seed=args.rs)
 
-        # display training instances
-        for i, train_ndx in enumerate(sort_ndx[:topk_train]):
-
-            # find the most impactful features
-            shap_list = _get_top_features(X_train[train_ndx], train_shap[train_ndx], feature, k=topk_feature)
-            shap_sum = np.sum(np.abs(train_shap[train_ndx]))
-
-            # display train instance
-            train_instance_str = train_str.format(train_ndx, tree_pred_train[train_ndx], y_train[train_ndx],
-                                                  contributions[train_ndx] / contribution_sum)
-            print(train_instance_str)
-            for feature_name, feature_val, feature_shap in shap_list:
-                print('\t{}: val={:.3f}, shap={:.3f}'.format(feature_name, feature_val, feature_shap / shap_sum))
+    print_util.remove_logger(logger)
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Feature representation extractions for tree ensembles',
                                      formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument('--dataset', type=str, default='nc17_mfc18', help='dataset to explain.')
-    parser.add_argument('--model', type=str, default='lgb', help='model to use.')
-    parser.add_argument('--linear_model', type=str, default='lr', help='linear model to use.')
+    parser.add_argument('--data_dir', type=str, default='data', help='dataset to explain.')
+    parser.add_argument('--out_dir', type=str, default='output/misclassification/', help='output directory.')
+
+    parser.add_argument('--max_bins', type=int, default=40, help='number of bins for feature values.')
+    parser.add_argument('--alpha', type=float, default=0.5, help='transparency value.')
+    parser.add_argument('--xlim', type=float, default=None, help='x limits on instance plots.')
+
+    parser.add_argument('--tree_type', type=str, default='lgb', help='model to use.')
+    parser.add_argument('--n_estimators', type=int, default=100, help='number of trees.')
+
+    parser.add_argument('--tree_kernel', type=str, default='leaf_output', help='type of encoding.')
+    parser.add_argument('--kernel_model', type=str, default='lr', help='kernel model to use.')
+    parser.add_argument('--kernel_model_kernel', type=str, default='linear', help='similarity kernel')
     parser.add_argument('--true_label', action='store_true', help='train TREX on the true labels.')
-    parser.add_argument('--encoding', type=str, default='leaf_output', help='type of encoding.')
-    parser.add_argument('--kernel', type=str, default='linear', help='similarity kernel.')
-    parser.add_argument('--n_estimators', metavar='N', type=int, default=100, help='number of trees in the ensemble.')
-    parser.add_argument('--rs', metavar='RANDOM_STATE', type=int, default=69, help='for reproducibility.')
-    parser.add_argument('--verbose', type=int, default=0, help='verbosity.')
-    parser.add_argument('--topk_train', metavar='NUM', type=int, default=4, help='train instances to show.')
-    parser.add_argument('--topk_test', metavar='NUM', type=int, default=1, help='missed test instances to show.')
-    parser.add_argument('--topk_feature', metavar='NUM', type=int, default=5, help='features to show.')
+
+    parser.add_argument('--rs', type=int, default=1, help='random state.')
+    parser.add_argument('--verbose', type=int, default=0, help='Verbosity level.')
+
     args = parser.parse_args()
-    print(args)
-    misclassification(model=args.model, encoding=args.encoding, dataset=args.dataset, n_estimators=args.n_estimators,
-                      random_state=args.rs, topk_train=args.topk_train, topk_test=args.topk_test,
-                      linear_model=args.linear_model, kernel=args.kernel, topk_feature=args.topk_feature,
-                      true_label=args.true_label, verbose=args.verbose)
+    main(args)
+
+
+class Args:
+    dataset = 'nc17_mfc18'
+    data_dir = 'data'
+    out_dir = 'output/clustering/'
+
+    max_bins = 40
+    alpha = 0.5
+    xlim = 0.05
+
+    tree_type = 'lgb'
+    n_estimators = 100
+    # max_depth = None
+    # C = 0.1
+
+    tree_kernel = 'leaf_output'
+    kernel_model = 'lr'
+    kernel_model_kernel = 'linear'
+    true_label = False
+
+    n_pca = 50
+    rs = 1
+    verbose = 0

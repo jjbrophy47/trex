@@ -61,94 +61,56 @@ def missed_instances(y1, y2, y_true):
     return both_ndx
 
 
-def performance(model, X_train=None, y_train=None, X_test=None, y_test=None, validate=False, logger=None):
+def performance(model, X_train=None, y_train=None, X_test=None, y_test=None,
+                validate=False, logger=None):
     """Displays train and test performance for a learned model."""
+
+    if not logger:
+        return
+
+    logger.info('')
 
     if validate:
         model_type = validate_model(model)
+        logger.info('model ({})'.format(model_type))
 
-        if logger:
-            logger.info('model ({})'.format(model_type))
-        else:
-            print('model ({})'.format(model_type))
-
-    result = tuple()
+    acc, auc, logloss = -1, -1, -1
 
     if X_train is not None and y_train is not None:
         y_hat_pred = model.predict(X_train).flatten()
-        acc_train = accuracy_score(y_train, y_hat_pred)
-
-        if logger:
-            logger.info('train set acc: {:4f}'.format(acc_train))
-        else:
-            print('train set acc: {:4f}'.format(acc_train))
+        acc = accuracy_score(y_train, y_hat_pred)
 
         if hasattr(model, 'predict_proba'):
             y_hat_proba = model.predict_proba(X_train)
-            ll_train = log_loss(y_train, y_hat_proba)
-
-            if logger:
-                logger.info('train log loss: {:.5f}'.format(ll_train))
-            else:
-                print('train log loss: {:.5f}'.format(ll_train))
+            logloss = log_loss(y_train, y_hat_proba)
 
             if len(np.unique(y_train)) == 2:
-                auroc_train = roc_auc_score(y_train, y_hat_proba[:, 1])
-
-                if logger:
-                    logger.info('train auroc: {:.3f}'.format(auroc_train))
-                else:
-                    print('train auroc: {:.3f}'.format(auroc_train))
+                auc = roc_auc_score(y_train, y_hat_proba[:, 1])
 
         if hasattr(model, 'decision_function') and len(np.unique(y_train)) == 2:
             y_hat_proba = model.decision_function(X_train)
-            auroc_train = roc_auc_score(y_train, y_hat_proba)
+            auc = roc_auc_score(y_train, y_hat_proba)
 
-            if logger:
-                logger.info('train auroc: {:.3f}'.format(auroc_train))
-            else:
-                print('train auroc: {:.3f}'.format(auroc_train))
-
-        result += (y_hat_pred,)
+    s = 'train acc: {:.3f}, auc: {:.3f}, logloss: {:.3f}'
+    logger.info(s.format(acc, auc, logloss))
 
     if X_test is not None and y_test is not None:
         y_hat_pred = model.predict(X_test).flatten()
-        acc_test = accuracy_score(y_test, y_hat_pred)
-
-        if logger:
-            logger.info('test set acc: {:4f}'.format(acc_test))
-        else:
-            print('test set acc: {:4f}'.format(acc_test))
+        acc = accuracy_score(y_test, y_hat_pred)
 
         if hasattr(model, 'predict_proba'):
             y_hat_proba = model.predict_proba(X_test)
-            ll_test = log_loss(y_test, y_hat_proba)
-
-            if logger:
-                logger.info('test log loss: {:.5f}'.format(ll_test))
-            else:
-                print('test log loss: {:.5f}'.format(ll_test))
+            logloss = log_loss(y_test, y_hat_proba)
 
             if len(np.unique(y_test)) == 2:
-                auroc = roc_auc_score(y_test, y_hat_proba[:, 1])
-
-                if logger:
-                    logger.info('test auroc: {:.3f}'.format(auroc))
-                else:
-                    logger.info('test auroc: {:.3f}'.format(auroc))
+                auc = roc_auc_score(y_test, y_hat_proba[:, 1])
 
         if hasattr(model, 'decision_function') and len(np.unique(y_test)) == 2:
             y_hat_proba = model.decision_function(X_test)
-            auroc = roc_auc_score(y_test, y_hat_proba)
+            auc = roc_auc_score(y_test, y_hat_proba)
 
-            if logger:
-                logger.info('test auroc: {:.3f}'.format(auroc))
-            else:
-                print('test auroc: {:.3f}'.format(auroc))
-
-        result += (y_hat_pred,)
-
-    return result
+    s = 'test  acc: {:.3f}, auc: {:.3f}, logloss: {:.3f}'
+    logger.info(s.format(acc, auc, logloss))
 
 
 def validate_model(model):

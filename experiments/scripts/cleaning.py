@@ -7,6 +7,8 @@ import argparse
 from copy import deepcopy
 import os
 import sys
+import warnings
+warnings.simplefilter(action='ignore', category=UserWarning)  # lgb compiler warning
 here = os.path.abspath(os.path.dirname(__file__))
 sys.path.insert(0, here + '/../../')  # for influence_boosting
 sys.path.insert(0, here + '/../')  # for utility
@@ -215,7 +217,7 @@ def noise_detection(args, logger, out_dir, seed=1):
     """
 
     # get model and data
-    clf = model_util.get_classifier(args.model_type, n_estimators=args.n_estimators, max_depth=args.max_depth,
+    clf = model_util.get_classifier(args.tree_type, n_estimators=args.n_estimators, max_depth=args.max_depth,
                                     random_state=seed)
     X_train, X_test, y_train, y_test, label = data_util.get_data(args.dataset, random_state=seed,
                                                                  data_dir=args.data_dir)
@@ -228,6 +230,7 @@ def noise_detection(args, logger, out_dir, seed=1):
 
     logger.info('train instances: {}'.format(len(X_train)))
     logger.info('test instances: {}'.format(len(X_test)))
+    logger.info('no. features: {}'.format(X_train.shape[1]))
 
     # add noise
     y_train_noisy, noisy_ndx = data_util.flip_labels(y_train, k=args.flip_frac, random_state=seed)
@@ -269,7 +272,9 @@ def noise_detection(args, logger, out_dir, seed=1):
     # random method
     logger.info('ordering by random...')
     start = time.time()
-    ckpt_ndx, fix_ndx = _random_method(noisy_ndx, y_train, interval, to_check=n_check, random_state=seed)
+    ckpt_ndx, fix_ndx = _random_method(noisy_ndx, y_train, interval,
+                                       to_check=n_check,
+                                       random_state=seed)
     check_pct, random_res = _interval_performance(ckpt_ndx, fix_ndx, noisy_ndx, clf, data, acc_test_noisy)
     logger.info('time: {:3f}s'.format(time.time() - start))
 
@@ -285,22 +290,28 @@ def noise_detection(args, logger, out_dir, seed=1):
     if args.trex:
         logger.info('ordering by our method...')
         start = time.time()
-        explainer = trex.TreeExplainer(model_noisy, X_train, y_train_noisy, encoding=args.encoding, dense_output=True,
-                                       random_state=seed, use_predicted_labels=not args.true_label,
-                                       kernel=args.kernel, linear_model=args.linear_model, C=args.C,
-                                       verbose=args.verbose, X_val=X_val, logger=logger)
+        explainer = trex.TreeExplainer(model_noisy, X_train, y_train_noisy,
+                                       tree_kernel=args.tree_kernel,
+                                       random_state=seed,
+                                       use_predicted_labels=not args.true_label,
+                                       kernel_model=args.kernel_model,
+                                       kernel_model_kernel=args.kernel_model_kernel,
+                                       C=args.C,
+                                       verbose=args.verbose,
+                                       X_val=X_val,
+                                       logger=logger)
         logger.info('C: {}'.format(explainer.C))
         ckpt_ndx, fix_ndx, _ = _our_method(explainer, noisy_ndx, y_train, n_check, interval)
         check_pct, our_res = _interval_performance(ckpt_ndx, fix_ndx, noisy_ndx, clf, data, acc_test_noisy)
-        settings = '{}_{}'.format(args.linear_model, args.kernel)
+        settings = '{}_{}'.format(args.kernel_model, args.tree_kernel)
         settings += '_true_label' if args.true_label else ''
         logger.info('time: {:3f}s'.format(time.time() - start))
 
     # linear loss method - if svm, squish decision values to between 0 and 1
-    if args.trex and args.linear_model_loss:
+    if args.trex and args.kernel_model_loss:
         logger.info('ordering by linear loss...')
         start = time.time()
-        if args.linear_model == 'svm':
+        if args.kernel_model == 'svm':
             y_train_proba = explainer.decision_function(X_train)
             if y_train_proba.ndim == 1:
                 y_train_proba = exp_util.make_multiclass(y_train_proba)
@@ -312,7 +323,7 @@ def noise_detection(args, logger, out_dir, seed=1):
         logger.info('time: {:3f}s'.format(time.time() - start))
 
     # influence method
-    if args.model_type == 'cb' and args.inf_k is not None:
+    if args.tree_type == 'cb' and args.inf_k is not None:
         logger.info('ordering by leafinfluence...')
         start = time.time()
 
@@ -350,7 +361,7 @@ def noise_detection(args, logger, out_dir, seed=1):
         start = time.time()
 
         # transform the data
-        extractor = trex.TreeExtractor(model_noisy, encoding=args.encoding)
+        extractor = trex.TreeExtractor(model_noisy, encoding=args.tree_kernel)
         X_train_alt = extractor.fit_transform(X_train)
         X_val_alt = extractor.transform(X_val)
         train_label = y_train if args.true_label else model_noisy.predict(X_train)
@@ -383,9 +394,9 @@ def noise_detection(args, logger, out_dir, seed=1):
     ax.set_ylabel('test accuracy')
     if args.trex:
         ax.plot(check_pct, our_res, marker='.', color='g', label='ours')
-    if args.trex and args.linear_model_loss:
+    if args.trex and args.kernel_model_loss:
         ax.plot(check_pct, linear_loss_res, marker='*', color='y', label='linear_loss')
-    if args.model_type == 'cb' and args.inf_k is not None:
+    if args.tree_type == 'cb' and args.inf_k is not None:
         ax.plot(check_pct, leafinfluence_res, marker='+', color='m', label='leafinfluence')
     if args.maple:
         ax.plot(check_pct, maple_res, marker='o', color='orange', label='maple')
@@ -418,11 +429,11 @@ def noise_detection(args, logger, out_dir, seed=1):
             np.save(os.path.join(rs_dir, 'our_{}.npy'.format(settings)), our_res)
 
         # linear model loss
-        if args.trex and args.linear_model_loss:
+        if args.trex and args.kernel_model_loss:
             np.save(os.path.join(rs_dir, '{}_loss.npy'.format(settings)), linear_loss_res)
 
         # leaf influence
-        if args.model_type == 'cb' and args.inf_k is not None:
+        if args.tree_type == 'cb' and args.inf_k is not None:
             np.save(os.path.join(rs_dir, 'leafinfluence.npy'), leafinfluence_res)
 
         # maple
@@ -431,11 +442,11 @@ def noise_detection(args, logger, out_dir, seed=1):
 
         # knn
         if args.knn:
-            np.save(os.path.join(rs_dir, 'knn.npy'), knn_res)
+            np.save(os.path.join(rs_dir, 'knn_{}.npy'.format(args.tree_kernel)), knn_res)
 
         # knn loss
         if args.knn and args.knn_loss:
-            np.save(os.path.join(rs_dir, 'knn_loss.npy'), knn_loss_res)
+            np.save(os.path.join(rs_dir, 'knn_{}_loss.npy'.format(args.tree_kernel)), knn_loss_res)
 
     if args.show_plot:
         plt.show()
@@ -445,8 +456,10 @@ def main(args):
 
     # make logger
     dataset = args.dataset
+
     if args.train_frac < 1.0 and args.train_frac > 0.0:
         dataset += '_{}'.format(str(args.train_frac).replace('.', 'p'))
+
     out_dir = os.path.join(args.out_dir, dataset)
     os.makedirs(out_dir, exist_ok=True)
     logger = print_util.get_logger(os.path.join(out_dir, '{}.txt'.format(args.dataset)))
@@ -464,30 +477,72 @@ if __name__ == '__main__':
                                      formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument('--dataset', type=str, default='adult', help='dataset to explain.')
     parser.add_argument('--data_dir', type=str, default='data', help='data directory.')
-    parser.add_argument('--out_dir', type=str, default='output/cleaning', help='output directory.')
+    parser.add_argument('--out_dir', type=str, default='output/cleaning/', help='output directory.')
+
     parser.add_argument('--train_frac', type=float, default=1.0, help='amount of training data to use.')
     parser.add_argument('--val_frac', type=float, default=0.1, help='amount of training data to use for validation.')
-    parser.add_argument('--repeats', type=int, default=1, help='repeats of the experiment.')
-    parser.add_argument('--model_type', type=str, default='cb', help='tree model to use.')
-    parser.add_argument('--trex', action='store_true', help='Use TREX.')
-    parser.add_argument('--linear_model', type=str, default='lr', help='linear model to use.')
-    parser.add_argument('--encoding', type=str, default='leaf_output', help='type of encoding.')
+    parser.add_argument('--flip_frac', type=float, default=0.4, help='Fraction of train labels to flip.')
+
+    parser.add_argument('--tree_type', type=str, default='cb', help='tree model to use.')
     parser.add_argument('--n_estimators', metavar='N', type=int, default=100, help='number of trees in random forest.')
     parser.add_argument('--max_depth', type=int, default=None, help='maximum depth in tree ensemble.')
     parser.add_argument('--C', type=float, default=0.1, help='kernel model penalty parameter.')
-    parser.add_argument('--kernel', default='linear', help='Similarity kernel for the linear model.')
-    parser.add_argument('--rs', metavar='RANDOM_STATE', type=int, default=1, help='for reproducibility.')
-    parser.add_argument('--linear_model_loss', action='store_true', default=False, help='Include linear loss.')
-    parser.add_argument('--show_plot', action='store_true', default=False, help='Save plot results.')
-    parser.add_argument('--save_results', action='store_true', default=False, help='Save cleaning results.')
-    parser.add_argument('--flip_frac', type=float, default=0.4, help='Fraction of train labels to flip.')
-    parser.add_argument('--inf_k', type=int, default=None, help='Number of leaves to use for leafinfluence.')
-    parser.add_argument('--maple', action='store_true', help='Whether to use MAPLE as a baseline.')
+
+    parser.add_argument('--trex', action='store_true', default=False, help='Use TREX.')
+    parser.add_argument('--tree_kernel', type=str, default='leaf_output', help='type of encoding.')
+    parser.add_argument('--true_label', action='store_true', help='Train the kernel model on the true labels.')
+    parser.add_argument('--kernel_model', type=str, default='lr', help='kernel model to use.')
+    parser.add_argument('--kernel_model_kernel', default='linear', help='Similarity kernel for the linear model.')
+    parser.add_argument('--kernel_model_loss', action='store_true', default=False, help='Include linear loss.')
+
     parser.add_argument('--check_pct', type=float, default=0.3, help='Max percentage of train instances to check.')
     parser.add_argument('--n_plot_points', type=int, default=10, help='Number of points to plot.')
-    parser.add_argument('--verbose', type=int, default=0, help='Verbosity level.')
-    parser.add_argument('--true_label', action='store_true', help='Train the SVM on the true labels.')
+    parser.add_argument('--show_plot', action='store_true', default=False, help='Save plot results.')
+    parser.add_argument('--save_results', action='store_true', default=False, help='Save cleaning results.')
+
+    parser.add_argument('--inf_k', type=int, default=None, help='Number of leaves to use for leafinfluence.')
+    parser.add_argument('--maple', action='store_true', default=False, help='Whether to use MAPLE as a baseline.')
     parser.add_argument('--knn', action='store_true', default=False, help='Use KNN on top of TREX features.')
     parser.add_argument('--knn_loss', action='store_true', default=False, help='Use KNN loss method.')
+
+    parser.add_argument('--rs', metavar='RANDOM_STATE', type=int, default=1, help='for reproducibility.')
+    parser.add_argument('--repeats', type=int, default=1, help='repeats of the experiment.')
+    parser.add_argument('--verbose', type=int, default=0, help='Verbosity level.')
     args = parser.parse_args()
     main(args)
+
+
+class Args:
+    dataset = 'adult'
+    data_dir = 'data'
+    out_dir = 'output/cleaning/'
+
+    train_frac = 1.0
+    val_frac = 0.1
+    flip_frac = 0.4
+
+    tree_type = 'cb'
+    n_estimators = 100
+    max_depth = None
+    C = 0.1
+
+    trex = True
+    tree_kernel = 'leaf_output'
+    true_label = False
+    kernel_model = 'lr'
+    kernel_model_kernel = 'linear'
+    kernel_model_loss = False
+
+    check_pct = 0.3
+    n_plot_points = 10
+    show_plot = False
+    save_results = False
+
+    inf_k = None
+    maple = False
+    knn = False
+    knn_loss = False
+
+    rs = 1
+    repeats = 1
+    verbose = 0

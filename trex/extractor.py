@@ -31,7 +31,7 @@ except ImportError as e:
 
 class TreeExtractor:
 
-    def __init__(self, model, encoding='leaf_path', sparse=False):
+    def __init__(self, model, tree_kernel='leaf_path', sparse=False):
         """
         Extracts model-specific feature representations for data instances from a trained tree ensemble.
 
@@ -40,13 +40,13 @@ class TreeExtractor:
         model: object
             Trained tree ensemble. Supported: RandomForestClassifier, GradientBoostingClassifier,
             LightGBM, XGBoost, CatBoost.
-        encoding: str, {'leaf_path', 'feature_path', 'leaf_output'}, (default='leaf_path')
+        tree_kernel: str, {'leaf_path', 'feature_path', 'leaf_output'}, (default='leaf_path')
             Type of feature representation to extract from the tree ensemble.
         sparse: bool (default=False)
             If True, feature representations are returned in a sparse format if possible.
         """
         self.model = model
-        self.encoding = encoding
+        self.tree_kernel = tree_kernel
         self.sparse = sparse
         self._validate()
 
@@ -66,13 +66,13 @@ class TreeExtractor:
         """
         assert X.ndim == 2, 'X is not 2d!'
 
-        if self.encoding == 'leaf_path':
+        if self.tree_kernel == 'leaf_path':
             X_feature, self.path_enc_ = self._leaf_path_encoding(X)
 
-        elif self.encoding == 'feature_path':
+        elif self.tree_kernel == 'feature_path':
             X_feature = self._feature_path_encoding(X)
 
-        elif self.encoding == 'leaf_output':
+        elif self.tree_kernel == 'leaf_output':
             X_feature = self._leaf_output_encoding(X)
 
         return X_feature
@@ -92,14 +92,14 @@ class TreeExtractor:
         """
         assert X.ndim == 2, 'X is not 2d!'
 
-        if self.encoding == 'leaf_path':
+        if self.tree_kernel == 'leaf_path':
             assert self.path_enc_ is not None, 'path_enc_ is not fitted!'
             X_feature, _ = self._leaf_path_encoding(X, one_hot_enc=self.path_enc_)
 
-        elif self.encoding == 'feature_path':
+        elif self.tree_kernel == 'feature_path':
             X_feature = self._feature_path_encoding(X)
 
-        elif self.encoding == 'leaf_output':
+        elif self.tree_kernel == 'leaf_output':
             X_feature = self._leaf_output_encoding(X)
 
         return X_feature
@@ -256,7 +256,8 @@ class TreeExtractor:
         """
         Validate model inputs.
         """
-        assert self.encoding in ['leaf_path', 'feature_path', 'leaf_output'], '{} not supported!'.format(self.encoding)
+        tree_kernels = ['leaf_path', 'feature_path', 'leaf_output']
+        assert self.tree_kernel in tree_kernels, '{} not supported!'.format(self.tree_kernel)
 
         if 'RandomForestClassifier' in str(self.model):
             self.model_type_ = 'RandomForestClassifier'

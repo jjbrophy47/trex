@@ -6,6 +6,9 @@ import logging
 
 
 def get_logger(filename=''):
+    """
+    Return a logger object.
+    """
 
     logger = logging.getLogger()
     logger.setLevel(logging.INFO)
@@ -23,6 +26,13 @@ def get_logger(filename=''):
     logger.addHandler(log_handler)
 
     return logger
+
+
+def remove_logger(logger):
+    """
+    Remove handlers from logger.
+    """
+    logger.handlers = []
 
 
 def show_test_instance(test_ndx, svm_pred, pred_label, y_test=None, label=None, X_test=None):

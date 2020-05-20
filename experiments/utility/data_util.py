@@ -290,6 +290,40 @@ def _load_mfc18_mfc19(data_dir='data', return_feature=False, return_image_id=Fal
     return result
 
 
+def _load_mfc19_mfc20(data_dir='data', return_feature=False, return_image_id=False, return_manipulation=False):
+    train = np.load(os.path.join(data_dir, 'mfc19_mfc20/mfc19.npy'))
+    test = np.load(os.path.join(data_dir, 'mfc19_mfc20/mfc20.npy'))
+    label = ['non-manipulated', 'manipulated']
+    X_train = train[:, :-1]
+    y_train = train[:, -1].astype(np.int32)
+    X_test = test[:, :-1]
+    y_test = test[:, -1].astype(np.int32)
+
+    # remove features that have missing values in the test set
+    remove_train_ndx = np.where(X_train == -1)[0]
+    remove_test_ndx = np.where(X_test == -1)[0]
+    remove_ndx = np.union1d(remove_train_ndx, remove_test_ndx)
+    X_train = np.delete(X_train, remove_ndx, axis=1)
+    X_test = np.delete(X_test, remove_ndx, axis=1)
+
+    result = (X_train, X_test, y_train, y_test, label)
+
+    if return_feature:
+        feature = np.load(os.path.join(data_dir, 'mfc19_mfc20/feature.npy'))
+        feature = np.delete(feature, remove_ndx)
+        result += (feature,)
+
+    if return_manipulation:
+        pass
+
+    if return_image_id:
+        train_id = pd.read_csv(os.path.join(data_dir, 'mfc19_mfc20/mfc19_reference.csv'))['image_id'].values
+        test_id = pd.read_csv(os.path.join(data_dir, 'mfc19_mfc20/mfc20_reference.csv'))['image_id'].values
+        result += (train_id, test_id)
+
+    return result
+
+
 def _load_medifor(data_dir='data', test_size=0.2, random_state=69, return_feature=False, return_manipulation=False,
                   return_image_id=False, dataset='MFC18_EvalPart1'):
 
@@ -464,6 +498,9 @@ def get_data(dataset, test_size=0.2, random_state=69, data_dir='data', return_fe
                                 remove_missing_features=remove_missing_features)
     elif dataset == 'mfc18_mfc19':
         return _load_mfc18_mfc19(data_dir=data_dir, return_feature=return_feature,
+                                 return_manipulation=return_manipulation, return_image_id=return_image_id)
+    elif dataset == 'mfc19_mfc20':
+        return _load_mfc19_mfc20(data_dir=data_dir, return_feature=return_feature,
                                  return_manipulation=return_manipulation, return_image_id=return_image_id)
     elif dataset == 'NC17_EvalPart1':
         return _load_medifor(data_dir=data_dir, return_feature=return_feature, return_manipulation=return_manipulation,

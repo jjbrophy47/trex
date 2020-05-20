@@ -5,9 +5,11 @@ import os
 import sys
 import time
 import argparse
+import warnings
+warnings.simplefilter(action='ignore', category=UserWarning)  # lgb compiler warning
 here = os.path.abspath(os.path.dirname(__file__))
 sys.path.insert(0, here + '/../')  # for utility
-sys.path.insert(0, here + '/../../')  # for libliner; TODO: remove this dependency
+sys.path.insert(0, here + '/../../')  # for libliner
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -107,13 +109,15 @@ def _plot_predictions(tree, explainer, data, ax=None, use_sigmoid=False):
     return res
 
 
-def fidelity(args):
+def main(args):
 
     # create directory
     if args.knn:
-        setting = '{}_teknn_{}'.format(args.model, args.encoding)
+        setting = '{}_teknn_{}'.format(args.tree_type, args.tree_kernel)
     else:
-        setting = '{}_{}_{}_{}'.format(args.model, args.linear_model, args.kernel, args.encoding)
+        setting = '{}_{}_{}_{}'.format(args.tree_type, args.kernel_model,
+                                       args.kernel_model_kernel,
+                                       args.tree_kernel)
 
     # write output to logs
     out_dir = os.path.join(args.out_dir, args.dataset, setting)
@@ -123,7 +127,7 @@ def fidelity(args):
     logger.info(time.ctime(time.time()))
 
     # get model and data
-    clf = model_util.get_classifier(args.model, n_estimators=args.n_estimators, max_depth=args.max_depth,
+    clf = model_util.get_classifier(args.tree_type, n_estimators=args.n_estimators, max_depth=args.max_depth,
                                     random_state=args.rs)
     X_train, X_test, y_train, y_test, label = data_util.get_data(args.dataset, random_state=args.rs,
                                                                  data_dir=args.data_dir)
@@ -141,9 +145,12 @@ def fidelity(args):
         X_val = X_val[int(X_val.shape[0] * args.val_frac):]
 
     logger.info('train instances: {}'.format(len(X_train)))
-    logger.info('val instances: {}'.format(len(X_test)))
-    logger.info('test instances: {}'.format(len(X_val)))
-    logger.info('num features: {}'.format(X_train.shape[1]))
+    logger.info('val instances: {}'.format(len(X_val)))
+    logger.info('test instances: {}'.format(len(X_test)))
+    logger.info('no. features: {}'.format(X_train.shape[1]))
+
+    logger.info('no. trees: {:,}'.format(args.n_estimators))
+    logger.info('max depth: {}'.format(args.max_depth))
 
     # train a tree ensemble
     tree = clf.fit(X_train, y_train)
@@ -151,7 +158,7 @@ def fidelity(args):
     if args.knn:
 
         # transform data
-        extractor = trex.TreeExtractor(tree, encoding=args.encoding)
+        extractor = trex.TreeExtractor(tree, tree_kernel=args.tree_kernel)
         X_train_alt = extractor.fit_transform(X_train)
         X_test_alt = extractor.transform(X_test)
         X_val_alt = extractor.transform(X_val)
@@ -172,8 +179,8 @@ def fidelity(args):
         logger.info('time: {:.3f}s'.format(time.time() - start))
 
         ax.set_xlabel('knn')
-        ax.set_ylabel('{}'.format(args.model))
-        ax.set_title('{}, {}\n{}, {}'.format(args.dataset, args.model, knn_clf.n_neighbors, knn_clf.weights))
+        ax.set_ylabel('{}'.format(args.tree_type))
+        ax.set_title('{}, {}\n{}, {}'.format(args.dataset, args.tree_type, knn_clf.n_neighbors, knn_clf.weights))
         ax.legend()
         plt.tight_layout()
 
@@ -186,20 +193,25 @@ def fidelity(args):
         # plot fidelity
         fig, ax = plt.subplots()
         start = time.time()
-        logger.info('tuning TREX-{}...'.format(args.linear_model))
-        explainer = trex.TreeExplainer(tree, X_train, y_train, encoding=args.encoding, linear_model=args.linear_model,
-                                       C=args.C, kernel=args.kernel, random_state=args.rs, logger=logger,
-                                       use_predicted_labels=not args.true_label, X_val=X_val)
+        logger.info('tuning TREX-{}...'.format(args.kernel_model))
+        explainer = trex.TreeExplainer(tree, X_train, y_train,
+                                       tree_kernel=args.tree_kernel,
+                                       kernel_model=args.kernel_model,
+                                       C=args.C, kernel=args.kernel_model_kernel,
+                                       random_state=args.rs,
+                                       logger=logger,
+                                       use_predicted_labels=not args.true_label,
+                                       X_val=X_val)
         logger.info('C: {}'.format(explainer.C))
         logger.info('time: {:.3f}s'.format(time.time() - start))
 
         logger.info('generating predictions...')
         results = _plot_predictions(tree, explainer, data, ax=ax, use_sigmoid=args.use_sigmoid)
         logger.info('time: {:.3f}s'.format(time.time() - start))
-        ax.set_xlabel('{}'.format(args.linear_model))
-        ax.set_ylabel('{}'.format(args.model))
-        ax.set_title('{}, {}\n{}, {}, {}'.format(args.dataset, args.model, args.linear_model, args.kernel,
-                                                 args.encoding))
+        ax.set_xlabel('TREX-{}'.format(args.kernel_model.upper()))
+        ax.set_ylabel('{}'.format(args.tree_type.upper()))
+        ax.set_title('Dataset: {}, Tree kernel: {}'.format(args.dataset.capitalize(),
+                                                           args.tree_kernel))
         ax.legend()
         plt.tight_layout()
 
@@ -218,20 +230,51 @@ if __name__ == '__main__':
                                      formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument('--dataset', type=str, default='churn', help='dataset to explain.')
     parser.add_argument('--data_dir', type=str, default='data', help='data directory.')
-    parser.add_argument('--out_dir', type=str, default='output/fidelity', help='output directory.')
+    parser.add_argument('--out_dir', type=str, default='output/fidelity/', help='output directory.')
+
     parser.add_argument('--val_frac', type=float, default=0.1, help='amount of training data to use for validation.')
     parser.add_argument('--flip_frac', type=float, default=None, help='Fraction of train labels to flip.')
-    parser.add_argument('--model', type=str, default='cb', help='model to use.')
-    parser.add_argument('--linear_model', type=str, default='lr', help='linear model to use.')
-    parser.add_argument('--kernel', type=str, default='linear', help='Similarity kernel.')
-    parser.add_argument('--encoding', type=str, default='leaf_output', help='type of encoding.')
+
+    parser.add_argument('--tree_type', type=str, default='cb', help='model to use.')
     parser.add_argument('--n_estimators', metavar='N', type=int, default=100, help='number of trees in tree ensemble.')
     parser.add_argument('--max_depth', type=int, default=None, help='maximum depth in tree ensemble.')
     parser.add_argument('--C', type=float, default=0.1, help='kernel model penalty parameter.')
+
+    parser.add_argument('--tree_kernel', type=str, default='leaf_output', help='type of encoding.')
+    parser.add_argument('--true_label', action='store_true', default=False, help='Use true labels for explainer.')
+    parser.add_argument('--kernel_model', type=str, default='lr', help='linear model to use.')
+    parser.add_argument('--kernel_model_kernel', type=str, default='linear', help='Similarity kernel.')
+    parser.add_argument('--use_sigmoid', action='store_true', default=False, help='Run svm results through sigmoid.')
+
+    parser.add_argument('--knn', action='store_true', default=False, help='Use KNN on top of TREX features.')
+
     parser.add_argument('--rs', metavar='RANDOM_STATE', type=int, default=1, help='for reproducibility.')
     parser.add_argument('--verbose', type=int, default=0, help='Verbosity level.')
-    parser.add_argument('--true_label', action='store_true', default=False, help='Use true labels for explainer.')
-    parser.add_argument('--use_sigmoid', action='store_true', default=False, help='Run svm results through sigmoid.')
-    parser.add_argument('--knn', action='store_true', default=False, help='Use KNN on top of TREX features.')
     args = parser.parse_args()
-    fidelity(args)
+    main(args)
+
+
+# External API
+class Args:
+    dataset = 'churn'
+    data_dir = 'data'
+    out_dir = 'output/fidelity/'
+
+    val_frac = 0.1
+    flip_frac = None
+
+    tree_type = 'cb'
+    n_estimators = 100
+    max_depth = None
+    C = 0.1
+
+    tree_kernel = 'leaf_output'
+    true_label = False
+    kernel_model = 'lr'
+    kernel_model_kernel = 'linear'
+    use_sigmoid = False
+
+    knn = False
+
+    rs = 1
+    verbose = 0

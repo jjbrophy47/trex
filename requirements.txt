@@ -1,9 +1,18 @@
-# remove dependency
+# tree ensembles
 catboost
-
-# tests
-nose
-
-numpy
-scipy
+lightgbm
+xgboost
 scikit-learn
+
+# visualization
+matplotlib
+seeaborn
+tqdm
+
+# data manipulation
+numpy
+pandas
+scipy
+
+# extra explainability
+shap

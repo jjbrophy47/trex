@@ -3,12 +3,16 @@
 **.npy
 **.csv
 **catboost_info
+
 myenv
 testenv
+
 dist
 build
+
 .*
 *.egg-info
+
 data
 **output
 results

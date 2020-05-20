@@ -18,10 +18,21 @@ from .models.linear_model import SVM, KernelLogisticRegression
 
 class TreeExplainer:
 
-    def __init__(self, tree, X_train, y_train, linear_model='svm', encoding='leaf_output', C=1.0,
-                 kernel='linear', gamma='scale', coef0=0.0, degree=3, dense_output=False,
-                 use_predicted_labels=True, random_state=None, X_val=None, verbose=0,
-                 C_grid=[1e-2, 1e-1, 1e0, 1e1, 1e2], logger=None):
+    def __init__(self, tree, X_train, y_train,
+                 kernel_model='svm',
+                 tree_kernel='leaf_output',
+                 C=1.0,
+                 kernel_model_kernel='linear',
+                 gamma='scale',
+                 coef0=0.0,
+                 degree=3,
+                 dense_output=True,
+                 use_predicted_labels=True,
+                 random_state=None,
+                 X_val=None,
+                 verbose=0,
+                 C_grid=[1e-2, 1e-1, 1e0, 1e1, 1e2],
+                 logger=None):
         """
         Trains an svm on feature representations from a learned tree ensemble.
 
@@ -33,33 +44,33 @@ class TreeExplainer:
             Train instances in original feature space.
         y_train : 1d array-like (default=None)
             Ground-truth train labels.
-        linear_model : str (default='svm', {'svm', 'lr'})
-            Linear model to approximate the tree ensemble.
-        encoding : str (default='leaf_output', {'leaf_output', 'leaf_path', 'feature_path'})
+        kernel_model : str (default='svm', {'svm', 'lr'})
+            Kernel model to approximate the tree ensemble.
+        tree_kernel : str (default='leaf_output', {'leaf_output', 'leaf_path', 'feature_path'})
             Feature representation to extract from the tree ensemble.
         C : float (default=0.1)
-            Regularization parameter for the linear model. Lower C values result
+            Regularization parameter for the kernel model. Lower C values result
             in stronger regularization.
-        kernel : str (default='linear', {'linear', 'poly', 'rbf', 'sigmoid'})
-            Kernel to use in the dual optimization of the linear model.
-            If linear_model='lr', only 'linear' is currently supported.
+        kernel_model_kernel : str (default='linear', {'linear', 'poly', 'rbf', 'sigmoid'})
+            Kernel to use in the dual optimization of the kernel model.
+            If kernel_model='lr', only 'linear' is currently supported.
         gamma : float (default='scale')
             Kernel coefficient for 'rbf', 'poly', and 'sigmoid'.
             If 'scale', gamma defaults to 1 / (n_features * X.var()).
             If None, defaults to 1 / n_features.
-            Only applies if linear_model='svm'.
+            Only applies if kernel_model='svm'.
         coef0 : float (default=0.0)
             Independent term in 'poly' and 'sigmoid'.
-            Only applies if linear_model='svm'.
+            Only applies if kernel_model='svm'.
         degree : int (default=3)
             Degree of the 'poly' kernel.
-            Only applies if linear_model='svm'.
+            Only applies if kernel_model='svm'.
         dense_output : bool (default=False)
             If True, returns impact of all training instances; otherwise, returns
             only support vector impacts and their corresponding training indices.
-            Only applies if linear_model='svm'.
+            Only applies if kernel_model='svm'.
         use_predicted_labels : bool (default=True)
-            If True, predicted labels from the tree ensemble are used to train the linear model.
+            If True, predicted labels from the tree ensemble are used to train the kernel model.
         random_state : int (default=None)
             Random state to promote reproducibility.
         X_val : 2d array-like
@@ -70,10 +81,10 @@ class TreeExplainer:
         self.tree = tree
         self.X_train = X_train
         self.y_train = y_train
-        self.linear_model = linear_model
-        self.encoding = encoding
+        self.kernel_model = kernel_model
+        self.tree_kernel = tree_kernel
         self.C = C
-        self.kernel = kernel
+        self.kernel_model_kernel = kernel_model_kernel
         self.gamma = gamma
         self.coef0 = coef0
         self.degree = degree
@@ -85,23 +96,23 @@ class TreeExplainer:
         self._validate()
 
         # extract feature representations from the tree ensemble
-        self.extractor_ = TreeExtractor(self.tree, encoding=self.encoding)
+        self.extractor_ = TreeExtractor(self.tree, tree_kernel=self.tree_kernel)
         self.train_feature_ = self.extractor_.fit_transform(self.X_train)
 
-        # choose ground truth or predicted labels to train the linear model
+        # choose ground truth or predicted labels to train the kernel model
         if use_predicted_labels:
             train_label = self.tree.predict(X_train).flatten()
         else:
             train_label = self.y_train
 
-        # create a linear model to approximate the tree ensemble
-        clf = self._get_linear_model(model_type=self.linear_model, C=self.C)
+        # create a kernel model to approximate the tree ensemble
+        clf = self._get_kernel_model(model_type=self.kernel_model, C=self.C)
 
         # encode class labels into numbers between 0 and n_classes - 1
         self.le_ = LabelEncoder().fit(train_label)
         train_label = self.le_.transform(train_label)
 
-        # train the linear model on the tree ensemble feature representation
+        # train the kernel model on the tree ensemble feature representation
         if X_val is not None:
             assert X_val.shape[1] == X_train.shape[1]
             X_val_feature = self.extractor_.transform(X_val)
@@ -117,11 +128,11 @@ class TreeExplainer:
                 start = time.time()
 
                 # fit a surrogate model
-                clf = self._get_linear_model(model_type=self.linear_model, C=C)
+                clf = self._get_kernel_model(model_type=self.kernel_model, C=C)
                 clf.fit(self.train_feature_, train_label)
 
                 # get surrogate model predictions on validation data
-                if self.linear_model == 'svm':
+                if self.kernel_model == 'svm':
                     trex_proba = clf.decision_proba(X_val_feature)
                 else:
                     trex_proba = clf.predict_proba(X_val_feature)[:, 1]
@@ -136,17 +147,17 @@ class TreeExplainer:
                     self.logger.info('C={}: {:.3f}s; corr={:.3f}'.format(C, time.time() - start, pearson_corr))
 
             self.C = best_C
-            clf = self._get_linear_model(model_type=self.linear_model, C=best_C)
-            self.linear_model_ = clf.fit(self.train_feature_, train_label)
+            clf = self._get_kernel_model(model_type=self.kernel_model, C=best_C)
+            self.kernel_model_ = clf.fit(self.train_feature_, train_label)
         else:
-            self.linear_model_ = clf.fit(self.train_feature_, train_label)
+            self.kernel_model_ = clf.fit(self.train_feature_, train_label)
 
     def __str__(self):
         s = '\nTree Explainer:'
         s += '\nextractor: {}'.format(self.extractor_)
         s += '\ntrain_feature: {}'.format(self.train_feature_)
         s += '\nlabel encoder: {}'.format(self.le_)
-        s += '\nlinear model: {}'.format(self.linear_model_)
+        s += '\nkernel model: {}'.format(self.kernel_model_)
         s += '\nn_samples: {}'.format(self.n_samples_)
         s += '\nn_feats: {}'.format(self.n_feats_)
         s += '\nn_classes: {}'.format(self.n_classes_)
@@ -179,8 +190,8 @@ class TreeExplainer:
 
         Returns a 1d array of decision vaues.
         """
-        assert self.linear_model == 'svm', 'decision_function only supports svm!'
-        return self.linear_model_.decision_function(self.transform(X))
+        assert self.kernel_model == 'svm', 'decision_function only supports svm!'
+        return self.kernel_model_.decision_function(self.transform(X))
 
     def predict_proba(self, X):
         """
@@ -193,12 +204,12 @@ class TreeExplainer:
 
         Returns a 2d array of probabilities of shape (len(X), n_classes).
         """
-        assert self.linear_model == 'lr', 'predict_proba only supports lr!'
-        return self.linear_model_.predict_proba(self.transform(X))
+        assert self.kernel_model == 'lr', 'predict_proba only supports lr!'
+        return self.kernel_model_.predict_proba(self.transform(X))
 
     def predict(self, X):
         """
-        Computes the predicted labels for X using the linear model.
+        Computes the predicted labels for X using the kernel model.
 
         Parameters
         ----------
@@ -207,7 +218,7 @@ class TreeExplainer:
 
         Return 1 1d array of predicted labels.
         """
-        return self.le_.inverse_transform(self.linear_model_.predict(self.transform(X)))
+        return self.le_.inverse_transform(self.kernel_model_.predict(self.transform(X)))
 
     # Note: If len(X) is large and the number of training instances is large,
     #       the resulting matrix may be huge.
@@ -224,7 +235,7 @@ class TreeExplainer:
 
         Returns an array of shape (len(X), n_train_samples).
         """
-        X_sim = self.linear_model_.similarity(self.transform(X), train_indices=train_indices)
+        X_sim = self.kernel_model_.similarity(self.transform(X), train_indices=train_indices)
         return X_sim
 
     def get_weight(self):
@@ -234,9 +245,9 @@ class TreeExplainer:
             If binary, returns an array of shape (1, n_train_samples).
             If multiclass, returns an array of shape (n_classes, n_train_samples).
         """
-        weight = self.linear_model_.get_weight()
+        weight = self.kernel_model_.get_weight()
 
-        if self.dense_output and self.linear_model == 'svm':
+        if self.dense_output and self.kernel_model == 'svm':
             weight = weight.toarray()
 
         if self.n_classes_ == 2:
@@ -262,12 +273,12 @@ class TreeExplainer:
             Must have the same length as X.
 
         Returns a 2d array of contributions of shape (len(X), n_train_samples). A sparse
-            matrix is returned if linear_model=svm and dense_output=False.
+            matrix is returned if kernel_model=svm and dense_output=False.
         """
-        contributions = self.linear_model_.explain(self.transform(X), y=y)
+        contributions = self.kernel_model_.explain(self.transform(X), y=y)
         assert contributions.shape == (len(X), self.n_samples_)
 
-        if self.dense_output and self.linear_model == 'svm':
+        if self.dense_output and self.kernel_model == 'svm':
             contributions = contributions.toarray()
 
         return contributions
@@ -291,13 +302,48 @@ class TreeExplainer:
 
         return X_feature
 
-    def _get_linear_model(self, model_type='svm', C=0.1):
+    def get_params(self, deep=False):
+        """
+        Returns the parameter of this model as a dictionary.
+        """
+        d = {}
+        d['tree_kernel'] = self.tree_kernel
+        d['tree_type'] = str(self.tree)
+        d['kernel_model'] = self.kernel_model
+        d['kernel_model_kernel'] = self.kernel_model_kernel
+        d['C'] = self.C
+        d['gamma'] = self.gamma
+        d['coef0'] = self.coef0
+        d['degree'] = self.degree
+        d['dense_output'] = self.dense_output
+        d['use_predicted_labels'] = self.use_predicted_labels
+        d['random_state'] = self.random_state
+        d['train_shape'] = self.X_train.shape
+        return d
+
+    def set_params(self, **params):
+        """
+        Set the parameters of this model.
+        """
+        for key, value in params.items():
+            setattr(self, key, value)
+        return self
+
+    def _get_kernel_model(self, model_type='svm', C=0.1):
+        """
+        Return C implementation of the kernel model.
+        """
         if model_type == 'svm':
-            linear_model = SVM(kernel=self.kernel, C=C, gamma=self.gamma, coef0=self.coef0,
-                               degree=self.degree, random_state=self.random_state)
+            kernel_model = SVM(kernel=self.kernel_model_kernel,
+                               C=C,
+                               gamma=self.gamma,
+                               coef0=self.coef0,
+                               degree=self.degree,
+                               random_state=self.random_state)
         else:
-            linear_model = KernelLogisticRegression(C=C)
-        return linear_model
+            kernel_model = KernelLogisticRegression(C=C)
+
+        return kernel_model
 
     def _validate(self):
         """
@@ -314,8 +360,9 @@ class TreeExplainer:
         self.n_classes_ = len(self.classes_)
         self.labels_ = dict(zip(self.classes_, np.arange(self.n_classes_)))
 
-        # check encoding
-        assert self.encoding in ['leaf_path', 'feature_path', 'leaf_output'], '{} unsupported!'.format(self.encoding)
+        # check tree_kernel
+        tree_types = ['leaf_path', 'feature_path', 'leaf_output']
+        assert self.tree_kernel in tree_types, '{} unsupported!'.format(self.tree_kernel)
 
         # check model
         if 'RandomForestClassifier' in str(self.tree):
@@ -331,12 +378,13 @@ class TreeExplainer:
         else:
             exit('{} not currently supported!'.format(str(self.tree)))
 
-        # check linear model
-        assert self.linear_model in ['svm', 'lr'], '{} unsupported'.format(self.linear_model)
+        # check kernel model
+        assert self.kernel_model in ['svm', 'lr'], '{} unsupported'.format(self.kernel_model)
 
-        # check kernel
-        assert self.kernel in ['linear', 'rbf', 'poly', 'sigmoid'], '{} unsupported'.format(self.kernel)
+        # check kernel model kernel
+        kernel_types = ['linear', 'rbf', 'poly', 'sigmoid']
+        assert self.kernel_model_kernel in kernel_types, '{} unsupported'.format(self.kernel_model_kernel)
 
-        # check kernel for linear model
-        if self.linear_model == 'lr':
-            assert self.kernel == 'linear', "lr only supports 'linear' kernel"
+        # check kernel for LR
+        if self.kernel_model == 'lr':
+            assert self.kernel_model_kernel == 'linear', "lr only supports 'linear' kernel"
