@@ -15,5 +15,5 @@ sbatch jobs/performance/template.sh adult knn
 
 sbatch jobs/performance/template.sh census svm_linear
 sbatch jobs/performance/template.sh census svm_rbf
-sbatch jobs/performance/template.sh census lr
+sbatch jobs/performance/template.sh census svm_linear
 sbatch jobs/performance/template.sh census knn
