@@ -390,10 +390,6 @@ def noise_detection(args, logger, out_dir, seed=1):
         rs_dir = os.path.join(out_dir, 'rs{}'.format(seed))
         os.makedirs(rs_dir, exist_ok=True)
 
-        # save plot
-        logger.info('saving plot...')
-        plt.savefig(os.path.join(rs_dir, 'cleaning.pdf'), format='pdf', bbox_inches='tight')
-
         # save global lines
         np.save(os.path.join(rs_dir, 'test_clean.npy'), acc_test_clean)
         np.save(os.path.join(rs_dir, 'check_pct.npy'), check_pct)
@@ -448,6 +444,8 @@ def noise_detection(args, logger, out_dir, seed=1):
         if args.knn and args.knn_loss:
             ax.plot(check_pct, knn_loss_res, marker='h', color='#EEC64F', label='knn_loss')
         ax.legend()
+        logger.info('saving plot...')
+        plt.savefig(os.path.join(rs_dir, 'cleaning.pdf'), format='pdf', bbox_inches='tight')
         plt.show()
 
 
