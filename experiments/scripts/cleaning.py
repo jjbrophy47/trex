@@ -489,7 +489,7 @@ if __name__ == '__main__':
 
     parser.add_argument('--trex', action='store_true', default=False, help='Use TREX.')
     parser.add_argument('--tree_kernel', type=str, default='leaf_output', help='type of encoding.')
-    parser.add_argument('--true_label', action='store_true', defaul=False, help='Train model on true labels.')
+    parser.add_argument('--true_label', action='store_true', default=False, help='Train model on true labels.')
     parser.add_argument('--kernel_model', type=str, default='lr', help='kernel model to use.')
     parser.add_argument('--kernel_model_kernel', default='linear', help='Similarity kernel for the linear model.')
     parser.add_argument('--kernel_model_loss', action='store_true', default=False, help='Include linear loss.')
