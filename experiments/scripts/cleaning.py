@@ -460,16 +460,15 @@ def main(args):
     if args.train_frac < 1.0 and args.train_frac > 0.0:
         dataset += '_{}'.format(str(args.train_frac).replace('.', 'p'))
 
-    out_dir = os.path.join(args.out_dir, dataset)
+    out_dir = os.path.join(args.out_dir, dataset, args.rs)
     os.makedirs(out_dir, exist_ok=True)
     logger = print_util.get_logger(os.path.join(out_dir, '{}.txt'.format(args.dataset)))
     logger.info(args)
 
     seed = args.rs
-    for i in range(args.repeats):
-        logger.info('\nRun {}, seed: {}'.format(i + 1, seed))
-        noise_detection(args, logger, out_dir, seed=seed)
-        seed += 1
+    logger.info('\nSeed: {}'.format(seed))
+    noise_detection(args, logger, out_dir, seed=seed)
+    seed += 1
 
 
 if __name__ == '__main__':
@@ -484,13 +483,13 @@ if __name__ == '__main__':
     parser.add_argument('--flip_frac', type=float, default=0.4, help='Fraction of train labels to flip.')
 
     parser.add_argument('--tree_type', type=str, default='cb', help='tree model to use.')
-    parser.add_argument('--n_estimators', metavar='N', type=int, default=100, help='number of trees in random forest.')
+    parser.add_argument('--n_estimators', type=int, default=100, help='number of trees in random forest.')
     parser.add_argument('--max_depth', type=int, default=None, help='maximum depth in tree ensemble.')
     parser.add_argument('--C', type=float, default=0.1, help='kernel model penalty parameter.')
 
     parser.add_argument('--trex', action='store_true', default=False, help='Use TREX.')
     parser.add_argument('--tree_kernel', type=str, default='leaf_output', help='type of encoding.')
-    parser.add_argument('--true_label', action='store_true', help='Train the kernel model on the true labels.')
+    parser.add_argument('--true_label', action='store_true', defaul=False, help='Train model on true labels.')
     parser.add_argument('--kernel_model', type=str, default='lr', help='kernel model to use.')
     parser.add_argument('--kernel_model_kernel', default='linear', help='Similarity kernel for the linear model.')
     parser.add_argument('--kernel_model_loss', action='store_true', default=False, help='Include linear loss.')
@@ -505,8 +504,7 @@ if __name__ == '__main__':
     parser.add_argument('--knn', action='store_true', default=False, help='Use KNN on top of TREX features.')
     parser.add_argument('--knn_loss', action='store_true', default=False, help='Use KNN loss method.')
 
-    parser.add_argument('--rs', metavar='RANDOM_STATE', type=int, default=1, help='for reproducibility.')
-    parser.add_argument('--repeats', type=int, default=1, help='repeats of the experiment.')
+    parser.add_argument('--rs', type=int, default=1, help='random state.')
     parser.add_argument('--verbose', type=int, default=0, help='Verbosity level.')
     args = parser.parse_args()
     main(args)

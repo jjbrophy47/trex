@@ -74,7 +74,7 @@ def experiment(args, logger, out_dir, seed):
     # train model
     logger.info('\nmodel: {}, params: {}'.format(args.model, params))
 
-    if args.tune:
+    if not args.no_tune:
         gs = GridSearchCV(clf, params, cv=args.cv, verbose=args.verbose).fit(X_train, y_train)
 
         cols = ['mean_fit_time', 'mean_test_score', 'rank_test_score']
@@ -115,7 +115,7 @@ if __name__ == '__main__':
     parser.add_argument('--out_dir', type=str, default='output/performance/', help='output directory.')
 
     parser.add_argument('--model', type=str, default='cb', help='model to use.')
-    parser.add_argument('--tune', action='store_true', default=True, help='whether to tune the model.')
+    parser.add_argument('--no_tune', action='store_true', default=False, help='do not tune the model.')
     parser.add_argument('--cv', type=int, default=3, help='number of cross-val folds.')
 
     # tree hyperparameters
