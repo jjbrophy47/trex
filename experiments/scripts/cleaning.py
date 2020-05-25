@@ -361,7 +361,7 @@ def noise_detection(args, logger, out_dir, seed=1):
         start = time.time()
 
         # transform the data
-        extractor = trex.TreeExtractor(model_noisy, encoding=args.tree_kernel)
+        extractor = trex.TreeExtractor(model_noisy, tree_kernel=args.tree_kernel)
         X_train_alt = extractor.fit_transform(X_train)
         X_val_alt = extractor.transform(X_val)
         train_label = y_train if args.true_label else model_noisy.predict(X_train)
