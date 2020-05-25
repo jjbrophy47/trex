@@ -2,7 +2,7 @@
 catboost
 lightgbm
 xgboost
-scikit-learn
+scikit-learn==0.21.2
 
 # visualization
 matplotlib

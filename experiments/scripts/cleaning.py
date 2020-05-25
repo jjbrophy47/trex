@@ -384,28 +384,6 @@ def noise_detection(args, logger, out_dir, seed=1):
         _, knn_loss_res = _interval_performance(ckpt_ndx, fix_ndx, noisy_ndx, clf, data, acc_test_noisy)
         logger.info('time: {:3f}s'.format(time.time() - start))
 
-    # plot results
-    logger.info('plotting...')
-    fig, ax = plt.subplots(figsize=(7, 4))
-    ax.plot(check_pct, random_res, marker='^', color='r', label='random')
-    ax.plot(check_pct, tree_loss_res, marker='p', color='c', label='tree_loss')
-    ax.axhline(acc_test_clean, color='k', linestyle='--')
-    ax.set_xlabel('fraction of train data checked')
-    ax.set_ylabel('test accuracy')
-    if args.trex:
-        ax.plot(check_pct, our_res, marker='.', color='g', label='ours')
-    if args.trex and args.kernel_model_loss:
-        ax.plot(check_pct, linear_loss_res, marker='*', color='y', label='linear_loss')
-    if args.tree_type == 'cb' and args.inf_k is not None:
-        ax.plot(check_pct, leafinfluence_res, marker='+', color='m', label='leafinfluence')
-    if args.maple:
-        ax.plot(check_pct, maple_res, marker='o', color='orange', label='maple')
-    if args.knn:
-        ax.plot(check_pct, knn_res, marker='D', color='magenta', label='knn')
-    if args.knn and args.knn_loss:
-        ax.plot(check_pct, knn_loss_res, marker='h', color='#EEC64F', label='knn_loss')
-    ax.legend()
-
     if args.save_results:
 
         # make seed directory
@@ -448,7 +426,28 @@ def noise_detection(args, logger, out_dir, seed=1):
         if args.knn and args.knn_loss:
             np.save(os.path.join(rs_dir, 'knn_{}_loss.npy'.format(args.tree_kernel)), knn_loss_res)
 
+    # plot results
     if args.show_plot:
+        logger.info('plotting...')
+        fig, ax = plt.subplots(figsize=(7, 4))
+        ax.plot(check_pct, random_res, marker='^', color='r', label='random')
+        ax.plot(check_pct, tree_loss_res, marker='p', color='c', label='tree_loss')
+        ax.axhline(acc_test_clean, color='k', linestyle='--')
+        ax.set_xlabel('fraction of train data checked')
+        ax.set_ylabel('test accuracy')
+        if args.trex:
+            ax.plot(check_pct, our_res, marker='.', color='g', label='ours')
+        if args.trex and args.kernel_model_loss:
+            ax.plot(check_pct, linear_loss_res, marker='*', color='y', label='linear_loss')
+        if args.tree_type == 'cb' and args.inf_k is not None:
+            ax.plot(check_pct, leafinfluence_res, marker='+', color='m', label='leafinfluence')
+        if args.maple:
+            ax.plot(check_pct, maple_res, marker='o', color='orange', label='maple')
+        if args.knn:
+            ax.plot(check_pct, knn_res, marker='D', color='magenta', label='knn')
+        if args.knn and args.knn_loss:
+            ax.plot(check_pct, knn_loss_res, marker='h', color='#EEC64F', label='knn_loss')
+        ax.legend()
         plt.show()
 
 
