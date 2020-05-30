@@ -56,7 +56,7 @@ def _get_trex_predictions(tree, explainer, data):
         yhat_tree_test = yhat_tree_test.flatten()
 
     # linear model predictions
-    if explainer.linear_model == 'svm':
+    if explainer.kernel_model == 'svm':
         yhat_trex_test = explainer.decision_function(X_test).flatten()
     else:
         yhat_trex_test = explainer.predict_proba(X_test)
