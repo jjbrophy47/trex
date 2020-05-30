@@ -210,7 +210,7 @@ def _knn_method(knn_clf, weights, X_train, noisy_ndx, interval, to_check=1):
     return ckpt_ndx, fix_ndx, train_order
 
 
-def noise_detection(args, logger, out_dir, seed=1):
+def noise_detection(args, logger, out_dir, seed):
     """
     Main method that trains a tree ensemble, flips a percentage of train labels, prioritizes train
     instances using various methods, and computes how effective each method is at cleaning the data.
@@ -386,41 +386,37 @@ def noise_detection(args, logger, out_dir, seed=1):
 
     if args.save_results:
 
-        # make seed directory
-        rs_dir = os.path.join(out_dir, 'rs{}'.format(seed))
-        os.makedirs(rs_dir, exist_ok=True)
-
         # save global lines
-        np.save(os.path.join(rs_dir, 'test_clean.npy'), acc_test_clean)
-        np.save(os.path.join(rs_dir, 'check_pct.npy'), check_pct)
+        np.save(os.path.join(out_dir, 'test_clean.npy'), acc_test_clean)
+        np.save(os.path.join(out_dir, 'check_pct.npy'), check_pct)
 
         # ours, random, and tree loss
-        np.save(os.path.join(rs_dir, 'random.npy'), random_res)
-        np.save(os.path.join(rs_dir, 'tree_loss.npy'), tree_loss_res)
+        np.save(os.path.join(out_dir, 'random.npy'), random_res)
+        np.save(os.path.join(out_dir, 'tree_loss.npy'), tree_loss_res)
 
         # trex
         if args.trex:
-            np.save(os.path.join(rs_dir, 'our_{}.npy'.format(settings)), our_res)
+            np.save(os.path.join(out_dir, 'our_{}.npy'.format(settings)), our_res)
 
         # linear model loss
         if args.trex and args.kernel_model_loss:
-            np.save(os.path.join(rs_dir, '{}_loss.npy'.format(settings)), linear_loss_res)
+            np.save(os.path.join(out_dir, '{}_loss.npy'.format(settings)), linear_loss_res)
 
         # leaf influence
         if args.tree_type == 'cb' and args.inf_k is not None:
-            np.save(os.path.join(rs_dir, 'leafinfluence.npy'), leafinfluence_res)
+            np.save(os.path.join(out_dir, 'leafinfluence.npy'), leafinfluence_res)
 
         # maple
         if args.maple:
-            np.save(os.path.join(rs_dir, 'maple.npy'), maple_res)
+            np.save(os.path.join(out_dir, 'maple.npy'), maple_res)
 
         # knn
         if args.knn:
-            np.save(os.path.join(rs_dir, 'knn_{}.npy'.format(args.tree_kernel)), knn_res)
+            np.save(os.path.join(out_dir, 'knn_{}.npy'.format(args.tree_kernel)), knn_res)
 
         # knn loss
         if args.knn and args.knn_loss:
-            np.save(os.path.join(rs_dir, 'knn_{}_loss.npy'.format(args.tree_kernel)), knn_loss_res)
+            np.save(os.path.join(out_dir, 'knn_{}_loss.npy'.format(args.tree_kernel)), knn_loss_res)
 
     # plot results
     if args.show_plot:
@@ -445,7 +441,7 @@ def noise_detection(args, logger, out_dir, seed=1):
             ax.plot(check_pct, knn_loss_res, marker='h', color='#EEC64F', label='knn_loss')
         ax.legend()
         logger.info('saving plot...')
-        plt.savefig(os.path.join(rs_dir, 'cleaning.pdf'), format='pdf', bbox_inches='tight')
+        plt.savefig(os.path.join(out_dir, 'cleaning.pdf'), format='pdf', bbox_inches='tight')
         plt.show()
 
 

@@ -31,7 +31,7 @@ def _get_classifier(args):
                                         n_estimators=args.n_estimators,
                                         max_depth=args.max_depth,
                                         random_state=args.rs)
-        params = {'n_estimators': [10, 100, 250], 'max_depth': [1, 3, 5, 10, None]}
+        params = {'n_estimators': [10, 100, 250], 'max_depth': [3, 5, 10, None]}
 
     elif args.model == 'lr':
         clf = LogisticRegression(penalty=args.penalty, C=args.C)

@@ -11,8 +11,8 @@
 module load python3/3.6.1
 
 dataset='churn'
-n_estimators=250
-max_depth=1
+n_estimators=100
+max_depth=3
 check_pct=0.3
 rs_list=(1)
 

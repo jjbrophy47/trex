@@ -38,10 +38,8 @@ def tune_knn(X_train, y_train, tree, X_val_tree, X_val_knn, logger=None):
     Tunes KNN by choosing hyperparameters that give the best pearson
     correlation to the tree predictions.
     """
-    bootstrap_n = int(np.sqrt(X_train.shape[0]))
-    bootstrap_n += 1 if bootstrap_n % 2 == 0 else 0
-    knn_n_neighbors_grid = sorted([5, 17, 45, 91] + [bootstrap_n])
-    knn_weights_grid = ['uniform', 'distance']
+    knn_n_neighbors_grid = [3, 5, 7, 9, 11, 13, 15, 31, 45, 61]
+    knn_weights_grid = ['uniform']
 
     best_score = 0
     best_n_neighbors = None
