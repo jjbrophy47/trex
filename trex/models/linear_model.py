@@ -2,7 +2,6 @@
 SVM and kernel kernel logistic regression models.
 """
 import os
-import shutil
 
 import numpy as np
 from scipy import sparse as sps

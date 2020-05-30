@@ -22,9 +22,9 @@ from utility import data_util
 from utility import print_util
 from utility import exp_util
 
-ONE_DAY = 86400  # number of seconds in a day
+ONE_DAY = 43200  # number of seconds in 12 hours
 maple_limit_reached = False
-knn_limit_reached = False
+teknn_limit_reached = False
 
 
 class timeout:
@@ -47,9 +47,11 @@ class timeout:
         signal.alarm(0)
 
 
-def _our_method(test_ndx, X_test, model, X_train, y_train,
-                args, seed, logger=None):
-    """Explains the predictions of each test instance."""
+def _trex_method(test_ndx, X_test, model, X_train, y_train,
+                 args, seed, logger=None):
+    """
+    Explains the predictions of each test instance.
+    """
 
     start = time.time()
     explainer = trex.TreeExplainer(model, X_train, y_train,
@@ -87,12 +89,12 @@ def _maple_method(model, test_ndx, X_train, y_train, X_test, y_test, dstump=Fals
     """
     Produces a train weight distribution for a single test instance.
     """
-
     with timeout(seconds=ONE_DAY):
         try:
             start = time.time()
             maple = MAPLE.MAPLE(X_train, y_train, X_train, y_train, dstump=dstump)
             fine_tune = time.time() - start
+
         except:
             if logger:
                 logger.info('maple fine-tuning exceeded 24h!')
@@ -107,7 +109,10 @@ def _maple_method(model, test_ndx, X_train, y_train, X_test, y_test, dstump=Fals
     return fine_tune, test_time
 
 
-def _knn_method(tree, args, test_ndx, X_train, y_train, X_val, X_test, logger=None):
+def _teknn_method(tree, args, test_ndx, X_train, y_train, X_val, X_test, logger=None):
+    """
+    TEKNN fine tuning and computation.
+    """
 
     with timeout(seconds=ONE_DAY):
         try:
@@ -121,10 +126,12 @@ def _knn_method(tree, args, test_ndx, X_train, y_train, X_val, X_test, logger=No
             fine_tune = time.time() - start
 
             if logger:
-                logger.info('n_neighbors: {}, weights: {}'.format(params['n_neighbors'], params['weights']))
+                logger.info('n_neighbors: {}'.format(params['n_neighbors']))
+
         except:
             if logger:
-                logger.info('knn fine-tuning exceeded 24h!')
+                logger.info('teknn fine-tuning exceeded 24h!')
+
             global knn_limit_reached
             knn_limit_reached = True
             return None, None
@@ -176,23 +183,23 @@ def experiment(args, logger, out_dir, seed):
     # train on predicted labels
     train_label = y_train if args.true_label else model.predict(X_train)
 
-    # our method
+    # TREX
     if args.trex:
         logger.info('TREX...')
-        fine_tune, test_time = _our_method(test_ndx, X_test, model, X_train, train_label, args,
-                                           seed=seed,
-                                           logger=logger)
+        fine_tune, test_time = _trex_method(test_ndx, X_test, model, X_train, train_label, args,
+                                            seed=seed, logger=logger)
+
         logger.info('fine tune: {:.3f}s'.format(fine_tune))
         logger.info('test time: {:.3f}s'.format(test_time))
         r = {'fine_tune': fine_tune, 'test_time': test_time}
-        np.save(os.path.join(out_dir, 'trex_{}_{}.npy'.format(
-                args.tree_kernel, args.kernel_model)), r)
+        np.save(os.path.join(out_dir, 'trex_{}.npy'.format(args.kernel_model)), r)
 
-    # influence method
+    # Leaf Influence
     if args.tree_type == 'cb' and args.inf_k is not None:
         logger.info('leafinfluence...')
         fine_tune, test_time = _influence_method(model, test_ndx, X_train,
                                                  y_train, X_test, y_test, args.inf_k)
+
         logger.info('fine tune: {:.3f}s'.format(fine_tune))
         logger.info('test time: {:.3f}s'.format(test_time))
         r = {'fine_tune': fine_tune, 'test_time': test_time}
@@ -202,6 +209,7 @@ def experiment(args, logger, out_dir, seed):
         logger.info('maple...')
         fine_tune, test_time = _maple_method(model, test_ndx, X_train, train_label, X_test, y_test,
                                              dstump=args.dstump, logger=logger)
+
         if fine_tune is not None and test_time is not None:
             logger.info('fine tune: {:.3f}s'.format(fine_tune))
             logger.info('test time: {:.3f}s'.format(test_time))
@@ -211,15 +219,15 @@ def experiment(args, logger, out_dir, seed):
         else:
             logger.info('time limit reached!')
 
-    if args.knn and not knn_limit_reached:
+    if args.teknn and not teknn_limit_reached:
         logger.info('knn...')
-        fine_tune, test_time = _knn_method(model, args, test_ndx, X_train, train_label,
-                                           X_val, X_test, logger=logger)
+        fine_tune, test_time = _teknn_method(model, args, test_ndx, X_train, train_label,
+                                             X_val, X_test, logger=logger)
         if fine_tune is not None and test_time is not None:
             logger.info('fine tune: {:.3f}s'.format(fine_tune))
             logger.info('test time: {:.3f}s'.format(test_time))
             r = {'fine_tune': fine_tune, 'test_time': test_time}
-            np.save(os.path.join(out_dir, 'knn_{}.npy'.format(args.tree_kernel)), r)
+            np.save(os.path.join(out_dir, 'teknn.npy'), r)
 
         else:
             logger.info('time limit reached!')
@@ -228,14 +236,10 @@ def experiment(args, logger, out_dir, seed):
 def main(args):
 
     # make logger
-    dataset = args.dataset
-
-    if args.train_frac < 1.0 and args.train_frac > 0.0:
-        dataset += '_{}'.format(str(args.train_frac).replace('.', 'p'))
-
-    out_dir = os.path.join(args.out_dir, dataset, 'rs{}'.format(args.rs))
+    out_dir = os.path.join(args.out_dir, args.dataset, args.tree_type,
+                           args.tree_kernel, 'rs{}'.format(args.rs))
     os.makedirs(out_dir, exist_ok=True)
-    logger = print_util.get_logger(os.path.join(out_dir, '{}.txt'.format(args.dataset)))
+    logger = print_util.get_logger(os.path.join(out_dir, 'log.txt'))
     logger.info(args)
 
     experiment(args, logger, out_dir, seed=args.rs)
@@ -255,7 +259,6 @@ if __name__ == '__main__':
     parser.add_argument('--tree_type', type=str, default='cb', help='Model to use.')
     parser.add_argument('--n_estimators', type=int, default=100, help='Number of trees.')
     parser.add_argument('--max_depth', type=int, default=None, help='Maximum depth in tree ensemble.')
-    parser.add_argument('--C', type=float, default=0.1, help='Kernel model penalty parameter.')
 
     parser.add_argument('--trex', action='store_true', default=False, help='TREX method.')
     parser.add_argument('--tree_kernel', type=str, default='leaf_output', help='Type of encoding.')
@@ -263,10 +266,10 @@ if __name__ == '__main__':
     parser.add_argument('--kernel_model_kernel', type=str, default='linear', help='Similarity kernel')
     parser.add_argument('--true_label', action='store_true', help='Train TREX on the true labels.')
 
-    parser.add_argument('--knn', action='store_true', default=False, help='Use KNN on top of TREX features.')
-    parser.add_argument('--inf_k', default=None, type=int, help='Number of leaves for leafinfluence.')
-    parser.add_argument('--maple', action='store_true', help='Run experiment using MAPLE.')
-    parser.add_argument('--dstump', action='store_true', help='Enable DSTUMP with Maple.')
+    parser.add_argument('--teknn', action='store_true', default=False, help='Use KNN on top of TREX features.')
+    parser.add_argument('--inf_k', type=int, default=None, help='Number of leaves for leafinfluence.')
+    parser.add_argument('--maple', action='store_true', default=False, help='Run experiment using MAPLE.')
+    parser.add_argument('--dstump', action='store_true', default=False, help='Enable DSTUMP with Maple.')
 
     parser.add_argument('--rs', type=int, default=1, help='Random state.')
 
@@ -285,7 +288,6 @@ class Args:
     tree_type = 'lgb'
     n_estimators = 100
     max_depth = None
-    C = 0.1
 
     trex = True
     tree_kernel = 'leaf_output'
@@ -296,6 +298,6 @@ class Args:
     knn = False
     inf_k = None
     maple = False
-    dstump = False
+    dstump = True
 
     rs = 1
