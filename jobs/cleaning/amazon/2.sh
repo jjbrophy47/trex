@@ -15,7 +15,7 @@ n_estimators=250
 max_depth=5
 check_pct=0.15
 
-rs_list=(4 5)
+rs_list=(2)
 
 verbose=1
 tree_kernel='leaf_output'

@@ -14,7 +14,7 @@ dataset='churn'
 n_estimators=100
 max_depth=3
 check_pct=0.3
-rs_list=(4)
+rs_list=(1)
 
 verbose=1
 inf_k=-1

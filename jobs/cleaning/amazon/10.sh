@@ -1,8 +1,8 @@
 #!/bin/bash
 #SBATCH --partition=long
 #SBATCH --job-name=cleaning
-#SBATCH --output=jobs/logs/cleaning/amazon7
-#SBATCH --error=jobs/errors/cleaning/amazon7
+#SBATCH --output=jobs/logs/cleaning/amazon10
+#SBATCH --error=jobs/errors/cleaning/amazon10
 #SBATCH --time=5-00:00:00
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1
@@ -15,7 +15,7 @@ n_estimators=250
 max_depth=5
 check_pct=0.15
 
-rs_list=(2)
+rs_list=(5)
 
 verbose=1
 inf_k=-1

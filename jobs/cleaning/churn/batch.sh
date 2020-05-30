@@ -5,3 +5,6 @@ sbatch jobs/cleaning/churn/4.sh
 sbatch jobs/cleaning/churn/5.sh
 sbatch jobs/cleaning/churn/6.sh
 sbatch jobs/cleaning/churn/7.sh
+sbatch jobs/cleaning/churn/8.sh
+sbatch jobs/cleaning/churn/9.sh
+sbatch jobs/cleaning/churn/10.sh

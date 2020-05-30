@@ -15,7 +15,7 @@ n_estimators=250
 max_depth=10
 check_pct=0.25
 
-rs_list=(4)
+rs_list=(1)
 
 verbose=1
 inf_k=-1

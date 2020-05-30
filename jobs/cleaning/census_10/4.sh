@@ -15,11 +15,12 @@ n_estimators=250
 max_depth=5
 check_pct=0.15
 
-rs_list=(2)
+rs_list=(4)
 train_frac=0.1
 
 verbose=1
-inf_k=-1
+tree_kernel='leaf_output'
+kernel_model_kernel='linear'
 
 for i in ${!rs_list[@]}; do
     python3 experiments/scripts/cleaning.py \
@@ -30,6 +31,28 @@ for i in ${!rs_list[@]}; do
       --save_results \
       --rs ${rs_list[$i]} \
       --verbose $verbose \
-      --inf_k $inf_k \
+      --trex \
+      --tree_kernel $tree_kernel \
+      --kernel_model 'svm' \
+      --kernel_model_kernel $kernel_model_kernel \
+      --kernel_model_loss \
+      --train_frac $train_frac
+
+    python3 experiments/scripts/cleaning.py \
+      --dataset $dataset \
+      --n_estimators $n_estimators \
+      --max_depth $max_depth \
+      --check_pct $check_pct \
+      --save_results \
+      --rs ${rs_list[$i]} \
+      --verbose $verbose \
+      --trex \
+      --tree_kernel $tree_kernel \
+      --kernel_model 'lr' \
+      --kernel_model_kernel $kernel_model_kernel \
+      --kernel_model_loss \
+      --maple \
+      --teknn \
+      --teknn_loss \
       --train_frac $train_frac
 done

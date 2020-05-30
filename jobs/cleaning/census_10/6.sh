@@ -15,7 +15,7 @@ n_estimators=250
 max_depth=5
 check_pct=0.15
 
-rs_list=(4)
+rs_list=(1)
 train_frac=0.1
 
 verbose=1
