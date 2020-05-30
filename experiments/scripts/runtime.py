@@ -120,9 +120,9 @@ def _teknn_method(tree, args, test_ndx, X_train, y_train, X_val, X_test, logger=
             extractor = trex.TreeExtractor(tree, tree_kernel=args.tree_kernel)
             X_train_alt = extractor.fit_transform(X_train)
             X_val_alt = extractor.transform(X_val)
-            train_label = y_train if args.true_label else tree.predict(X_train)
 
-            knn_clf, params = exp_util.tune_knn(X_train_alt, train_label, tree, X_val, X_val_alt, logger=logger)
+            knn_clf, params = exp_util.tune_knn(X_train_alt, y_train, tree, X_val, X_val_alt,
+                                                logger=logger)
             fine_tune = time.time() - start
 
             if logger:
@@ -190,7 +190,7 @@ def experiment(args, logger, out_dir, seed):
                                             seed=seed, logger=logger)
 
         logger.info('fine tune: {:.3f}s'.format(fine_tune))
-        logger.info('test time: {:.3f}s'.format(test_time))
+        logger.info('computation time: {:.3f}s'.format(test_time))
         r = {'fine_tune': fine_tune, 'test_time': test_time}
         np.save(os.path.join(out_dir, 'trex_{}.npy'.format(args.kernel_model)), r)
 
@@ -201,7 +201,7 @@ def experiment(args, logger, out_dir, seed):
                                                  y_train, X_test, y_test, args.inf_k)
 
         logger.info('fine tune: {:.3f}s'.format(fine_tune))
-        logger.info('test time: {:.3f}s'.format(test_time))
+        logger.info('computation time: {:.3f}s'.format(test_time))
         r = {'fine_tune': fine_tune, 'test_time': test_time}
         np.save(os.path.join(out_dir, 'influence.npy'), r)
 
@@ -212,7 +212,7 @@ def experiment(args, logger, out_dir, seed):
 
         if fine_tune is not None and test_time is not None:
             logger.info('fine tune: {:.3f}s'.format(fine_tune))
-            logger.info('test time: {:.3f}s'.format(test_time))
+            logger.info('computation time: {:.3f}s'.format(test_time))
             r = {'fine_tune': fine_tune, 'test_time': test_time}
             np.save(os.path.join(out_dir, 'maple.npy'), r)
 
@@ -225,7 +225,7 @@ def experiment(args, logger, out_dir, seed):
                                              X_val, X_test, logger=logger)
         if fine_tune is not None and test_time is not None:
             logger.info('fine tune: {:.3f}s'.format(fine_tune))
-            logger.info('test time: {:.3f}s'.format(test_time))
+            logger.info('computation time: {:.3f}s'.format(test_time))
             r = {'fine_tune': fine_tune, 'test_time': test_time}
             np.save(os.path.join(out_dir, 'teknn.npy'), r)
 
@@ -264,7 +264,7 @@ if __name__ == '__main__':
     parser.add_argument('--tree_kernel', type=str, default='leaf_output', help='Type of encoding.')
     parser.add_argument('--kernel_model', type=str, default='lr', help='Kernel model to use.')
     parser.add_argument('--kernel_model_kernel', type=str, default='linear', help='Similarity kernel')
-    parser.add_argument('--true_label', action='store_true', help='Train TREX on the true labels.')
+    parser.add_argument('--true_label', action='store_true', default=False, help='Train TREX on the true labels.')
 
     parser.add_argument('--teknn', action='store_true', default=False, help='Use KNN on top of TREX features.')
     parser.add_argument('--inf_k', type=int, default=None, help='Number of leaves for leafinfluence.')
@@ -285,7 +285,7 @@ class Args:
     train_frac = 1.0
     val_frac = 0.1
 
-    tree_type = 'lgb'
+    tree_type = 'cb'
     n_estimators = 100
     max_depth = None
 
@@ -295,7 +295,7 @@ class Args:
     kernel_model_kernel = 'linear'
     true_label = False
 
-    knn = False
+    teknn = False
     inf_k = None
     maple = False
     dstump = True

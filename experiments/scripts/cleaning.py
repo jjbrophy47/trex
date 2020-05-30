@@ -276,6 +276,11 @@ def noise_detection(args, logger, out_dir, seed):
                                        random_state=seed)
     check_pct, random_res = _interval_performance(ckpt_ndx, fix_ndx, noisy_ndx, clf, data, acc_test_noisy)
     logger.info('time: {:3f}s'.format(time.time() - start))
+    np.save(os.path.join(out_dir, 'random.npy'), random_res)
+
+    # save global lines
+    np.save(os.path.join(out_dir, 'test_clean.npy'), acc_test_clean)
+    np.save(os.path.join(out_dir, 'check_pct.npy'), check_pct)
 
     # tree loss method
     logger.info('ordering by tree loss...')
@@ -284,6 +289,7 @@ def noise_detection(args, logger, out_dir, seed):
     ckpt_ndx, fix_ndx, _, _ = _loss_method(noisy_ndx, y_train_proba, y_train_noisy, interval, to_check=n_check)
     _, tree_loss_res = _interval_performance(ckpt_ndx, fix_ndx, noisy_ndx, clf, data, acc_test_noisy)
     logger.info('time: {:3f}s'.format(time.time() - start))
+    np.save(os.path.join(out_dir, 'tree_loss.npy'), tree_loss_res)
 
     # trex method
     if args.trex:
@@ -292,7 +298,7 @@ def noise_detection(args, logger, out_dir, seed):
         explainer = trex.TreeExplainer(model_noisy, X_train, y_train_noisy,
                                        tree_kernel=args.tree_kernel,
                                        random_state=seed,
-                                       use_predicted_labels=not args.true_label,
+                                       true_label=args.true_label,
                                        kernel_model=args.kernel_model,
                                        kernel_model_kernel=args.kernel_model_kernel,
                                        verbose=args.verbose,
@@ -302,6 +308,7 @@ def noise_detection(args, logger, out_dir, seed):
         ckpt_ndx, fix_ndx, _ = _our_method(explainer, noisy_ndx, y_train, n_check, interval)
         check_pct, trex_res = _interval_performance(ckpt_ndx, fix_ndx, noisy_ndx, clf, data, acc_test_noisy)
         logger.info('time: {:3f}s'.format(time.time() - start))
+        np.save(os.path.join(out_dir, 'trex_{}.npy'.format(args.kernel_model)), trex_res)
 
     # trex loss method - if svm, squish decision values to between 0 and 1
     if args.trex and args.kernel_model_loss:
@@ -317,6 +324,7 @@ def noise_detection(args, logger, out_dir, seed):
         ckpt_ndx, fix_ndx, _, _ = _loss_method(noisy_ndx, y_train_proba, y_train_noisy, interval, to_check=n_check)
         _, trex_loss_res = _interval_performance(ckpt_ndx, fix_ndx, noisy_ndx, clf, data, acc_test_noisy)
         logger.info('time: {:3f}s'.format(time.time() - start))
+        np.save(os.path.join(out_dir, 'trex_{}_loss.npy'.format(args.kernel_model)), trex_loss_res)
 
     # influence method
     if args.tree_type == 'cb' and args.inf_k is not None:
@@ -339,6 +347,7 @@ def noise_detection(args, logger, out_dir, seed):
                                                     interval, to_check=n_check)
         _, leafinfluence_res = _interval_performance(ckpt_ndx, fix_ndx, noisy_ndx, clf, data, acc_test_noisy)
         logger.info('time: {:3f}s'.format(time.time() - start))
+        np.save(os.path.join(out_dir, 'leafinfluence.npy'), leafinfluence_res)
 
     # MAPLE method
     if args.maple:
@@ -350,6 +359,7 @@ def noise_detection(args, logger, out_dir, seed):
                                                                  to_check=n_check)
         _, maple_res = _interval_performance(ckpt_ndx, fix_ndx, noisy_ndx, clf, data, acc_test_noisy)
         logger.info('time: {:3f}s'.format(time.time() - start))
+        np.save(os.path.join(out_dir, 'maple.npy'), maple_res)
 
     # TE-KNN method
     if args.teknn:
@@ -370,6 +380,7 @@ def noise_detection(args, logger, out_dir, seed):
         ckpt_ndx, fix_ndx, _ = _knn_method(knn_clf, weights, X_train_alt, noisy_ndx, interval, to_check=n_check)
         _, teknn_res = _interval_performance(ckpt_ndx, fix_ndx, noisy_ndx, clf, data, acc_test_noisy)
         logger.info('time: {:3f}s'.format(time.time() - start))
+        np.save(os.path.join(out_dir, 'teknn.npy'), teknn_res)
 
     # te-knn loss method
     if args.teknn and args.teknn_loss:
@@ -380,39 +391,6 @@ def noise_detection(args, logger, out_dir, seed):
         ckpt_ndx, fix_ndx, _, _ = _loss_method(noisy_ndx, y_train_proba, y_train_noisy, interval, to_check=n_check)
         _, teknn_loss_res = _interval_performance(ckpt_ndx, fix_ndx, noisy_ndx, clf, data, acc_test_noisy)
         logger.info('time: {:3f}s'.format(time.time() - start))
-
-    # save global lines
-    np.save(os.path.join(out_dir, 'test_clean.npy'), acc_test_clean)
-    np.save(os.path.join(out_dir, 'check_pct.npy'), check_pct)
-
-    # random
-    np.save(os.path.join(out_dir, 'random.npy'), random_res)
-
-    # tree loss
-    np.save(os.path.join(out_dir, 'tree_loss.npy'), tree_loss_res)
-
-    # trex
-    if args.trex:
-        np.save(os.path.join(out_dir, 'trex_{}.npy'.format(args.kernel_model)), trex_res)
-
-    # linear model loss
-    if args.trex and args.kernel_model_loss:
-        np.save(os.path.join(out_dir, 'trex_{}_loss.npy'.format(args.kernel_model)), trex_loss_res)
-
-    # leaf influence
-    if args.tree_type == 'cb' and args.inf_k is not None:
-        np.save(os.path.join(out_dir, 'leafinfluence.npy'), leafinfluence_res)
-
-    # maple
-    if args.maple:
-        np.save(os.path.join(out_dir, 'maple.npy'), maple_res)
-
-    # teknn
-    if args.teknn:
-        np.save(os.path.join(out_dir, 'teknn.npy'), teknn_res)
-
-    # teknn loss
-    if args.teknn and args.teknn_loss:
         np.save(os.path.join(out_dir, 'teknn_loss.npy'), teknn_loss_res)
 
 
@@ -427,13 +405,12 @@ def main(args):
     out_dir = os.path.join(args.out_dir, dataset, args.tree_type,
                            args.tree_kernel, 'rs{}'.format(args.rs))
     os.makedirs(out_dir, exist_ok=True)
-    logger = print_util.get_logger(os.path.join(out_dir, '{}.txt'.format(args.dataset)))
+    logger = print_util.get_logger(os.path.join(out_dir, 'log.txt'))
     logger.info(args)
 
     seed = args.rs
     logger.info('\nSeed: {}'.format(seed))
     noise_detection(args, logger, out_dir, seed=seed)
-    seed += 1
 
 
 if __name__ == '__main__':
@@ -494,7 +471,6 @@ class Args:
 
     check_pct = 0.3
     n_plot_points = 10
-    save_results = False
 
     inf_k = None
     maple = False

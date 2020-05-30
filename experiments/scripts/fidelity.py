@@ -142,7 +142,7 @@ def experiment(args, logger, out_dir, seed):
                                        kernel_model_kernel=args.kernel_model_kernel,
                                        random_state=args.rs,
                                        logger=logger,
-                                       use_predicted_labels=not args.true_label,
+                                       true_label=not args.true_label,
                                        X_val=X_val)
         logger.info('C: {}'.format(explainer.C))
         logger.info('time: {:.3f}s'.format(time.time() - start))
@@ -217,7 +217,8 @@ class Args:
     kernel_model = 'lr'
     kernel_model_kernel = 'linear'
 
-    knn = False
+    trex = True
+    teknn = False
 
     rs = 1
     verbose = 0

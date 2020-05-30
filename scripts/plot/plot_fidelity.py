@@ -8,32 +8,36 @@ import numpy as np
 import matplotlib.pyplot as plt
 from scipy.stats import pearsonr, spearmanr
 
-from plot_cleaning import set_size
+from .plot_cleaning import set_size
 
 
 def _sigmoid(x):
     return 1 / (1 + np.exp(-x))
 
 
-def _plot_graph(args, ax, dataset, method_list, labels, colors, markers, corr='pearson'):
+def _plot_graph(args, ax, dataset, method_list, tree_kernel,
+                labels, colors, markers, corr='pearson'):
+
+    in_dir = os.path.join(args.in_dir, dataset, args.tree_type, tree_kernel)
+
+    # tree results
+    tree_path = os.path.join(in_dir, 'tree.npy')
+    if not os.path.exists(tree_path):
+        return
+    tree_res = np.load(tree_path)
 
     for i, method in enumerate(method_list):
-        method_path = os.path.join(args.in_dir, dataset, method, 'ours_test.npy')
-        tree_path = os.path.join(args.in_dir, dataset, method, 'tree_test.npy')
+        method_path = os.path.join(in_dir, '{}.npy'.format(method))
 
         if not os.path.exists(method_path):
             continue
 
         method_res = np.load(method_path)
-        tree_res = np.load(tree_path)
-
         if 'svm' in method:
             method_res = _sigmoid(method_res)
 
-        if args.corr == 'pearson':
-            corr = pearsonr(tree_res, method_res)[0]
-        else:
-            corr = spearmanr(tree_res, method_res)[0]
+        corr_func = pearsonr if args.corr == 'pearson' else spearmanr
+        corr = corr_func(tree_res, method_res)[0]
 
         label = '{}={:.3f}'.format(labels[i], corr)
         ax.scatter(method_res, tree_res, color=colors[i],
@@ -45,15 +49,10 @@ def _plot_graph(args, ax, dataset, method_list, labels, colors, markers, corr='p
 
 def main(args):
 
-    top_method_list = ['lr_linear_leaf_output', 'svm_linear_leaf_output', 'teknn_leaf_output']
-    bot_method_list = ['lr_linear_leaf_path', 'svm_linear_leaf_path', 'teknn_leaf_path']
+    method_list = ['trex_lr', 'trex_svm', 'teknn']
     labels = ['KLR', 'SVM', 'KNN']
     colors = ['cyan', 'blue', 'purple']
     markers = ['1', '2', '*']
-
-    # select a tree-ensemble model
-    top_method_list = ['{}_{}'.format(args.model, method) for method in top_method_list]
-    bot_method_list = ['{}_{}'.format(args.model, method) for method in bot_method_list]
 
     ylabel = 'GBDT probability'
     xlabel = 'Surrogate probability'
@@ -72,19 +71,20 @@ def main(args):
     # inches
     width = 5.5  # Neurips 2020
     width, height = set_size(width=width * 3, fraction=1, subplots=(2, 3))
-    fig, axs = plt.subplots(2, len(args.dataset), figsize=(width, height), sharey='row', sharex='col')
+    fig, axs = plt.subplots(2, max(2, len(args.dataset)), figsize=(width, height),
+                            sharey='row', sharex='col')
 
     # plot top row
     row = 0
     for i, dataset in enumerate(args.dataset):
-        _plot_graph(args, axs[row][i], dataset, top_method_list,
+        _plot_graph(args, axs[row][i], dataset, method_list, 'leaf_output',
                     labels, colors, markers, corr=args.corr)
         axs[row][i].set_title(dataset.capitalize())
 
     # plot bottom row
     row = 1
     for i, dataset in enumerate(args.dataset):
-        _plot_graph(args, axs[row][i], dataset, bot_method_list,
+        _plot_graph(args, axs[row][i], dataset, method_list, 'leaf_path',
                     labels, colors, markers, corr=args.corr)
         axs[row][i].set_xlabel(xlabel)
 
@@ -95,7 +95,7 @@ def main(args):
 
     fig.subplots_adjust(wspace=0.005, hspace=0.005)
     plt.tight_layout()
-    plt.savefig(os.path.join(args.out_dir, 'plot.{}'.format(args.format)))
+    plt.savefig(os.path.join(args.out_dir, 'plot.{}'.format(args.ext)))
 
 
 if __name__ == '__main__':
@@ -106,9 +106,24 @@ if __name__ == '__main__':
     parser.add_argument('--in_dir', type=str, default='output/fidelity/', help='input directory.')
     parser.add_argument('--out_dir', type=str, default='output/plots/fidelity/', help='output directory.')
 
-    parser.add_argument('--model', type=str, default='cb', help='tree ensemble.')
-    parser.add_argument('--corr', type=str, default='pearson', help='statistical correlation.')
+    parser.add_argument('--tree_type', type=str, default='cb', help='tree ensemble.')
+    parser.add_argument('--kernel_model', type=str, default='lr', help='kernel model.')
 
-    parser.add_argument('--format', type=str, default='png', help='output image format.')
+    parser.add_argument('--corr', type=str, default='pearson', help='statistical correlation.')
+    parser.add_argument('--ext', type=str, default='png', help='output image format.')
     args = parser.parse_args()
     main(args)
+
+
+class Args:
+
+    dataset = ['churn', 'amazon', 'adult', 'census']
+    in_dir = 'output/fidelity/'
+    out_dir = 'output/plots/fidelity/'
+
+    tree_type = 'cb'
+    tree_kernel = 'leaf_output'
+    kernel_model = 'lr'
+
+    corr = 'pearson'
+    ext = 'png'

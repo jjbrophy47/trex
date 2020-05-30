@@ -58,7 +58,7 @@ def _measure_performance(sort_indices, percentages, X_test, y_test, X_train, y_t
 
 
 def _trex_method(X_test, tree, args, X_train, y_train,
-                 X_val, seed, logger, model_dir):
+                 X_val, seed, logger):
 
     # train TREX
     explainer = trex.TreeExplainer(tree, X_train, y_train,
@@ -84,10 +84,11 @@ def _trex_method(X_test, tree, args, X_train, y_train,
     return train_order
 
 
-def _maple_method(X_test, args, model, X_train, y_train, logger, model_dir):
+def _maple_method(X_test, args, model, X_train, y_train, logger):
 
     train_label = y_train if args.true_label else model.predict(X_train)
-    explainer = MAPLE(X_train, train_label, X_train, train_label, verbose=args.verbose, dstump=False)
+    explainer = MAPLE(X_train, train_label, X_train, train_label,
+                      verbose=args.verbose, dstump=False)
 
     # order the training instances
     contributions_sum = np.zeros(X_train.shape[0])
@@ -131,7 +132,7 @@ def _influence_method(X_test, args, model, X_train, y_train, y_test, logger):
     return train_order
 
 
-def _knn_method(X_test, args, model, X_train, y_train, y_test, logger):
+def _teknn_method(X_test, args, model, X_train, y_train, y_test, logger):
 
     # transform the data
     extractor = trex.TreeExtractor(model, tree_kernel=args.tree_kernel)
@@ -160,10 +161,6 @@ def experiment(args, logger, out_dir, seed):
     Main method that trains a tree ensemble, flips a percentage of train labels, prioritizes train
     instances using various methods, and computes how effective each method is at cleaning the data.
     """
-
-    # crete a models directory
-    model_dir = os.path.join(out_dir, 'models')
-    os.makedirs(model_dir, exist_ok=True)
 
     # get model and data
     clf = model_util.get_classifier(args.tree_type,
@@ -199,6 +196,7 @@ def experiment(args, logger, out_dir, seed):
     model_util.performance(model, X_train, y_train, X_test=X_test, y_test=y_test, logger=logger)
 
     pcts = list(range(0, 100, 10))
+    np.save(os.path.join(out_dir, 'percentages.npy'), pcts)
 
     # random method
     logger.info('ordering by random...')
@@ -207,22 +205,25 @@ def experiment(args, logger, out_dir, seed):
     train_order = np.random.choice(np.arange(X_train.shape[0]), size=X_train.shape[0], replace=False)
     random_res = _measure_performance(train_order, pcts, X_test, y_test, X_train, y_train, clf)
     logger.info('time: {:3f}s'.format(time.time() - start))
+    np.save(os.path.join(out_dir, 'random.npy'), random_res)
 
     # our method
     if args.trex:
         logger.info('ordering by our method...')
         start = time.time()
-        train_order = _trex_method(X_test, model, args, X_train, y_train, X_val, seed, logger, model_dir)
+        train_order = _trex_method(X_test, model, args, X_train, y_train, X_val, seed, logger)
         trex_res = _measure_performance(train_order, pcts, X_test, y_test, X_train, y_train, clf)
         logger.info('time: {:3f}s'.format(time.time() - start))
+        np.save(os.path.join(out_dir, 'trex_{}.npy'.format(args.kernel_model)), trex_res)
 
     # MAPLE method
     if args.maple:
         logger.info('ordering by MAPLE...')
         start = time.time()
-        train_order = _maple_method(X_test, args, model, X_train, y_train, logger, model_dir)
+        train_order = _maple_method(X_test, args, model, X_train, y_train, logger)
         maple_res = _measure_performance(train_order, pcts, X_test, y_test, X_train, y_train, clf)
         logger.info('time: {:3f}s'.format(time.time() - start))
+        np.save(os.path.join(out_dir, 'maple.npy'), maple_res)
 
     # influence method
     if args.tree_type == 'cb' and args.inf_k is not None:
@@ -231,36 +232,16 @@ def experiment(args, logger, out_dir, seed):
         train_order = _influence_method(X_test, args, model, X_train, y_train, y_test, logger)
         leafinfluence_res = _measure_performance(train_order, pcts, X_test, y_test, X_train, y_train, clf)
         logger.info('time: {:3f}s'.format(time.time() - start))
+        np.save(os.path.join(out_dir, 'leafinfluence.npy'), leafinfluence_res)
 
-    # KNN method
+    # TE-KNN method
     if args.teknn:
-        logger.info('ordering by knn...')
+        logger.info('ordering by teknn...')
         start = time.time()
-        train_order = _knn_method(X_test, args, model, X_train, y_train, y_test, logger)
+        train_order = _teknn_method(X_test, args, model, X_train, y_train, y_test, logger)
         knn_res = _measure_performance(train_order, pcts, X_test, y_test, X_train, y_train, clf)
         logger.info('time: {:3f}s'.format(time.time() - start))
-
-    # save percentages
-    np.save(os.path.join(out_dir, 'percentages.npy'), pcts)
-
-    # random
-    np.save(os.path.join(out_dir, 'random.npy'), random_res)
-
-    # trex
-    if args.trex:
-        np.save(os.path.join(out_dir, 'trex_{}.npy'.format(args.kernel_model)), trex_res)
-
-    # MAPLE
-    if args.maple:
-        np.save(os.path.join(out_dir, 'maple.npy'), maple_res)
-
-    # TEKNN
-    if args.teknn:
         np.save(os.path.join(out_dir, 'teknn.npy'), knn_res)
-
-    # LeafInfluence
-    if args.tree_type == 'cb' and args.inf_k is not None:
-        np.save(os.path.join(out_dir, 'leafinfluence.npy'), leafinfluence_res)
 
 
 def main(args):
@@ -270,7 +251,7 @@ def main(args):
 
     out_dir = os.path.join(args.out_dir, dataset, args.tree_type, args.tree_kernel)
     os.makedirs(out_dir, exist_ok=True)
-    logger = print_util.get_logger(os.path.join(out_dir, '{}.txt'.format(args.dataset)))
+    logger = print_util.get_logger(os.path.join(out_dir, 'log.txt'))
     logger.info(args)
 
     experiment(args, logger, out_dir, seed=args.rs)
@@ -333,7 +314,7 @@ class Args:
 
     misclassified = False
 
-    knn = False
+    teknn = False
     inf_k = None
     maple = False
     maple_load = False

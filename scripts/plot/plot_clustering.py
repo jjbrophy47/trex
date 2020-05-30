@@ -2,67 +2,130 @@
 This script plots the data before and after feature transformations.
 """
 import os
+import argparse
+
 import numpy as np
 import matplotlib.pyplot as plt
-import matplotlib.gridspec as gridspec
+
+from .plot_cleaning import set_size
 
 
-def _get_results(dataset):
+def _get_results(args, dataset, tree_kernel='None'):
+    """
+    Return results.
+    """
+
+    res_dir = os.path.join(args.in_dir, dataset, args.tree_type, tree_kernel)
+    if not os.path.exists(res_dir):
+        return None
 
     res = {}
-    res['train_pos'] = np.load(os.path.join(dataset, 'train_positive.npy'))
-    res['train_neg'] = np.load(os.path.join(dataset, 'train_negative.npy'))
-    res['test_pos'] = np.load(os.path.join(dataset, 'test_positive.npy'))
-    res['test_neg'] = np.load(os.path.join(dataset, 'test_negative.npy'))
+    res['train_pos'] = np.load(os.path.join(res_dir, 'train_positive.npy'))
+    res['train_neg'] = np.load(os.path.join(res_dir, 'train_negative.npy'))
+    res['test_pos'] = np.load(os.path.join(res_dir, 'test_positive.npy'))
+    res['test_neg'] = np.load(os.path.join(res_dir, 'test_negative.npy'))
     return res
 
 
-def _plot_graph(ax, res, xlabel=None, ylabel=None, alpha=0.5, s=100, title=''):
+def _plot_graph(ax, res, xlabel=None, ylabel=None,
+                alpha=0.5, s=100, title=''):
 
-    ax.scatter(res['train_neg'][:, 0], res['train_neg'][:, 1], color='blue', alpha=alpha, label='train (y=0)',
+    # plot train
+    ax.scatter(res['train_neg'][:, 0], res['train_neg'][:, 1],
+               color='blue', alpha=alpha, label='train (y=0)',
                marker='+', s=s, rasterized=True)
-    ax.scatter(res['train_pos'][:, 0], res['train_pos'][:, 1], color='red', alpha=alpha, label='train (y=1)',
+
+    ax.scatter(res['train_pos'][:, 0], res['train_pos'][:, 1],
+               color='red', alpha=alpha, label='train (y=1)',
                marker='1', s=s, rasterized=True)
-    ax.scatter(res['test_neg'][:, 0], res['test_neg'][:, 1], color='cyan', alpha=alpha, label='test (y=0)',
+
+    # plot test
+    ax.scatter(res['test_neg'][:, 0], res['test_neg'][:, 1],
+               color='cyan', alpha=alpha, label='test (y=0)',
                marker='x', s=s, rasterized=True)
-    ax.scatter(res['test_pos'][:, 0], res['test_pos'][:, 1], color='orange', alpha=alpha, label='test (y=1)',
+
+    ax.scatter(res['test_pos'][:, 0], res['test_pos'][:, 1],
+               color='orange', alpha=alpha, label='test (y=1)',
                marker='2', s=s, rasterized=True)
 
     if xlabel is not None:
-        ax.set_xlabel(xlabel, fontsize=22)
+        ax.set_xlabel(xlabel)
 
     if ylabel is not None:
-        ax.set_ylabel(ylabel, fontsize=22)
+        ax.set_ylabel(ylabel)
 
-    ax.tick_params(axis='both', which='major', labelsize=24)
-    ax.set_title(title, fontsize=24)
+    ax.tick_params(axis='both', which='major')
+    ax.set_title(title)
 
 
-def main():
+def main(args):
 
-    # read in results
-    res_nc17none = _get_results('NC17_EvalPart1_none')
-    res_nc17leafoutput = _get_results('NC17_EvalPart1_leaf_output')
-    res_nc17mfc18leafoutput = _get_results('nc17_mfc18_leaf_output')
+    # matplotlib settings
+    plt.rc('font', family='serif')
+    plt.rc('xtick', labelsize=17)
+    plt.rc('ytick', labelsize=17)
+    plt.rc('axes', labelsize=22)
+    plt.rc('axes', titlesize=22)
+    plt.rc('legend', fontsize=20)
+    plt.rc('legend', title_fontsize=11)
+    plt.rc('lines', linewidth=1)
+    plt.rc('lines', markersize=6)
 
-    # plot results
-    gs = gridspec.GridSpec(2, 2)
-    fig = plt.figure(figsize=(12, 9))
+    # inches
+    width = 5.5  # Neurips 2020
+    width, height = set_size(width=width * 3, fraction=1, subplots=(1, 3))
+    fig, axs = plt.subplots(1, 3, figsize=(width, height))
+    axs = axs.flatten()
 
-    ax0 = fig.add_subplot(gs[0, 0])
-    ax1 = fig.add_subplot(gs[0, 1])
-    ax2 = fig.add_subplot(gs[1, :])  # second row, using all columns
+    d1 = args.dataset[0]
+    d1_res_none = _get_results(args, d1)
 
-    _plot_graph(ax0, res_nc17none, xlabel='tsne 0', ylabel='tsne 1', title='(a)')
-    _plot_graph(ax1, res_nc17leafoutput, xlabel='tsne 0', ylabel=None, title='(b)')
-    _plot_graph(ax2, res_nc17mfc18leafoutput, xlabel='tsne 0', ylabel='tsne 1', title='(c)')
+    if d1_res_none:
+        _plot_graph(axs[0], d1_res_none, xlabel='tsne 0',
+                    ylabel='tsne 1', title='Original')
 
-    ax2.legend(loc='right', bbox_to_anchor=(0.765, -0.5), ncol=2, fontsize=22)
-    fig.subplots_adjust(bottom=0.85)
+    if args.tree_kernel != 'None':
+        d1_res_tree = _get_results(args, d1, tree_kernel=args.tree_kernel)
+
+        if d1_res_tree:
+            _plot_graph(axs[1], d1_res_tree, xlabel='tsne 0',
+                        ylabel=None, title='Tree kernel')
+
+    if len(args.dataset) > 1:
+        d2 = args.dataset[1]
+        d2_res_tree = _get_results(args, d2, tree_kernel=args.tree_kernel)
+
+        if d2_res_tree:
+            _plot_graph(axs[2], d2_res_tree, xlabel='tsne 0',
+                        ylabel='tsne 1', title='Different train/test')
 
     plt.tight_layout()
-    plt.savefig('clustering.pdf', format='pdf', bbox_inches='tight', rasterized=True)
+    plt.savefig(args.out_dir, 'plot.{}'.format(args.ext), rasterized=True)
 
 
 if __name__ == '__main__':
-    main()
+    parser = argparse.ArgumentParser(description='Feature representation extractions for tree ensembles',
+                                     formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    parser.add_argument('--dataset', type=str, nargs='+', default=['NC17_EvalPart1', 'nc17_mfc18'],
+                        help='dataset to explain.')
+    parser.add_argument('--in_dir', type=str, default='output/clustering/', help='input directory.')
+    parser.add_argument('--out_dir', type=str, default='output/plots/clustering/', help='output directory.')
+
+    parser.add_argument('--tree_type', type=str, default='lgb', help='tree ensemble.')
+    parser.add_argument('--tree_kernel', type=str, default='leaf_output', help='tree kernel.')
+
+    parser.add_argument('--ext', type=str, default='png', help='output image format.')
+    args = parser.parse_args()
+    main(args)
+
+
+class Args:
+
+    dataset = ['NC17_EvalPart1', 'nc17_mfc18']
+    in_dir = 'output/clustering/'
+    out_dir = 'output/plots/clustering/'
+
+    tree_type = 'lgb'
+    tree_kernel = 'leaf_output'
+
+    ext = 'png'

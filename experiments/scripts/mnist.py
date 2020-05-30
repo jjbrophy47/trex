@@ -1,6 +1,5 @@
 """
-Exploration: Examine the raw image data from the most impactful train instances for a given test instance.
-    Overlay the binary or manipulation mask over the original probe image.
+Identify noisy training instances in MNIST.
 """
 import os
 import sys
@@ -37,7 +36,7 @@ def _sort_impact(sv_ndx, impact):
     return sv_ndx, impact
 
 
-def _display_image(x, identifier, predicted, actual, ax=None,
+def _display_image(args, x, identifier, predicted, actual, ax=None,
                    impact=None, weight=None, similarity=None, linewidth=3):
 
     if ax is None:
@@ -45,8 +44,13 @@ def _display_image(x, identifier, predicted, actual, ax=None,
 
     ax.imshow(x.reshape(28, 28), cmap='gray')
 
-    s = identifier
-    s += '\n{} predicted as {}'.format(actual, predicted)
+    s = ''
+
+    if args.show_id:
+        s = identifier
+        s += '\n'
+
+    s += '{} predicted as {}'.format(actual, predicted)
 
     if impact is not None:
         s += '\nimpact: {:.3f}'.format(impact)
@@ -71,27 +75,27 @@ def experiment(args, logger, out_dir, seed):
     clf = model_util.get_classifier(args.tree_type,
                                     n_estimators=args.n_estimators,
                                     max_depth=args.max_depth,
-                                    random_state=args.rs)
+                                    random_state=seed)
+
     data = data_util.get_data(args.dataset,
-                              random_state=args.rs,
+                              random_state=seed,
                               data_dir=args.data_dir,
                               return_image_id=True,
                               test_size=args.test_size)
     X_train, X_test, y_train, y_test, label = data
 
-    print('train instances: {}'.format(len(X_train)))
-    print('test instances: {}'.format(len(X_test)))
-    print('labels: {}'.format(label))
+    logger.info('train instances: {}'.format(len(X_train)))
+    logger.info('test instances: {}'.format(len(X_test)))
+    logger.info('labels: {}'.format(label))
 
     if args.pca_components is not None:
-        print('reducing features from {} to {} using PCA...'.format(X_train.shape[1],
-                                                                    args.pca_components))
+        logger.info('{} to {} using PCA...'.format(X_train.shape[1], args.pca_components))
         pca = PCA(args.pca_components, random_state=args.rs).fit(X_train)
         X_train_pca = pca.transform(X_train)
         X_test_pca = pca.transform(X_test)
 
     # fit a tree ensemble and an explainer for that tree ensemble
-    print('fitting {} model...'.format(args.tree_type))
+    logger.info('fitting {}...'.format(args.tree_type))
     tree = clone(clf).fit(X_train_pca, y_train)
 
     # use part of the test data as validation data
@@ -99,14 +103,13 @@ def experiment(args, logger, out_dir, seed):
     if args.val_frac < 1.0 and args.val_frac > 0.0:
         X_val_pca = X_val_pca[int(X_val_pca.shape[0] * args.val_frac):]
 
-    print('fitting tree explainer...')
+    logger.info('fitting TREX...')
     explainer = trex.TreeExplainer(tree, X_train_pca, y_train,
                                    tree_kernel=args.tree_kernel,
                                    random_state=seed,
-                                   use_predicted_labels=not args.true_label,
+                                   true_label=args.true_label,
                                    kernel_model=args.kernel_model,
                                    kernel_model_kernel=args.kernel_model_kernel,
-                                   C=args.C,
                                    X_val=X_val_pca,
                                    verbose=args.verbose,
                                    logger=logger)
@@ -142,7 +145,8 @@ def experiment(args, logger, out_dir, seed):
     fig, axs = plt.subplots(1, 1 + args.topk_train * 2, figsize=(16, 3))
     axs = axs.flatten()
     identifier = 'test_id{}'.format(test_ndx)
-    _display_image(X_test[test_ndx], identifier=identifier, predicted=test_pred, actual=test_actual, ax=axs[0])
+    _display_image(args, X_test[test_ndx], identifier=identifier,
+                   predicted=test_pred, actual=test_actual, ax=axs[0])
     plt.setp(axs[0].spines.values(), color='blue')
 
     topk_train = args.topk_train if args.show_negatives else args.topk_train * 2
@@ -154,9 +158,10 @@ def experiment(args, logger, out_dir, seed):
         train_pred = tree.predict(X_train_pca[train_ndx].reshape(1, -1))[0]
         similarity = sim[train_ndx] if args.show_similarity else None
         weight = alpha[train_ndx] if args.show_weight else None
-        plt.setp(axs[i].spines.values(), color='green')
-        _display_image(X_train[train_ndx], ax=axs[i], identifier=identifier, predicted=train_pred,
-                       actual=y_train[train_ndx], similarity=similarity, weight=weight)
+        plt.setp(axs[i].spines.values(), color='red')
+        _display_image(args, X_train[train_ndx], ax=axs[i], identifier=identifier,
+                       predicted=train_pred, actual=y_train[train_ndx],
+                       similarity=similarity, weight=weight)
 
     # show negative train images
     if args.show_negatives:
@@ -166,9 +171,10 @@ def experiment(args, logger, out_dir, seed):
             train_pred = tree.predict(X_train_pca[train_ndx].reshape(1, -1))[0]
             similarity = sim[train_ndx] if args.show_similarity else None
             weight = alpha[train_ndx] if args.show_weight else None
-            plt.setp(axs[i].spines.values(), color='red')
-            _display_image(X_train[train_ndx], ax=axs[i], identifier=identifier, predicted=train_pred,
-                           actual=y_train[train_ndx], similarity=similarity, weight=weight)
+            plt.setp(axs[i].spines.values(), color='green')
+            _display_image(args, X_train[train_ndx], ax=axs[i], identifier=identifier,
+                           predicted=train_pred, actual=y_train[train_ndx],
+                           similarity=similarity, weight=weight)
 
     os.makedirs(args.out_dir, exist_ok=True)
     plt.savefig(os.path.join(args.out_dir, 'mnist.pdf'), format='pdf', bbox_inches='tight')
@@ -180,10 +186,11 @@ def main(args):
     # make logger
     dataset = args.dataset
 
-    out_dir = os.path.join(args.out_dir, dataset, 'rs{}'.format(args.rs))
+    out_dir = os.path.join(args.out_dir, dataset, args.tree_type,
+                           args.tree_kernel, 'rs{}'.format(args.rs))
     os.makedirs(out_dir, exist_ok=True)
 
-    logger = print_util.get_logger(os.path.join(out_dir, '{}.txt'.format(args.dataset)))
+    logger = print_util.get_logger(os.path.join(out_dir, 'log.txt'))
     logger.info(args)
 
     experiment(args, logger, out_dir, seed=args.rs)
@@ -198,17 +205,16 @@ if __name__ == '__main__':
     parser.add_argument('--out_dir', type=str, default='output/mnist/', help='dataset to explain.')
 
     parser.add_argument('--val_frac', type=float, default=0.1, help='validation dataset.')
-    parser.add_argument('--random_test', action='store_true', default=False, help='choose random test instance.')
 
     parser.add_argument('--tree_type', type=str, default='lgb', help='model to use.')
     parser.add_argument('--n_estimators', type=int, default=100, help='number of trees.')
     parser.add_argument('--max_depth', type=float, default=None, help='maximum tree depth.')
-    parser.add_argument('--C', type=float, default=0.1, help='penalty parameter.')
 
     parser.add_argument('--tree_kernel', type=str, default='leaf_output', help='type of encoding.')
     parser.add_argument('--kernel_model', type=str, default='lr', help='linear model to use.')
     parser.add_argument('--kernel_model_kernel', type=str, default='linear', help='similarity kernel.')
 
+    parser.add_argument('--random_test', action='store_true', default=False, help='choose random test instance.')
     parser.add_argument('--test_size', type=float, default=0.2, help='fraction to use for testing.')
     parser.add_argument('--pca_components', type=int, default=50, help='number of pca components.')
 
@@ -217,7 +223,8 @@ if __name__ == '__main__':
 
     parser.add_argument('--show_negatives', action='store_true', default=False, help='show negative samples.')
     parser.add_argument('--show_similarity', action='store_true', default=False, help='show similarity.')
-    parser.add_argument('--show_weight', action='store_true', help='show weight.')
+    parser.add_argument('--show_weight', action='store_true', default=False, help='show weight.')
+    parser.add_argument('--show_id', action='store_true', default=False, help='show sample ID.')
 
     parser.add_argument('--rs', type=int, default=1, help='random state.')
     parser.add_argument('--verbose', type=int, default=0, help='Verbosity level.')
@@ -237,7 +244,6 @@ class Args:
     tree_type = 'lgb'
     n_estimators = 100
     max_depth = None
-    C = 0.1
 
     tree_kernel = 'leaf_output'
     kernel_model = 'lr'
@@ -252,6 +258,7 @@ class Args:
     show_negatives = False
     show_similarity = False
     show_weight = False
+    show_id = False
 
     rs = 1
     verbose = 0

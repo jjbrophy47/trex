@@ -28,7 +28,7 @@ class TreeExplainer:
                  coef0=0.0,
                  degree=3,
                  dense_output=True,
-                 use_predicted_labels=True,
+                 true_label=False,
                  random_state=None,
                  X_val=None,
                  verbose=0,
@@ -71,8 +71,8 @@ class TreeExplainer:
             If True, returns impact of all training instances; otherwise, returns
             only support vector impacts and their corresponding training indices.
             Only applies if kernel_model='svm'.
-        use_predicted_labels : bool (default=True)
-            If True, predicted labels from the tree ensemble are used to train the kernel model.
+        true_label : bool (default=False)
+            If False, predicted labels from the tree ensemble are used to train the kernel model.
         random_state : int (default=None)
             Random state to promote reproducibility.
         X_val : 2d array-like
@@ -92,7 +92,7 @@ class TreeExplainer:
         self.coef0 = coef0
         self.degree = degree
         self.dense_output = dense_output
-        self.use_predicted_labels = use_predicted_labels
+        self.true_label = true_label
         self.random_state = random_state
         self.verbose = verbose
         self.logger = logger
@@ -104,7 +104,7 @@ class TreeExplainer:
         self.train_feature_ = self.extractor_.fit_transform(self.X_train)
 
         # choose ground truth or predicted labels to train the kernel model
-        if use_predicted_labels:
+        if not true_label:
             train_label = self.tree.predict(X_train).flatten()
         else:
             train_label = self.y_train
@@ -320,7 +320,7 @@ class TreeExplainer:
         d['coef0'] = self.coef0
         d['degree'] = self.degree
         d['dense_output'] = self.dense_output
-        d['use_predicted_labels'] = self.use_predicted_labels
+        d['true_label'] = self.true_label
         d['random_state'] = self.random_state
         d['train_shape'] = self.X_train.shape
         return d

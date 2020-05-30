@@ -3,6 +3,8 @@ This script plots the cleaning experiment results.
 """
 import os
 import argparse
+import warnings
+warnings.simplefilter(action='ignore', category=RuntimeWarning)  # true divide
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -23,7 +25,8 @@ def get_results(dataset, method, args):
     # get results from each run
     res_list = []
     for i in args.rs:
-        res_path = os.path.join(args.in_dir, dataset, 'rs{}'.format(i),
+        res_path = os.path.join(args.in_dir, dataset, args.tree_type,
+                                args.tree_kernel, 'rs{}'.format(i),
                                 '{}.npy'.format(method))
 
         if not os.path.exists(res_path):
@@ -46,15 +49,14 @@ def get_results(dataset, method, args):
 def main(args):
 
     # settings
-    method_list = ['our_lr_leaf_output', 'our_svm_leaf_output', 'random',
-                   'tree_loss', 'lr_leaf_output_loss', 'svm_leaf_output_loss',
-                   'maple', 'leafinfluence', 'knn_leaf_output',
-                   'knn_leaf_output_loss']
+    method_list = ['trex_lr', 'trex_svm', 'random',
+                   'tree_loss', 'trex_lr_loss', 'trex_svm_loss',
+                   'maple', 'leafinfluence', 'teknn',
+                   'teknn_loss']
     labels = ['TREX-KLR', 'TREX-SVM', 'Random',
               'Tree Loss', 'KLR Loss', 'SVM Loss',
               'MAPLE', 'LeafInfluence', 'TE-KNN',
-              'KNN Loss']
-    titles = ['Churn', 'Amazon', 'Adult', 'Census (10%)', 'Census (100%)']
+              'TE-KNN Loss']
     colors = ['cyan', 'blue', 'red', 'green', 'purple', 'magenta', 'orange',
               'black', 'yellow', '#EEC64F', 'g', 'r']
     markers = ['1', '2', 'o', 'v', '^', '<', '>', '.', '*', 'h', '3', '4']
@@ -74,15 +76,17 @@ def main(args):
     width = 5.5  # Neurips 2020
     width, height = set_size(width=width * 3, fraction=1, subplots=(1, 3))
 
-    fig, axs = plt.subplots(1, len(args.dataset), figsize=(width, height))
+    fig, axs = plt.subplots(1, max(2, len(args.dataset)), figsize=(width, height))
     axs = axs.flatten()
 
     lines = []
+    new_labels = []
+
     for i, dataset in enumerate(args.dataset):
         ax = axs[i]
 
-        rs_dir = os.path.join(args.in_dir, dataset, 'rs1')
-        print(rs_dir)
+        rs_dir = os.path.join(args.in_dir, dataset, args.tree_type,
+                              args.tree_kernel, 'rs1')
         assert os.path.exists(rs_dir)
         check_pct = np.load(os.path.join(rs_dir, 'check_pct.npy'))
         test_clean = np.load(os.path.join(rs_dir, 'test_clean.npy'))
@@ -95,26 +99,29 @@ def main(args):
             if res is not None:
                 res_mean, res_std = res
                 line = ax.errorbar(check_pct, res_mean, yerr=res_std,
-                                   marker=markers[j], color=colors[j],
-                                   label=labels[j])
+                                   marker=markers[j], color=colors[j])
 
                 if i == 0:
                     lines.append(line[0])
+                    new_labels.append(labels[j])
 
         if i == 0:
             ax.set_ylabel('Test accuracy')
+
+        title = 'Census (10%)' if dataset == 'census_0p1' else dataset.capitalize()
+
         ax.set_xlabel('% train data checked')
-        ax.set_title(titles[i])
+        ax.set_title(title)
         ax.tick_params(axis='both', which='major')
         ax.axhline(test_clean, color='k', linestyle='--')
 
     os.makedirs(args.out_dir, exist_ok=True)
-
-    fig.legend(tuple(lines), tuple(labels), loc='center', ncol=int(len(lines) / 2),
+    n_legend_cols = int(len(lines) / 2) if len(lines) > 3 else len(lines)
+    fig.legend(tuple(lines), tuple(new_labels), loc='center', ncol=n_legend_cols,
                bbox_to_anchor=(0.525, 0.115))
     plt.tight_layout()
     fig.subplots_adjust(bottom=0.445, wspace=0.275)
-    plt.savefig(os.path.join(args.out_dir, 'plot.{}'.format(args.format)))
+    plt.savefig(os.path.join(args.out_dir, 'plot.{}'.format(args.ext)))
 
 
 if __name__ == '__main__':
@@ -122,9 +129,28 @@ if __name__ == '__main__':
                                      formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument('--dataset', type=str, nargs='+', default=['churn', 'amazon', 'adult',
                         'census_0p1', 'census'], help='dataset to explain.')
-    parser.add_argument('--rs', type=int, nargs='+', default=[1, 2, 3, 4, 5], help='random state.')
     parser.add_argument('--in_dir', type=str, default='output/cleaning/', help='input directory.')
     parser.add_argument('--out_dir', type=str, default='output/plots/cleaning/', help='output directory.')
-    parser.add_argument('--format', type=str, default='png', help='output image format.')
+
+    parser.add_argument('--tree_type', type=str, default='cb', help='tree type.')
+    parser.add_argument('--tree_kernel', type=str, default='leaf_output', help='tree kernel.')
+    parser.add_argument('--kernel_model', type=str, default='lr', help='kernel model.')
+
+    parser.add_argument('--rs', type=int, nargs='+', default=[1, 2, 3, 4, 5], help='random state.')
+    parser.add_argument('--ext', type=str, default='png', help='output image format.')
     args = parser.parse_args()
     main(args)
+
+
+class Args:
+
+    dataset = ['churn', 'amazon', 'adult', 'census']
+    in_dir = 'output/cleaning/'
+    out_dir = 'output/plots/cleaning/'
+
+    tree_type = 'cb'
+    tree_kernel = 'leaf_output'
+    kernel_model = 'lr'
+
+    rs = [1]
+    ext = 'png'
