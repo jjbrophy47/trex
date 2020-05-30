@@ -274,7 +274,7 @@ if __name__ == '__main__':
     parser.add_argument('--rs', type=int, default=1, help='Random state.')
 
     args = parser.parse_args()
-    experiment(args)
+    main(args)
 
 
 class Args:
