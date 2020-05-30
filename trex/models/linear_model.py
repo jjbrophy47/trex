@@ -248,7 +248,7 @@ class KernelLogisticRegression(BaseEstimator, ClassifierMixin):
     If multiclass, uses a one-vs-rest strategy and fits a BinaryKernelLogisticRegression classifier for each class.
     """
 
-    def __init__(self, C=1.0, pred_size=1000):
+    def __init__(self, C=1.0, pred_size=1000, temp_dir='.temp_klr'):
         """
         Parameters
         ----------
@@ -257,6 +257,8 @@ class KernelLogisticRegression(BaseEstimator, ClassifierMixin):
         pred_size: int (default=1000)
             Max number of instancs to predict at one time. A higher number can
             be faster, but requires more memory to create the similarity matrix.
+        temp_dir: str (default='.temp_klr')
+            Temporary directory.
         """
         self.C = C
         self.pred_size = pred_size
@@ -332,7 +334,7 @@ class BinaryKernelLogisticRegression(BaseEstimator, ClassifierMixin):
         """
         self.C = C
         self.pred_size = pred_size
-        self.temp_dir = os.path.join(temp_dir, str(uuid.uuid4()))
+        self.temp_dir = temp_dir
 
     def fit(self, X, y, n_check=10, atol=1e-4):
 

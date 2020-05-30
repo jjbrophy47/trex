@@ -14,7 +14,7 @@ dataset='census'
 n_estimators=250
 max_depth=5
 
-tree_kernels=('leaf_output', 'leaf_path')
+tree_kernels=('leaf_output' 'leaf_path')
 
 
 for tree_kernel in ${tree_kernels[@]}; do

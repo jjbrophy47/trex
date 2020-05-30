@@ -5,6 +5,7 @@ Currently supports: sklearn's RandomForestClassifier and GBMClassifier, lightgbm
 """
 import os
 import time
+import uuid
 
 import pickle
 import numpy as np
@@ -32,7 +33,8 @@ class TreeExplainer:
                  X_val=None,
                  verbose=0,
                  C_grid=[1e-2, 1e-1, 1e0, 1e1, 1e2],
-                 logger=None):
+                 logger=None,
+                 temp_dir='.trex'):
         """
         Trains an svm on feature representations from a learned tree ensemble.
 
@@ -75,6 +77,7 @@ class TreeExplainer:
             Random state to promote reproducibility.
         X_val : 2d array-like
             Used to tune the hyperparameters of KLR or SVM.
+        temp_dir : str (default='.trex')
         """
 
         # error checking
@@ -93,6 +96,7 @@ class TreeExplainer:
         self.random_state = random_state
         self.verbose = verbose
         self.logger = logger
+        self.temp_dir = os.path.join(temp_dir, uuid.uuid4())
         self._validate()
 
         # extract feature representations from the tree ensemble
@@ -341,7 +345,7 @@ class TreeExplainer:
                                degree=self.degree,
                                random_state=self.random_state)
         else:
-            kernel_model = KernelLogisticRegression(C=C)
+            kernel_model = KernelLogisticRegression(C=C, temp_dir=self.temp_dir)
 
         return kernel_model
 

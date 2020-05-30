@@ -60,23 +60,12 @@ def _measure_performance(sort_indices, percentages, X_test, y_test, X_train, y_t
 def _trex_method(X_test, tree, args, X_train, y_train,
                  X_val, seed, logger, model_dir):
 
-    # load previously saved model
-    model_path = os.path.join(model_dir, 'trex_{}_{}.pkl'.format(
-                              args.kernel_model, args.tree_kernel))
-
-    if args.trex_load and os.path.exists(model_path):
-        logger.info('loading model from: {}'.format(model_path))
-        explainer = trex.TreeExplainer.load(model_path)
-
     # train TREX
-    else:
-        explainer = trex.TreeExplainer(tree, X_train, y_train,
-                                       tree_kernel=args.tree_kernel,
-                                       random_state=seed,
-                                       kernel_model=args.kernel_model,
-                                       kernel_model_kernel=args.kernel_model_kernel)
-        logger.info('saving model to: {}'.format(model_path))
-        explainer.save(model_path)
+    explainer = trex.TreeExplainer(tree, X_train, y_train,
+                                   tree_kernel=args.tree_kernel,
+                                   random_state=seed,
+                                   kernel_model=args.kernel_model,
+                                   kernel_model_kernel=args.kernel_model_kernel)
 
     # sort instances with highest positive influence first
     contributions_sum = np.zeros(X_train.shape[0])
@@ -97,18 +86,8 @@ def _trex_method(X_test, tree, args, X_train, y_train,
 
 def _maple_method(X_test, args, model, X_train, y_train, logger, model_dir):
 
-    # load previously saved model
-    model_path = os.path.join(model_dir, 'maple.pkl')
-
-    if args.maple_load and os.path.exists(model_path):
-        logger.info('loading model from: {}'.format(model_path))
-        explainer = MAPLE.load(model_path)
-
-    else:
-        train_label = y_train if args.true_label else model.predict(X_train)
-        explainer = MAPLE(X_train, train_label, X_train, train_label, verbose=args.verbose, dstump=False)
-        logger.info('saving model to: {}'.format(model_path))
-        explainer.save(model_path)
+    train_label = y_train if args.true_label else model.predict(X_train)
+    explainer = MAPLE(X_train, train_label, X_train, train_label, verbose=args.verbose, dstump=False)
 
     # order the training instances
     contributions_sum = np.zeros(X_train.shape[0])
@@ -314,7 +293,6 @@ if __name__ == '__main__':
     parser.add_argument('--max_depth', type=int, default=None, help='maximum depth in tree ensemble.')
 
     parser.add_argument('--trex', action='store_true', default=False, help='Use TREX.')
-    parser.add_argument('--trex_load', action='store_true', default=False, help='Load saved model.')
     parser.add_argument('--tree_kernel', type=str, default='leaf_output', help='type of encoding.')
     parser.add_argument('--kernel_model', type=str, default='lr', help='kernel model to use.')
     parser.add_argument('--kernel_model_kernel', type=str, default='linear', help='similarity kernel')
@@ -325,7 +303,6 @@ if __name__ == '__main__':
     parser.add_argument('--teknn', action='store_true', default=False, help='Use KNN on top of TREX features.')
     parser.add_argument('--inf_k', type=int, default=None, help='Number of leaves to use for leafinfluence.')
     parser.add_argument('--maple', action='store_true', default=False, help='Whether to use MAPLE as a baseline.')
-    parser.add_argument('--maple_load', action='store_true', default=False, help='Load saved model.')
 
     parser.add_argument('--rs', type=int, default=1, help='Random State.')
     parser.add_argument('--verbose', type=int, default=0, help='Verbosity level.')

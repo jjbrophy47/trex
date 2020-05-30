@@ -14,7 +14,7 @@ dataset='churn'
 n_estimators=100
 max_depth=3
 
-tree_kernels=('leaf_output', 'leaf_path')
+tree_kernels=('leaf_output' 'leaf_path')
 
 for tree_kernel in ${tree_kernels[@]}; do
     python3 experiments/scripts/fidelity.py \
