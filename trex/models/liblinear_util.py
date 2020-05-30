@@ -62,7 +62,7 @@ def parse_model_file(model_file):
         elif line.startswith('nr_feature'):
             nr_feature = int(line.split(' ')[1])
         elif line.startswith('bias'):
-            bias = float(line.split(' ')[1])
+            continue
         elif line.startswith('w'):
             w = lines[i + 1: i + nr_feature]
             w = [float(x.strip()) for x in w]

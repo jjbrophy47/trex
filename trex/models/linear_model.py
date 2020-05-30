@@ -2,7 +2,6 @@
 SVM and kernel kernel logistic regression models.
 """
 import os
-import uuid
 import shutil
 
 import numpy as np
@@ -267,7 +266,8 @@ class KernelLogisticRegression(BaseEstimator, ClassifierMixin):
         self.X_train_ = X
         self.n_features_ = X.shape[1]
         self.n_classes_ = len(np.unique(y))
-        estimator = BinaryKernelLogisticRegression(C=self.C, pred_size=self.pred_size)
+        estimator = BinaryKernelLogisticRegression(C=self.C, pred_size=self.pred_size,
+                                                   temp_dir=self.temp_dir)
         self.ovr_ = OneVsRestClassifier(estimator).fit(X, y)
         self.coef_ = np.vstack([estimator.coef_ for estimator in self.ovr_.estimators_])
         return self
@@ -344,9 +344,7 @@ class BinaryKernelLogisticRegression(BaseEstimator, ClassifierMixin):
         assert len(self.classes_) == 2
 
         # remove any previously stored models
-        if os.path.exists(self.temp_dir):
-            shutil.rmtree(self.temp_dir)
-        os.makedirs(self.temp_dir)
+        os.makedirs(self.temp_dir, exist_ok=True)
 
         # setup path names
         train_data_path = os.path.join(self.temp_dir, 'train_data')

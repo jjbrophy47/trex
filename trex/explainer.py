@@ -110,7 +110,7 @@ class TreeExplainer:
             train_label = self.y_train
 
         # create a kernel model to approximate the tree ensemble
-        clf = self._get_kernel_model(model_type=self.kernel_model, C=self.C)
+        clf = self._get_kernel_model(C=self.C)
 
         # encode class labels into numbers between 0 and n_classes - 1
         self.le_ = LabelEncoder().fit(train_label)
@@ -132,7 +132,7 @@ class TreeExplainer:
                 start = time.time()
 
                 # fit a surrogate model
-                clf = self._get_kernel_model(model_type=self.kernel_model, C=C)
+                clf = self._get_kernel_model(C=C)
                 clf.fit(self.train_feature_, train_label)
 
                 # get surrogate model predictions on validation data
@@ -151,7 +151,7 @@ class TreeExplainer:
                     self.logger.info('C={}: {:.3f}s; corr={:.3f}'.format(C, time.time() - start, pearson_corr))
 
             self.C = best_C
-            clf = self._get_kernel_model(model_type=self.kernel_model, C=best_C)
+            clf = self._get_kernel_model(C=best_C)
             self.kernel_model_ = clf.fit(self.train_feature_, train_label)
         else:
             self.kernel_model_ = clf.fit(self.train_feature_, train_label)
@@ -333,11 +333,11 @@ class TreeExplainer:
             setattr(self, key, value)
         return self
 
-    def _get_kernel_model(self, model_type='svm', C=0.1):
+    def _get_kernel_model(self, C=0.1):
         """
         Return C implementation of the kernel model.
         """
-        if model_type == 'svm':
+        if self.kernel_model == 'svm':
             kernel_model = SVM(kernel=self.kernel_model_kernel,
                                C=C,
                                gamma=self.gamma,
