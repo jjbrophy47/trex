@@ -2,6 +2,7 @@
 SVM and kernel kernel logistic regression models.
 """
 import os
+import uuid
 import shutil
 
 import numpy as np
@@ -331,7 +332,7 @@ class BinaryKernelLogisticRegression(BaseEstimator, ClassifierMixin):
         """
         self.C = C
         self.pred_size = pred_size
-        self.temp_dir = temp_dir
+        self.temp_dir = os.path.join(temp_dir, str(uuid.uuid4()))
 
     def fit(self, X, y, n_check=10, atol=1e-4):
 
