@@ -16,7 +16,6 @@ sys.path.insert(0, here + '/../../')  # for influence_boosting
 sys.path.insert(0, here + '/../')  # for utility
 
 import tqdm
-import matplotlib.pyplot as plt
 import numpy as np
 from sklearn.base import clone
 from sklearn.metrics import roc_auc_score, accuracy_score
@@ -58,8 +57,8 @@ def _measure_performance(sort_indices, percentages, X_test, y_test, X_train, y_t
     return aucs, accs
 
 
-def _our_method(X_test, tree, args, X_train, y_train,
-                X_val, seed, logger, model_dir):
+def _trex_method(X_test, tree, args, X_train, y_train,
+                 X_val, seed, logger, model_dir):
 
     # load previously saved model
     model_path = os.path.join(model_dir, 'trex_{}_{}.pkl'.format(
@@ -201,7 +200,7 @@ def experiment(args, logger, out_dir, seed):
         n_samples = int(X_train.shape[0] * args.train_frac)
         X_train, y_train = X_train[:n_samples], y_train[:n_samples]
 
-    # use part of the test data as validation data
+    # use part of the test data for tuning
     X_val = X_test.copy()
     if args.val_frac < 1.0 and args.val_frac > 0.0:
         X_val = X_val[int(X_val.shape[0] * args.val_frac):]
@@ -234,8 +233,8 @@ def experiment(args, logger, out_dir, seed):
     if args.trex:
         logger.info('ordering by our method...')
         start = time.time()
-        train_order = _our_method(X_test, model, args, X_train, y_train, X_val, seed, logger, model_dir)
-        our_res = _measure_performance(train_order, pcts, X_test, y_test, X_train, y_train, clf)
+        train_order = _trex_method(X_test, model, args, X_train, y_train, X_val, seed, logger, model_dir)
+        trex_res = _measure_performance(train_order, pcts, X_test, y_test, X_train, y_train, clf)
         logger.info('time: {:3f}s'.format(time.time() - start))
 
     # MAPLE method
@@ -255,86 +254,34 @@ def experiment(args, logger, out_dir, seed):
         logger.info('time: {:3f}s'.format(time.time() - start))
 
     # KNN method
-    if args.knn:
+    if args.teknn:
         logger.info('ordering by knn...')
         start = time.time()
         train_order = _knn_method(X_test, args, model, X_train, y_train, y_test, logger)
         knn_res = _measure_performance(train_order, pcts, X_test, y_test, X_train, y_train, clf)
         logger.info('time: {:3f}s'.format(time.time() - start))
 
-    # plot results
-    fig, axs = plt.subplots(1, 2, figsize=(12, 4))
-    ax = axs[0]
-    ax.plot(pcts, random_res[0], color='red', label='Random', marker='d')
-    if args.trex:
-        ax.plot(pcts[:len(our_res[0])], our_res[0], color='cyan',
-                label='TREX-{}'.format(args.kernel_model), marker='1')
-
-    if args.maple:
-        ax.plot(pcts[:len(maple_res[0])], maple_res[0], color='orange',
-                label='MAPLE', marker='>')
-
-    if args.knn:
-        ax.plot(pcts[:len(knn_res[0])], knn_res[0], color='purple',
-                label='TEKNN', marker='o')
-
-    if args.tree_type == 'cb' and args.inf_k is not None:
-        ax.plot(pcts[:len(leafinfluence_res[0])], leafinfluence_res[0],
-                color='green', label='LeafInfluence', marker='*')
-
-    ax.set_xlabel('train data removed (%)')
-    ax.set_ylabel('roc_auc')
-
-    ax = axs[1]
-    ax.plot(pcts, random_res[1], color='red', label='Random', marker='d')
-
-    if args.trex:
-        ax.plot(pcts[:len(our_res[1])], our_res[1], color='cyan',
-                label='TREX-{}'.format(args.kernel_model), marker='1')
-    if args.maple:
-        ax.plot(pcts[:len(maple_res[1])], maple_res[1], color='orange',
-                label='MAPLE', marker='>')
-
-    if args.knn:
-        ax.plot(pcts[:len(knn_res[1])], knn_res[1], color='purple',
-                label='TEKNN', marker='o')
-
-    if args.tree_type == 'cb' and args.inf_k is not None:
-        ax.plot(pcts[:len(leafinfluence_res[1])], leafinfluence_res[1],
-                color='green', label='LeafInfluence', marker='*')
-    ax.set_xlabel('train data removed (%)')
-    ax.set_ylabel('test accuracy')
-    ax.legend()
-
-    # make seed directory
-    rs_dir = os.path.join(out_dir, 'rs{}'.format(seed))
-    os.makedirs(rs_dir, exist_ok=True)
-
-    # save plot
-    plt.savefig(os.path.join(rs_dir, 'roar.pdf'), bbox_inches='tight')
-
     # save percentages
-    np.save(os.path.join(rs_dir, 'percentages.npy'), pcts)
+    np.save(os.path.join(out_dir, 'percentages.npy'), pcts)
 
     # random
-    np.save(os.path.join(rs_dir, 'random.npy'), random_res)
+    np.save(os.path.join(out_dir, 'random.npy'), random_res)
 
     # trex
     if args.trex:
-        setting = '{}_{}'.format(args.kernel_model, args.tree_kernel)
-        np.save(os.path.join(rs_dir, 'ours_{}.npy'.format(setting)), our_res)
+        np.save(os.path.join(out_dir, 'trex_{}.npy'.format(args.kernel_model)), trex_res)
 
     # MAPLE
     if args.maple:
-        np.save(os.path.join(rs_dir, 'maple.npy'), maple_res)
+        np.save(os.path.join(out_dir, 'maple.npy'), maple_res)
 
     # TEKNN
-    if args.knn:
-        np.save(os.path.join(rs_dir, 'teknn_{}.npy'.format(args.tree_kernel)), knn_res)
+    if args.teknn:
+        np.save(os.path.join(out_dir, 'teknn.npy'), knn_res)
 
     # LeafInfluence
     if args.tree_type == 'cb' and args.inf_k is not None:
-        np.save(os.path.join(rs_dir, 'leafinfluence.npy'), leafinfluence_res)
+        np.save(os.path.join(out_dir, 'leafinfluence.npy'), leafinfluence_res)
 
 
 def main(args):
@@ -342,10 +289,7 @@ def main(args):
     # make logger
     dataset = args.dataset
 
-    if args.train_frac < 1.0 and args.train_frac > 0.0:
-        dataset += '_{}'.format(str(args.train_frac).replace('.', 'p'))
-
-    out_dir = os.path.join(args.out_dir, dataset, 'rs{}'.format(args.rs))
+    out_dir = os.path.join(args.out_dir, dataset, args.tree_type, args.tree_kernel)
     os.makedirs(out_dir, exist_ok=True)
     logger = print_util.get_logger(os.path.join(out_dir, '{}.txt'.format(args.dataset)))
     logger.info(args)
@@ -368,18 +312,17 @@ if __name__ == '__main__':
     parser.add_argument('--tree_type', type=str, default='cb', help='model to use.')
     parser.add_argument('--n_estimators', type=int, default=100, help='number of trees.')
     parser.add_argument('--max_depth', type=int, default=None, help='maximum depth in tree ensemble.')
-    parser.add_argument('--C', type=float, default=0.1, help='kernel model penalty parameter.')
 
-    parser.add_argument('--trex', action='store_true', help='Use TREX.')
-    parser.add_argument('--trex_load', action='store_true', help='Load saved model.')
+    parser.add_argument('--trex', action='store_true', default=False, help='Use TREX.')
+    parser.add_argument('--trex_load', action='store_true', default=False, help='Load saved model.')
     parser.add_argument('--tree_kernel', type=str, default='leaf_output', help='type of encoding.')
     parser.add_argument('--kernel_model', type=str, default='lr', help='kernel model to use.')
     parser.add_argument('--kernel_model_kernel', type=str, default='linear', help='similarity kernel')
-    parser.add_argument('--true_label', action='store_true', help='train TREX on the true labels.')
+    parser.add_argument('--true_label', action='store_true', default=False, help='train TREX on the true labels.')
 
     parser.add_argument('--misclassified', action='store_true', default=False, help='Use misclassified instance.')
 
-    parser.add_argument('--knn', action='store_true', default=False, help='Use KNN on top of TREX features.')
+    parser.add_argument('--teknn', action='store_true', default=False, help='Use KNN on top of TREX features.')
     parser.add_argument('--inf_k', type=int, default=None, help='Number of leaves to use for leafinfluence.')
     parser.add_argument('--maple', action='store_true', default=False, help='Whether to use MAPLE as a baseline.')
     parser.add_argument('--maple_load', action='store_true', default=False, help='Load saved model.')
@@ -403,7 +346,6 @@ class Args:
     tree_type = 'lgb'
     n_estimators = 100
     max_depth = None
-    C = 0.1
 
     trex = True
     trex_load = False
@@ -420,5 +362,4 @@ class Args:
     maple_load = False
 
     rs = 1
-    repeats = 1
     verbose = 0

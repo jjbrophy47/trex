@@ -52,7 +52,7 @@ for i in ${!rs_list[@]}; do
       --kernel_model_kernel $kernel_model_kernel \
       --kernel_model_loss \
       --maple \
-      --knn \
-      --knn_loss \
+      --teknn \
+      --teknn_loss \
       --train_frac $train_frac
 done

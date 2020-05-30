@@ -107,7 +107,7 @@ def experiment(args, logger, out_dir, seed):
     # train a tree ensemble
     tree = clf.fit(X_train, y_train)
 
-    if args.knn:
+    if args.teknn:
 
         # transform data
         extractor = trex.TreeExtractor(tree, tree_kernel=args.tree_kernel)
@@ -132,7 +132,7 @@ def experiment(args, logger, out_dir, seed):
         np.save(os.path.join(out_dir, 'tree.npy'), results['tree'])
         np.save(os.path.join(out_dir, 'teknn.npy'), results['teknn'])
 
-    if trex:
+    if args.trex:
 
         start = time.time()
         logger.info('tuning TREX-{}...'.format(args.kernel_model))
@@ -191,7 +191,7 @@ if __name__ == '__main__':
     parser.add_argument('--kernel_model_kernel', type=str, default='linear', help='Similarity kernel.')
 
     parser.add_argument('--trex', action='store_true', default=False, help='use TREX as surrogate model.')
-    parser.add_argument('--knn', action='store_true', default=False, help='Use KNN on top of TREX features.')
+    parser.add_argument('--teknn', action='store_true', default=False, help='Use KNN on top of TREX features.')
 
     parser.add_argument('--rs', type=int, default=1, help='random state.')
     parser.add_argument('--verbose', type=int, default=0, help='Verbosity level.')

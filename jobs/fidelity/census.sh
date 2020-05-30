@@ -33,5 +33,5 @@ for tree_kernel in ${tree_kernels[@]}; do
       --max_depth $max_depth \
       --trex \
       --kernel_model 'lr' \
-      --knn
+      --teknn
 done

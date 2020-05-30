@@ -16,7 +16,6 @@ max_depth=3
 
 tree_kernels=('leaf_output', 'leaf_path')
 
-
 for tree_kernel in ${tree_kernels[@]}; do
     python3 experiments/scripts/fidelity.py \
       --dataset $dataset \
@@ -33,5 +32,5 @@ for tree_kernel in ${tree_kernels[@]}; do
       --max_depth $max_depth \
       --trex \
       --kernel_model 'lr' \
-      --knn
+      --teknn
 done

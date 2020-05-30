@@ -286,9 +286,9 @@ def noise_detection(args, logger, out_dir, seed):
     _, tree_loss_res = _interval_performance(ckpt_ndx, fix_ndx, noisy_ndx, clf, data, acc_test_noisy)
     logger.info('time: {:3f}s'.format(time.time() - start))
 
-    # our method
+    # trex method
     if args.trex:
-        logger.info('ordering by our method...')
+        logger.info('ordering by TREX-{}...'.format(args.kernel_model))
         start = time.time()
         explainer = trex.TreeExplainer(model_noisy, X_train, y_train_noisy,
                                        tree_kernel=args.tree_kernel,
@@ -296,15 +296,12 @@ def noise_detection(args, logger, out_dir, seed):
                                        use_predicted_labels=not args.true_label,
                                        kernel_model=args.kernel_model,
                                        kernel_model_kernel=args.kernel_model_kernel,
-                                       C=args.C,
                                        verbose=args.verbose,
                                        X_val=X_val,
                                        logger=logger)
         logger.info('C: {}'.format(explainer.C))
         ckpt_ndx, fix_ndx, _ = _our_method(explainer, noisy_ndx, y_train, n_check, interval)
         check_pct, our_res = _interval_performance(ckpt_ndx, fix_ndx, noisy_ndx, clf, data, acc_test_noisy)
-        settings = '{}_{}'.format(args.kernel_model, args.tree_kernel)
-        settings += '_true_label' if args.true_label else ''
         logger.info('time: {:3f}s'.format(time.time() - start))
 
     # linear loss method - if svm, squish decision values to between 0 and 1
@@ -355,9 +352,9 @@ def noise_detection(args, logger, out_dir, seed):
         _, maple_res = _interval_performance(ckpt_ndx, fix_ndx, noisy_ndx, clf, data, acc_test_noisy)
         logger.info('time: {:3f}s'.format(time.time() - start))
 
-    # KNN method
-    if args.knn:
-        logger.info('ordering by knn...')
+    # TE-KNN method
+    if args.teknn:
+        logger.info('ordering by teknn...')
         start = time.time()
 
         # transform the data
@@ -375,9 +372,9 @@ def noise_detection(args, logger, out_dir, seed):
         _, knn_res = _interval_performance(ckpt_ndx, fix_ndx, noisy_ndx, clf, data, acc_test_noisy)
         logger.info('time: {:3f}s'.format(time.time() - start))
 
-    # knn loss method
-    if args.knn and args.knn_loss:
-        logger.info('ordering by knn loss...')
+    # te-knn loss method
+    if args.teknn and args.teknn_loss:
+        logger.info('ordering by teknn loss...')
         start = time.time()
         y_train_proba = knn_clf.predict_proba(X_train_alt)
         ckpt_ndx, fix_ndx, _, _ = _loss_method(noisy_ndx, y_train_proba, y_train_noisy, interval, to_check=n_check)
@@ -396,7 +393,8 @@ def noise_detection(args, logger, out_dir, seed):
 
         # trex
         if args.trex:
-            np.save(os.path.join(out_dir, 'our_{}.npy'.format(settings)), our_res)
+            settings = '{}_{}'.format(args.kernel_model, args.tree_kernel)
+            np.save(os.path.join(out_dir, 'trex_{}.npy'.format(settings)), our_res)
 
         # linear model loss
         if args.trex and args.kernel_model_loss:
@@ -410,13 +408,13 @@ def noise_detection(args, logger, out_dir, seed):
         if args.maple:
             np.save(os.path.join(out_dir, 'maple.npy'), maple_res)
 
-        # knn
-        if args.knn:
-            np.save(os.path.join(out_dir, 'knn_{}.npy'.format(args.tree_kernel)), knn_res)
+        # teknn
+        if args.teknn:
+            np.save(os.path.join(out_dir, 'teknn_{}.npy'.format(args.tree_kernel)), knn_res)
 
-        # knn loss
-        if args.knn and args.knn_loss:
-            np.save(os.path.join(out_dir, 'knn_{}_loss.npy'.format(args.tree_kernel)), knn_loss_res)
+        # teknn loss
+        if args.teknn and args.teknn_loss:
+            np.save(os.path.join(out_dir, 'teknn_{}_loss.npy'.format(args.tree_kernel)), knn_loss_res)
 
     # plot results
     if args.show_plot:
@@ -435,9 +433,9 @@ def noise_detection(args, logger, out_dir, seed):
             ax.plot(check_pct, leafinfluence_res, marker='+', color='m', label='leafinfluence')
         if args.maple:
             ax.plot(check_pct, maple_res, marker='o', color='orange', label='maple')
-        if args.knn:
+        if args.teknn:
             ax.plot(check_pct, knn_res, marker='D', color='magenta', label='knn')
-        if args.knn and args.knn_loss:
+        if args.teknn and args.teknn_loss:
             ax.plot(check_pct, knn_loss_res, marker='h', color='#EEC64F', label='knn_loss')
         ax.legend()
         logger.info('saving plot...')
@@ -453,7 +451,7 @@ def main(args):
     if args.train_frac < 1.0 and args.train_frac > 0.0:
         dataset += '_{}'.format(str(args.train_frac).replace('.', 'p'))
 
-    out_dir = os.path.join(args.out_dir, dataset, 'rs{}'.format(args.rs))
+    out_dir = os.path.join(args.out_dir, dataset, args.tree_type, 'rs{}'.format(args.rs))
     os.makedirs(out_dir, exist_ok=True)
     logger = print_util.get_logger(os.path.join(out_dir, '{}.txt'.format(args.dataset)))
     logger.info(args)
@@ -489,13 +487,12 @@ if __name__ == '__main__':
 
     parser.add_argument('--check_pct', type=float, default=0.3, help='Max percentage of train instances to check.')
     parser.add_argument('--n_plot_points', type=int, default=10, help='Number of points to plot.')
-    parser.add_argument('--show_plot', action='store_true', default=False, help='Save plot results.')
     parser.add_argument('--save_results', action='store_true', default=False, help='Save cleaning results.')
 
     parser.add_argument('--inf_k', type=int, default=None, help='Number of leaves to use for leafinfluence.')
     parser.add_argument('--maple', action='store_true', default=False, help='Whether to use MAPLE as a baseline.')
-    parser.add_argument('--knn', action='store_true', default=False, help='Use KNN on top of TREX features.')
-    parser.add_argument('--knn_loss', action='store_true', default=False, help='Use KNN loss method.')
+    parser.add_argument('--teknn', action='store_true', default=False, help='Use KNN on top of TREX features.')
+    parser.add_argument('--teknn_loss', action='store_true', default=False, help='Use KNN loss method.')
 
     parser.add_argument('--rs', type=int, default=1, help='random state.')
     parser.add_argument('--verbose', type=int, default=0, help='Verbosity level.')
@@ -515,7 +512,6 @@ class Args:
     tree_type = 'cb'
     n_estimators = 100
     max_depth = None
-    C = 0.1
 
     trex = True
     tree_kernel = 'leaf_output'
@@ -526,7 +522,6 @@ class Args:
 
     check_pct = 0.3
     n_plot_points = 10
-    show_plot = False
     save_results = False
 
     inf_k = None
@@ -535,5 +530,4 @@ class Args:
     knn_loss = False
 
     rs = 1
-    repeats = 1
     verbose = 0
