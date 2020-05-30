@@ -27,7 +27,6 @@ for i in ${!rs_list[@]}; do
       --n_estimators $n_estimators \
       --max_depth $max_depth \
       --check_pct $check_pct \
-      --save_results \
       --rs ${rs_list[$i]} \
       --verbose $verbose \
       --trex \
@@ -41,7 +40,6 @@ for i in ${!rs_list[@]}; do
       --n_estimators $n_estimators \
       --max_depth $max_depth \
       --check_pct $check_pct \
-      --save_results \
       --rs ${rs_list[$i]} \
       --verbose $verbose \
       --trex \
