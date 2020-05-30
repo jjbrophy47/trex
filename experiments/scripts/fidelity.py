@@ -139,7 +139,7 @@ def experiment(args, logger, out_dir, seed):
         explainer = trex.TreeExplainer(tree, X_train, y_train,
                                        tree_kernel=args.tree_kernel,
                                        kernel_model=args.kernel_model,
-                                       kernel=args.kernel_model_kernel,
+                                       kernel_model_kernel=args.kernel_model_kernel,
                                        random_state=args.rs,
                                        logger=logger,
                                        use_predicted_labels=not args.true_label,
