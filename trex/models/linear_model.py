@@ -260,6 +260,7 @@ class KernelLogisticRegression(BaseEstimator, ClassifierMixin):
         """
         self.C = C
         self.pred_size = pred_size
+        self.temp_dir = temp_dir
 
     def fit(self, X, y):
         self.X_train_ = X
