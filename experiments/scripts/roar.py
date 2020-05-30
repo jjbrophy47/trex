@@ -255,6 +255,7 @@ def main(args):
     logger.info(args)
 
     experiment(args, logger, out_dir, seed=args.rs)
+    print_util.remove_logger(logger)
 
 
 if __name__ == '__main__':

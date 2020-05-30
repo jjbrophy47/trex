@@ -97,10 +97,10 @@ def main(args):
 
         if d2_res_tree:
             _plot_graph(axs[2], d2_res_tree, xlabel='tsne 0',
-                        ylabel='tsne 1', title='Different train/test')
+                        ylabel=None, title='Different train/test')
 
     plt.tight_layout()
-    plt.savefig(args.out_dir, 'plot.{}'.format(args.ext), rasterized=True)
+    plt.savefig(os.path.join(args.out_dir, 'plot.{}'.format(args.ext)), rasterized=True)
 
 
 if __name__ == '__main__':

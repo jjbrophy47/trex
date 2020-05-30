@@ -209,7 +209,7 @@ def _knn_method(knn_clf, weights, X_train, noisy_ndx, interval, to_check=1):
     return ckpt_ndx, fix_ndx, train_order
 
 
-def noise_detection(args, logger, out_dir, seed):
+def experiment(args, logger, out_dir, seed):
     """
     Main method that trains a tree ensemble, flips a percentage of train labels, prioritizes train
     instances using various methods, and computes how effective each method is at cleaning the data.
@@ -410,7 +410,8 @@ def main(args):
 
     seed = args.rs
     logger.info('\nSeed: {}'.format(seed))
-    noise_detection(args, logger, out_dir, seed=seed)
+    experiment(args, logger, out_dir, seed=seed)
+    print_util.remove_logger(logger)
 
 
 if __name__ == '__main__':

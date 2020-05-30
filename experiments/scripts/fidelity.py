@@ -169,6 +169,7 @@ def main(args):
     seed = args.rs
     logger.info('\nSeed: {}'.format(seed))
     experiment(args, logger, out_dir, seed=seed)
+    print_util.remove_logger(logger)
 
 
 if __name__ == '__main__':
