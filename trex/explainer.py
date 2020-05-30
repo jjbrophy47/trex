@@ -96,7 +96,7 @@ class TreeExplainer:
         self.random_state = random_state
         self.verbose = verbose
         self.logger = logger
-        self.temp_dir = os.path.join(temp_dir, uuid.uuid4())
+        self.temp_dir = os.path.join(temp_dir, str(uuid.uuid4()))
         self._validate()
 
         # extract feature representations from the tree ensemble
