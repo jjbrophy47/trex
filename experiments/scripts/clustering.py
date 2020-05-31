@@ -123,7 +123,7 @@ def main(args):
     out_dir = os.path.join(args.out_dir, dataset, args.tree_type, args.tree_kernel)
     os.makedirs(out_dir, exist_ok=True)
 
-    logger = print_util.get_logger(os.path.join(out_dir, '{}.txt'.format(args.dataset)))
+    logger = print_util.get_logger(os.path.join(out_dir, 'log.txt'))
     logger.info(args)
 
     experiment(args, logger, out_dir, seed=args.rs)
@@ -171,5 +171,6 @@ class Args:
     true_label = False
 
     n_pca = 50
+
     rs = 1
     verbose = 0

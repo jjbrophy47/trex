@@ -8,7 +8,14 @@ import numpy as np
 import matplotlib.pyplot as plt
 from scipy.stats import pearsonr, spearmanr
 
-from .plot_cleaning import set_size
+
+def set_size(width, fraction=1, subplots=(1, 1)):
+    """
+    Set figure dimensions to avoid scaling in LaTeX.
+    """
+    golden_ratio = 1.618
+    height = (width / golden_ratio) * (subplots[0] / subplots[1])
+    return width, height
 
 
 def _sigmoid(x):

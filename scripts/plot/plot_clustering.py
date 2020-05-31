@@ -7,7 +7,14 @@ import argparse
 import numpy as np
 import matplotlib.pyplot as plt
 
-from .plot_cleaning import set_size
+
+def set_size(width, fraction=1, subplots=(1, 1)):
+    """
+    Set figure dimensions to avoid scaling in LaTeX.
+    """
+    golden_ratio = 1.618
+    height = (width / golden_ratio) * (subplots[0] / subplots[1])
+    return width, height
 
 
 def _get_results(args, dataset, tree_kernel='None'):
@@ -33,20 +40,20 @@ def _plot_graph(ax, res, xlabel=None, ylabel=None,
     # plot train
     ax.scatter(res['train_neg'][:, 0], res['train_neg'][:, 1],
                color='blue', alpha=alpha, label='train (y=0)',
-               marker='+', s=s, rasterized=True)
+               marker='+', s=s, rasterized=args.rasterize)
 
     ax.scatter(res['train_pos'][:, 0], res['train_pos'][:, 1],
                color='red', alpha=alpha, label='train (y=1)',
-               marker='1', s=s, rasterized=True)
+               marker='1', s=s, rasterized=args.rasterize)
 
     # plot test
     ax.scatter(res['test_neg'][:, 0], res['test_neg'][:, 1],
                color='cyan', alpha=alpha, label='test (y=0)',
-               marker='x', s=s, rasterized=True)
+               marker='x', s=s, rasterized=args.rasterize)
 
     ax.scatter(res['test_pos'][:, 0], res['test_pos'][:, 1],
                color='orange', alpha=alpha, label='test (y=1)',
-               marker='2', s=s, rasterized=True)
+               marker='2', s=s, rasterized=args.rasterize)
 
     if xlabel is not None:
         ax.set_xlabel(xlabel)
@@ -66,7 +73,7 @@ def main(args):
     plt.rc('ytick', labelsize=17)
     plt.rc('axes', labelsize=22)
     plt.rc('axes', titlesize=22)
-    plt.rc('legend', fontsize=20)
+    plt.rc('legend', fontsize=18)
     plt.rc('legend', title_fontsize=11)
     plt.rc('lines', linewidth=1)
     plt.rc('lines', markersize=6)
@@ -83,6 +90,7 @@ def main(args):
     if d1_res_none:
         _plot_graph(axs[0], d1_res_none, xlabel='tsne 0',
                     ylabel='tsne 1', title='Original')
+        axs[0].legend()
 
     if args.tree_kernel != 'None':
         d1_res_tree = _get_results(args, d1, tree_kernel=args.tree_kernel)
@@ -99,8 +107,11 @@ def main(args):
             _plot_graph(axs[2], d2_res_tree, xlabel='tsne 0',
                         ylabel=None, title='Different train/test')
 
+    os.makedirs(args.out_dir, exist_ok=True)
+
     plt.tight_layout()
-    plt.savefig(os.path.join(args.out_dir, 'plot.{}'.format(args.ext)), rasterized=True)
+    plt.savefig(os.path.join(args.out_dir, 'plot.{}'.format(args.ext)),
+                rasterized=args.rasterize)
 
 
 if __name__ == '__main__':
@@ -115,6 +126,7 @@ if __name__ == '__main__':
     parser.add_argument('--tree_kernel', type=str, default='leaf_output', help='tree kernel.')
 
     parser.add_argument('--ext', type=str, default='png', help='output image format.')
+    parser.add_argument('--rasterize', action='store_true', default=False, help='rasterize image.')
     args = parser.parse_args()
     main(args)
 
@@ -129,3 +141,4 @@ class Args:
     tree_kernel = 'leaf_output'
 
     ext = 'png'
+    rasterize = True

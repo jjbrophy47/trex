@@ -23,6 +23,15 @@ from utility import print_util
 from utility import exp_util
 
 
+def set_size(width, fraction=1, subplots=(1, 1)):
+    """
+    Set figure dimensions to avoid scaling in LaTeX.
+    """
+    golden_ratio = 1.618
+    height = (width / golden_ratio) * (subplots[0] / subplots[1])
+    return width, height
+
+
 def _sort_impact(sv_ndx, impact):
     """Sorts support vectors by absolute impact values."""
 
@@ -50,7 +59,7 @@ def _display_image(args, x, identifier, predicted, actual, ax=None,
         s = identifier
         s += '\n'
 
-    s += '{} predicted as {}'.format(actual, predicted)
+    s += 'pred: {}\n label: {}'.format(predicted, actual)
 
     if impact is not None:
         s += '\nimpact: {:.3f}'.format(impact)
@@ -65,8 +74,9 @@ def _display_image(args, x, identifier, predicted, actual, ax=None,
     ax.spines['left'].set_linewidth(linewidth)
     ax.spines['right'].set_linewidth(linewidth)
     ax.spines['bottom'].set_linewidth(linewidth)
-    ax.tick_params(axis='both', bottom=False, labelbottom=False, left=False, labelleft=False)
-    ax.set_title(s, fontsize=10)
+    ax.tick_params(axis='both', bottom=False, labelbottom=False,
+                   left=False, labelleft=False)
+    ax.set_title(s)
 
 
 def experiment(args, logger, out_dir, seed):
@@ -141,8 +151,24 @@ def experiment(args, logger, out_dir, seed):
     # sort the training instances by impact in descending order
     sort_ndx = np.argsort(impact)[::-1]
 
-    # show the test image
-    fig, axs = plt.subplots(1, 1 + args.topk_train * 2, figsize=(16, 3))
+    # matplotlib settings
+    plt.rc('font', family='serif')
+    plt.rc('xtick', labelsize=17)
+    plt.rc('ytick', labelsize=17)
+    plt.rc('axes', labelsize=22)
+    plt.rc('axes', titlesize=22)
+    plt.rc('legend', fontsize=18)
+    plt.rc('legend', title_fontsize=11)
+    plt.rc('lines', linewidth=1)
+    plt.rc('lines', markersize=6)
+
+    # inches
+    width = 5.5  # Neurips 2020
+    width, height = set_size(width=width * 3, fraction=1, subplots=(1, 3))
+    fig, axs = plt.subplots(1, 1 + args.topk_train * 2, figsize=(width, height))
+    axs = axs.flatten()
+
+    # plot the test image
     axs = axs.flatten()
     identifier = 'test_id{}'.format(test_ndx)
     _display_image(args, X_test[test_ndx], identifier=identifier,
@@ -176,8 +202,7 @@ def experiment(args, logger, out_dir, seed):
                            predicted=train_pred, actual=y_train[train_ndx],
                            similarity=similarity, weight=weight)
 
-    os.makedirs(args.out_dir, exist_ok=True)
-    plt.savefig(os.path.join(args.out_dir, 'mnist.pdf'), format='pdf', bbox_inches='tight')
+    plt.savefig(os.path.join(out_dir, 'plot.pdf'), format='pdf', bbox_inches='tight')
     plt.show()
 
 

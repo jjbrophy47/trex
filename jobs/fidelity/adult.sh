@@ -6,7 +6,7 @@
 #SBATCH --time=5-00:00:00
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1
-#SBATCH --cpus-per-task=18
+#SBATCH --cpus-per-task=20
 #SBATCH --account=uoml
 module load python3/3.6.1
 
@@ -14,7 +14,8 @@ dataset='adult'
 n_estimators=250
 max_depth=10
 
-tree_kernels=('leaf_output' 'leaf_path')
+# tree_kernels=('leaf_output' 'leaf_path')
+tree_kernels=('leaf_path')
 
 
 for tree_kernel in ${tree_kernels[@]}; do

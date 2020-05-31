@@ -1,5 +1,5 @@
 """
-Experiment: Remove the training instances that contribute the most
+Remove the training instances that contribute the most
 towards the wrongly predicted label for misclassified test instances.
 """
 import os
@@ -28,7 +28,9 @@ def experiment(args, logger, out_dir, seed):
     # get model and data
     clf = model_util.get_classifier(args.tree_type,
                                     n_estimators=args.n_estimators,
+                                    max_depth=args.max_depth,
                                     random_state=seed)
+
     data = data_util.get_data(args.dataset,
                               random_state=seed,
                               data_dir=args.data_dir,
@@ -43,17 +45,16 @@ def experiment(args, logger, out_dir, seed):
     tree = clone(clf).fit(X_train, y_train)
     model_util.performance(tree, X_train, y_train, X_test, y_test, logger=logger)
 
-    if args.scoring == 'auroc':
-        original_score = roc_auc_score(y_test, tree.predict_proba(X_test)[:, 1])
-    else:
-        original_score = accuracy_score(y_test, tree.predict(X_test))
+    original_auc = roc_auc_score(y_test, tree.predict_proba(X_test)[:, 1])
+    original_acc = accuracy_score(y_test, tree.predict(X_test))
 
     # train TREX
     explainer = trex.TreeExplainer(tree, X_train, y_train,
                                    tree_kernel=args.tree_kernel,
                                    random_state=seed,
                                    kernel_model=args.kernel_model,
-                                   kernel_model_kernel=args.kernel_model_kernel)
+                                   kernel_model_kernel=args.kernel_model_kernel,
+                                   true_label=args.true_label)
 
     # get missed test instances
     missed_indices = np.where(tree.predict(X_test) != y_test)[0]
@@ -75,8 +76,9 @@ def experiment(args, logger, out_dir, seed):
     neg_contributors = neg_contributors[np.argsort(neg_impact)]
 
     # remove offending train instances in segments and measure performance
-    scores, n_removed = [], []
-
+    aucs = []
+    accs = []
+    n_removed = []
     for i in tqdm.tqdm(range(args.n_iterations + 1)):
 
         # remove these instances from the train data
@@ -86,27 +88,19 @@ def experiment(args, logger, out_dir, seed):
 
         tree = clone(clf).fit(new_X_train, new_y_train)
 
-        if args.scoring == 'auroc':
-            scores.append(roc_auc_score(y_test, tree.predict_proba(X_test)[:, 1]))
-        else:
-            scores.append(accuracy_score(y_test, tree.predict(X_test)))
+        aucs.append(roc_auc_score(y_test, tree.predict_proba(X_test)[:, 1]))
+        accs.append(accuracy_score(y_test, tree.predict(X_test)))
 
         n_removed.append(args.n_remove * i)
 
+    # save results
     result = tree.get_params()
-    result[seed] = scores
+    result['original_auc'] = original_auc
+    result['original_acc'] = original_acc
+    result['auc'] = aucs
+    result['acc'] = accs
+    result['n_remove'] = n_removed
     np.save(os.path.join(out_dir, 'results.npy'), result)
-
-    # plot results
-    fig, ax = plt.subplots(figsize=(12, 4))
-    ax.errorbar(n_removed, scores, fmt='-o', color='green')
-    ax.axhline(original_score, linestyle='--', color='k')
-    ax.set_xlabel('train instances removed')
-    ax.set_ylabel('test {}'.format(args.scoring))
-    ax.tick_params(axis='both', which='major')
-    plt.show()
-
-    return scores, n_removed, original_score
 
 
 def main(args):
@@ -116,14 +110,15 @@ def main(args):
 
     for i in range(args.repeats):
         seed = args.rs + i
-        rs_dir = os.path.join(args.out_dir, dataset, 'rs{}'.format(seed))
+        rs_dir = os.path.join(args.out_dir, dataset, args.tree_type,
+                              args.tree_kernel, 'rs{}'.format(seed))
         os.makedirs(rs_dir, exist_ok=True)
 
-        logger = print_util.get_logger(os.path.join(rs_dir, '{}.txt'.format(args.dataset)))
+        logger = print_util.get_logger(os.path.join(rs_dir, 'log.txt'))
         logger.info(args)
+        logger.info('Seed {}'.format(seed))
 
-        experiment(args, logger, rs_dir, seed=args.rs)
-
+        experiment(args, logger, rs_dir, seed=seed)
         print_util.remove_logger(logger)
 
 
@@ -146,7 +141,6 @@ if __name__ == '__main__':
     parser.add_argument('--iterations', type=int, default=5, help='Number of rounds.')
     parser.add_argument('--sample_frac', type=float, default=0.1, help='Fraction of test instances to explain.')
     parser.add_argument('--n_remove', type=int, default=50, help='Number of points to remove.')
-    parser.add_argument('--scoring', default='auroc', help='Metric to use.')
 
     parser.add_argument('--repeats', type=int, default=1, help='Number of times to repeat experiment.')
     parser.add_argument('--rs', type=int, default=1, help='random state.')
@@ -159,12 +153,11 @@ if __name__ == '__main__':
 class Args:
     dataset = 'mfc19_mfc20'
     data_dir = 'data'
-    out_dir = 'output/clustering/'
+    out_dir = 'output/removal/'
 
     tree_type = 'lgb'
     n_estimators = 100
-    # max_depth = None
-    # C = 0.1
+    max_depth = None
 
     tree_kernel = 'leaf_output'
     kernel_model = 'lr'
@@ -174,7 +167,6 @@ class Args:
     sample_frac = 0.1
     n_iterations = 5
     n_remove = 50
-    scoring = 'auroc'
 
     repeats = 1
     rs = 1
