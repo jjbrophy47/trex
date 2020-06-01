@@ -53,10 +53,10 @@ def main(args):
 
     # matplotlib settings
     plt.rc('font', family='serif')
-    plt.rc('xtick', labelsize=17)
-    plt.rc('ytick', labelsize=17)
-    plt.rc('axes', labelsize=22)
-    plt.rc('axes', titlesize=22)
+    plt.rc('xtick', labelsize=15)
+    plt.rc('ytick', labelsize=15)
+    plt.rc('axes', labelsize=16)
+    plt.rc('axes', titlesize=16)
     plt.rc('legend', fontsize=18)
     plt.rc('legend', title_fontsize=11)
     plt.rc('lines', linewidth=1)
@@ -64,8 +64,8 @@ def main(args):
 
     # inches
     width = 5.5  # Neurips 2020
-    width, height = set_size(width=width, fraction=1, subplots=(1, 1))
-    fig, ax = plt.subplots(1, 1, figsize=(width, height))
+    width, height = set_size(width=width * 1.25, fraction=1, subplots=(1, 1))
+    fig, ax = plt.subplots(1, 1, figsize=(width, height / 1.5))
 
     res = get_results(args)
     n_removed, _ = get_mean(res, name='n_remove')
@@ -75,8 +75,8 @@ def main(args):
     # plot results
     ax.errorbar(n_removed, score_mean, yerr=score_sem, fmt='-o', color='green')
     ax.axhline(original_score, linestyle='--', color='k')
-    ax.set_xlabel('train instances removed')
-    ax.set_ylabel('test {}'.format(args.metric.upper()))
+    ax.set_xlabel('# train samples removed')
+    ax.set_ylabel('Test {}'.format(args.metric.upper()))
     ax.tick_params(axis='both', which='major')
 
     os.makedirs(args.out_dir, exist_ok=True)

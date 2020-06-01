@@ -24,7 +24,15 @@ import trex
 from utility import model_util
 from utility import data_util
 from utility import print_util
-from utility import exp_util
+
+
+def set_size(width, fraction=1, subplots=(1, 1)):
+    """
+    Set figure dimensions to avoid scaling in LaTeX.
+    """
+    golden_ratio = 1.618
+    height = (width / golden_ratio) * (subplots[0] / subplots[1])
+    return width, height
 
 
 def _get_top_features(x, shap_vals, feature_list, k=1):
@@ -108,10 +116,10 @@ def _plot_feature_histograms(args, results, out_dir):
     ax.tick_params(axis='both', which='major')
 
     plt.tight_layout()
-    plt.savefig(os.path.join(out_dir, 'feature_distribution.{}'.format(args.ext)))
+    # plt.savefig(os.path.join(out_dir, 'feature_distribution.{}'.format(args.ext)))
 
 
-def _plot_instance_histograms(args, results, out_dir):
+def _plot_instance_histograms(args, logger, results, out_dir):
     """
     Plot TREX's:
       weight distribution and
@@ -122,9 +130,21 @@ def _plot_instance_histograms(args, results, out_dir):
 
     fig, axs = plt.subplots(1, 2, figsize=(10, 5))
 
+    train_sim_weight = train_sim * train_weight
+    all_vals = np.concatenate([train_weight, train_sim_weight])
+    bins = np.histogram(all_vals, bins=args.max_bins)[1]
+
+    s = '[{:15}] mean: {:>12.7f}, median: {:>12.7f}, sum: {:>12.7f}'
+    logger.info(s.format('weight', np.mean(train_weight),
+                np.median(train_weight), np.sum(train_weight)))
+    logger.info(s.format('sim', np.mean(train_sim),
+                np.median(train_sim), np.sum(train_sim)))
+    logger.info(s.format('sim * weight', np.mean(train_sim_weight),
+                np.median(train_sim_weight), np.sum(train_sim_weight)))
+
     # plot weight distribution for the training samples
     ax = axs[0]
-    sns.distplot(train_weight, color='orange', ax=axs[0], kde=args.kde)
+    sns.distplot(train_weight, color='orange', ax=axs[0], kde=args.kde, bins=bins)
     ax.set_xlabel(r'$\alpha$')
     ax.set_ylabel('density')
     ax.set_title('(a)')
@@ -133,8 +153,9 @@ def _plot_instance_histograms(args, results, out_dir):
         ax.set_xlim(-args.xlim, args.xlim)
 
     # plot similarity x weight for the training samples
-    ax = axs[1]
-    sns.distplot(train_sim * train_weight, color='green', ax=ax, kde=args.kde)
+    i = 0 if args.overlay else 1
+    ax = axs[i]
+    sns.distplot(train_sim_weight, color='green', ax=ax, kde=args.kde, bins=bins)
     ax.set_xlabel(r'$\alpha$ * similarity')
     ax.set_title('(b)')
     ax.tick_params(axis='both', which='major')
@@ -142,7 +163,36 @@ def _plot_instance_histograms(args, results, out_dir):
         ax.set_xlim(-args.xlim, args.xlim)
 
     plt.tight_layout()
-    plt.savefig(os.path.join(out_dir, 'weight_distribution.{}'.format(args.ext)))
+    # plt.savefig(os.path.join(out_dir, 'weight_distribution.{}'.format(args.ext)))
+
+    # plot contributions
+    width = 5.5  # Neurips 2020
+    width, height = set_size(width=width * 1.25, fraction=1, subplots=(1, 1))
+    fig, ax = plt.subplots(1, 1, figsize=(width, height))
+
+    ax.scatter(train_weight, train_sim, alpha=args.alpha, color='green',
+               marker='x', label=r'$\gamma$')
+    ax.scatter(train_weight, train_sim_weight, alpha=args.alpha, color='orange',
+               marker='*', label=r'$\alpha * \gamma$')
+    ax.axhline(0, color='k')
+    ax.axvline(0, color='k')
+    ax.set_ylabel(r'$\gamma$')
+    ax.set_xlabel(r'$\alpha$')
+    ax.legend(loc='lower right')
+
+    ax2 = ax.twinx()
+
+    train_weight_sorted_ndx = np.argsort(train_weight)
+    train_weight_sorted = train_weight[train_weight_sorted_ndx]
+    train_sim_weight_sorted = train_sim_weight[train_weight_sorted_ndx]
+    train_sim_weight_sorted_cumsum = np.cumsum(train_sim_weight_sorted)
+
+    ax2.plot(train_weight_sorted, train_sim_weight_sorted_cumsum,
+             label='contribution', color='k', linestyle='--')
+    ax2.set_ylabel(r'$\alpha * \gamma$')
+
+    plt.tight_layout()
+    plt.savefig(os.path.join(out_dir, 'contributions.{}'.format(args.ext)))
 
 
 def experiment(args, logger, out_dir, seed):
@@ -186,14 +236,18 @@ def experiment(args, logger, out_dir, seed):
     if args.kernel_model == 'lr':
         y_test_proba_trex = explainer.predict_proba(X_test)[:, 1]
 
-    # get worst missed test index
-    test_dist = exp_util.instance_loss(tree.predict_proba(X_test), y_test)
-    test_dist_ndx = np.argsort(test_dist)[::-1]
+    # instances where pred=1 but label=0
+    if args.pos_pred:
+        missed_indices = np.where((y_test_pred_tree == 1) & (y_test == 0))[0]
+        np.random.seed(seed)
+        test_ndx = np.random.choice(missed_indices)
 
-    # geta random incorrectly predicted test instance
-    np.random.seed(seed)
-    rand_num = np.random.choice(1000)
-    test_ndx = test_dist_ndx[rand_num]
+    # instances where pred=0 but label=1
+    else:
+        missed_indices = np.where((y_test_pred_tree == 0) & (y_test == 1))[0]
+        np.random.seed(seed)
+        test_ndx = np.random.choice(missed_indices)
+
     x_test = X_test[[test_ndx]]
 
     # show explanations for missed instances
@@ -210,7 +264,7 @@ def experiment(args, logger, out_dir, seed):
     logger.info('\ncomputing most influential features...')
     shap_explainer = shap.TreeExplainer(tree)
     test_shap = shap_explainer.shap_values(x_test)
-    top_features = _get_top_features(x_test[0], test_shap[0], feature)
+    top_features = _get_top_features(x_test[0], test_shap[0], feature, k=args.topk)
 
     # get positive and negative training samples
     train_pos_ndx = np.where(y_train == 1)[0]
@@ -228,6 +282,17 @@ def experiment(args, logger, out_dir, seed):
     results['train_weight'] = train_weight
     results['train_sim'] = sim
 
+    # matplotlib settings
+    plt.rc('font', family='serif')
+    plt.rc('xtick', labelsize=15)
+    plt.rc('ytick', labelsize=15)
+    plt.rc('axes', labelsize=16)
+    plt.rc('axes', titlesize=16)
+    plt.rc('legend', fontsize=16)
+    plt.rc('legend', title_fontsize=11)
+    plt.rc('lines', linewidth=1)
+    plt.rc('lines', markersize=6)
+
     # explain features
     for target_feature, val, shap_val in top_features:
         feat_ndx = np.where(target_feature == feature)[0][0]
@@ -242,7 +307,7 @@ def experiment(args, logger, out_dir, seed):
 
         _plot_feature_histograms(args, results, out_dir)
 
-    _plot_instance_histograms(args, results, out_dir)
+    _plot_instance_histograms(args, logger, results, out_dir)
     np.save(os.path.join(out_dir, 'results.npy'), results)
 
 
@@ -254,7 +319,6 @@ def main(args):
     out_dir = os.path.join(args.out_dir, dataset, args.tree_type,
                            args.tree_kernel, 'rs{}'.format(args.rs))
     os.makedirs(out_dir, exist_ok=True)
-    print(out_dir)
 
     logger = print_util.get_logger(os.path.join(out_dir, 'log.txt'))
     logger.info(args)
@@ -275,6 +339,9 @@ if __name__ == '__main__':
     parser.add_argument('--alpha', type=float, default=0.5, help='transparency value.')
     parser.add_argument('--xlim', type=float, default=None, help='x limits on instance plots.')
     parser.add_argument('--kde', action='store_true', default=None, help='plot kde on weight distribution.')
+    parser.add_argument('--overlay', action='store_true', default=None, help='overlay weight distributions.')
+    parser.add_argument('--topk', type=int, default=1, help='number of features to show.')
+    parser.add_argument('--pos_pred', action='store_true', default=False, help='show positive prediction.')
 
     parser.add_argument('--tree_type', type=str, default='lgb', help='model to use.')
     parser.add_argument('--n_estimators', type=int, default=100, help='number of trees.')
@@ -303,6 +370,9 @@ class Args:
     alpha = 0.5
     xlim = 0.05
     kde = False
+    overlay = False
+    topk = 1
+    pos_pred = True
 
     tree_type = 'lgb'
     n_estimators = 100

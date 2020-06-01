@@ -32,6 +32,7 @@ def _measure_performance(sort_indices, percentages, X_test, y_test, X_train, y_t
     """
     Measures the change in log loss as training instances are removed.
     """
+    r = {}
     aucs = []
     accs = []
 
@@ -54,7 +55,10 @@ def _measure_performance(sort_indices, percentages, X_test, y_test, X_train, y_t
         aucs.append(X_test_auc)
         accs.append(X_test_acc)
 
-    return aucs, accs
+    r['auc'] = aucs
+    r['acc'] = accs
+
+    return r
 
 
 def _trex_method(X_test, tree, args, X_train, y_train,

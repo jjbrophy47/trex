@@ -38,8 +38,9 @@ def main(args):
     method_list = ['trex_lr', 'random', 'maple', 'leafinfluence', 'teknn']
     colors = ['blue', 'red', 'orange', 'black', 'purple']
     labels = ['TREX', 'Random', 'MAPLE', 'LeafInfluence', 'TE-KNN']
-    markers = ['1', '2', 'd', 'h', 'o', '*']
-    metrics = ['AUC', 'accuracy']
+    markers = ['1', '*', 'd', 'h', 'o']
+    metric_mapping = {'auc': 'AUROC', 'acc': 'Accuracy'}
+    metric_ndx_mapping = {'auc': 0, 'acc': 1}
 
     # matplotlib settings
     plt.rc('font', family='serif')
@@ -50,42 +51,40 @@ def main(args):
     plt.rc('legend', fontsize=20)
     plt.rc('legend', title_fontsize=11)
     plt.rc('lines', linewidth=2)
-    plt.rc('lines', markersize=11)
+    plt.rc('lines', markersize=8)
 
     # inches
     width = 5.5  # Neurips 2020
-    width, height = set_size(width=width * 3, fraction=1, subplots=(2, 3))
-    fig, axs = plt.subplots(2, max(2, len(args.dataset)),
-                            figsize=(width, height / 1.25), sharex=True)
+    width, height = set_size(width=width * 3, fraction=1, subplots=(1, 3))
+    fig, axs = plt.subplots(1, max(2, len(args.dataset)),
+                            figsize=(width, height), sharex=True)
+    axs = axs.flatten()
 
-    for h, metric in enumerate(metrics):
+    lines = []
+    lines_ndx = []
+    for i, dataset in enumerate(args.dataset):
+        ax = axs[i]
 
-        lines = []
-        lines_ndx = []
-        for i, dataset in enumerate(args.dataset):
-            ax = axs[h][i]
+        for j, method in enumerate(method_list):
+            res = get_results(args, dataset, method,
+                              score_ndx=metric_ndx_mapping[args.metric])
 
-            for j, method in enumerate(method_list):
-                res = get_results(args, dataset, method, score_ndx=h)
+            if res is not None:
+                res, pcts = res
+                line = ax.errorbar(pcts[:len(res)], res,
+                                   marker=markers[j], color=colors[j], label=labels[j])
 
-                if res is not None:
-                    res, pcts = res
-                    line = ax.errorbar(pcts[:len(res)], res,
-                                       marker=markers[j], color=colors[j], label=labels[j])
+                if i == 0:
+                    lines.append(line[0])
+                    lines_ndx.append(j)
 
-                    if i == 0:
-                        lines.append(line[0])
-                        lines_ndx.append(j)
-
-            if i == 0:
-                ax.set_ylabel('Test {}'.format(metric))
-                if h == 0:
-                    ax.legend()
-            if h == 0:
-                ax.set_title(dataset.capitalize())
-            if h == 1:
-                ax.set_xlabel('% train data removed')
-            ax.tick_params(axis='both', which='major')
+        if i == 0:
+            ax.set_ylabel('Test {}'.format(metric_mapping[args.metric]))
+        if i == 1:
+            ax.legend()
+        ax.set_title(dataset.capitalize())
+        ax.set_xlabel('% train data removed')
+        ax.tick_params(axis='both', which='major')
 
     os.makedirs(args.out_dir, exist_ok=True)
 
@@ -105,6 +104,8 @@ if __name__ == '__main__':
     parser.add_argument('--tree_type', type=str, default='cb', help='tree type.')
     parser.add_argument('--tree_kernel', type=str, default='leaf_output', help='tree kernel.')
     parser.add_argument('--kernel_model', type=str, default='lr', help='kernel model.')
+
+    parser.add_argument('--metric', type=str, default='acc', help='predictive metric.')
 
     parser.add_argument('--rs', type=int, nargs='+', default=[1], help='dataset to explain.')
     parser.add_argument('--ext', type=str, default='png', help='output image format.')

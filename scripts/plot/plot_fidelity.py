@@ -30,6 +30,7 @@ def _plot_graph(args, ax, dataset, method_list, tree_kernel,
     # tree results
     tree_path = os.path.join(in_dir, 'tree.npy')
     if not os.path.exists(tree_path):
+        print(tree_path)
         return
     tree_res = np.load(tree_path)
 
@@ -37,6 +38,7 @@ def _plot_graph(args, ax, dataset, method_list, tree_kernel,
         method_path = os.path.join(in_dir, '{}.npy'.format(method))
 
         if not os.path.exists(method_path):
+            print(method_path)
             continue
 
         method_res = np.load(method_path)
@@ -77,26 +79,28 @@ def main(args):
 
     # inches
     width = 5.5  # Neurips 2020
-    width, height = set_size(width=width * 3, fraction=1, subplots=(2, 3))
-    fig, axs = plt.subplots(2, max(2, len(args.dataset)), figsize=(width, height),
-                            sharey='row', sharex='col')
+    width, height = set_size(width=width * 3, fraction=1, subplots=(1, 3))
+    fig, axs = plt.subplots(1, max(2, len(args.dataset)), figsize=(width, height),
+                            sharey='row')
+    axs = axs.flatten()
 
     # plot top row
-    row = 0
     for i, dataset in enumerate(args.dataset):
-        _plot_graph(args, axs[row][i], dataset, method_list, 'leaf_output',
+        _plot_graph(args, axs[i], dataset, method_list, 'leaf_output',
                     labels, colors, markers, corr=args.corr)
-        axs[row][i].set_title(dataset.capitalize())
+        axs[i].set_title(dataset.capitalize())
+        axs[i].set_xlabel(xlabel)
+    axs[0].set_ylabel(ylabel)
 
-    # plot bottom row
-    row = 1
-    for i, dataset in enumerate(args.dataset):
-        _plot_graph(args, axs[row][i], dataset, method_list, 'leaf_path',
-                    labels, colors, markers, corr=args.corr)
-        axs[row][i].set_xlabel(xlabel)
+    # # plot bottom row
+    # row = 1
+    # for i, dataset in enumerate(args.dataset):
+    #     _plot_graph(args, axs[row][i], dataset, method_list, 'leaf_path',
+    #                 labels, colors, markers, corr=args.corr)
+    # axs[row][i].set_xlabel(xlabel)
 
-    axs[0][0].set_ylabel(ylabel)
-    axs[1][0].set_ylabel(ylabel)
+    # axs[0].set_ylabel(ylabel)
+    # axs[1][0].set_ylabel(ylabel)
 
     os.makedirs(args.out_dir, exist_ok=True)
 
