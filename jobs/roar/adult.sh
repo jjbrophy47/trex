@@ -16,7 +16,6 @@ max_depth=10
 
 tree_kernel='leaf_output'
 
-
 python3 experiments/scripts/roar.py \
   --dataset $dataset \
   --tree_kernel $tree_kernel \

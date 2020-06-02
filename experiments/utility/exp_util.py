@@ -16,6 +16,18 @@ from sklearn.neighbors import KNeighborsClassifier
 from influence_boosting.influence.leaf_influence import CBLeafInfluenceEnsemble
 
 
+def get_val_data(X_train, val_frac, seed):
+    """
+    Use part of the training data as validation data.
+    """
+    if val_frac < 1.0 and val_frac > 0.0:
+        n_val = int(X_train.shape[0] * val_frac)
+        np.random.seed(seed)
+        val_indices = np.random.choice(X_train.shape[0], size=n_val, replace=False)
+        X_val = X_train[val_indices].copy()
+    return X_val
+
+
 def save_model(model, model_path):
     """
     Saves model for later use.

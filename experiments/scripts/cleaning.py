@@ -236,10 +236,8 @@ def experiment(args, logger, out_dir, seed):
     noisy_ndx = np.array(sorted(noisy_ndx))
     logger.info('num noisy labels: {}'.format(len(noisy_ndx)))
 
-    # use part of the test data as validation data
-    X_val = X_test.copy()
-    if args.val_frac < 1.0 and args.val_frac > 0.0:
-        X_val = X_val[int(X_val.shape[0] * args.val_frac):]
+    # get validation
+    X_val = exp_util.get_val_data(X_train, args.val_frac, seed)
 
     # train a tree ensemble on the clean and noisy labels
     model = clone(clf).fit(X_train, y_train)

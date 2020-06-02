@@ -24,6 +24,7 @@ import trex
 from utility import model_util
 from utility import data_util
 from utility import print_util
+from utility import exp_util
 from influence_boosting.influence.leaf_influence import CBLeafInfluenceEnsemble
 from maple.MAPLE import MAPLE
 
@@ -180,10 +181,7 @@ def experiment(args, logger, out_dir, seed):
         n_samples = int(X_train.shape[0] * args.train_frac)
         X_train, y_train = X_train[:n_samples], y_train[:n_samples]
 
-    # use part of the test data for tuning
-    X_val = X_test.copy()
-    if args.val_frac < 1.0 and args.val_frac > 0.0:
-        X_val = X_val[int(X_val.shape[0] * args.val_frac):]
+    X_val = exp_util.get_val_data(X_train, args.val_frac, seed)
 
     # use part of the test data for evaluation
     if args.test_frac < 1.0 and args.test_frac > 0.0:

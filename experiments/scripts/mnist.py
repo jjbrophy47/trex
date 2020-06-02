@@ -108,10 +108,7 @@ def experiment(args, logger, out_dir, seed):
     logger.info('fitting {}...'.format(args.tree_type))
     tree = clone(clf).fit(X_train_pca, y_train)
 
-    # use part of the test data as validation data
-    X_val_pca = X_test_pca.copy()
-    if args.val_frac < 1.0 and args.val_frac > 0.0:
-        X_val_pca = X_val_pca[int(X_val_pca.shape[0] * args.val_frac):]
+    X_val_pca = exp_util.get_val_data(X_train_pca, args.val_frac, seed)
 
     logger.info('fitting TREX...')
     explainer = trex.TreeExplainer(tree, X_train_pca, y_train,

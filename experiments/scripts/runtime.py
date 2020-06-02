@@ -158,11 +158,7 @@ def experiment(args, logger, out_dir, seed):
                               random_state=seed,
                               data_dir=args.data_dir)
     X_train, X_test, y_train, y_test, label = data
-
-    # use part of the test data as validation data
-    X_val = X_test.copy()
-    if args.val_frac < 1.0 and args.val_frac > 0.0:
-        X_val = X_val[int(X_val.shape[0] * args.val_frac):]
+    X_val = exp_util.get_val_data(X_train, args.val_frac, seed)
 
     logger.info('train instances: {:,}'.format(len(X_train)))
     logger.info('val instances: {:,}'.format(len(X_val)))
