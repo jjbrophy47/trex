@@ -3,6 +3,7 @@
 **.npy
 **.csv
 **catboost_info
+*cb_model.json
 
 myenv
 testenv

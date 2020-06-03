@@ -8,6 +8,7 @@ for a single test instance.
 """
 import os
 import sys
+import time
 import argparse
 import warnings
 warnings.simplefilter(action='ignore', category=UserWarning)  # lgb compiler warning
@@ -19,11 +20,14 @@ import shap
 import numpy as np
 import seaborn as sns
 import matplotlib.pyplot as plt
+from scipy.stats import gaussian_kde
+# from sklearn.metrics import accuracy_score
 
 import trex
 from utility import model_util
 from utility import data_util
 from utility import print_util
+from utility import exp_util
 
 
 def set_size(width, fraction=1, subplots=(1, 1)):
@@ -35,7 +39,7 @@ def set_size(width, fraction=1, subplots=(1, 1)):
     return width, height
 
 
-def _get_top_features(x, shap_vals, feature_list, k=1):
+def _get_top_features(x, shap_vals, feature_list, k=1, normalize=False):
     """
     Parameters
     ----------
@@ -52,11 +56,15 @@ def _get_top_features(x, shap_vals, feature_list, k=1):
     """
     assert len(x) == len(shap_vals) == len(feature_list)
     shap_sort_ndx = np.argsort(np.abs(shap_vals))[::-1]
+
+    if normalize:
+        shap_vals /= np.sum(np.abs(shap_vals))
+
     return list(zip(feature_list[shap_sort_ndx], x[shap_sort_ndx],
                     shap_vals[shap_sort_ndx]))[:k]
 
 
-def _plot_feature_histograms(args, results, out_dir):
+def _plot_feature_histograms(args, results, test_val, out_dir):
     """
     Plot the density of the most important feature weighted
     by training instance importance and similarity to the test instance.
@@ -78,10 +86,11 @@ def _plot_feature_histograms(args, results, out_dir):
             color='g', hatch='.', alpha=args.alpha, label='positive instances')
     ax.hist(train_feature_vals[train_neg_ndx], bins=train_feature_bins,
             color='r', hatch='\\', alpha=args.alpha, label='negative instances')
+    ax.axvline(test_val, color='k')
     ax.set_xlabel('value')
     ax.set_ylabel('density')
     ax.set_title('Unweighted')
-    ax.set_xlim(-0.25, 1.25)
+    # ax.set_xlim(-0.25, 1.25)
     ax.legend()
     ax.tick_params(axis='both', which='major')
 
@@ -89,15 +98,18 @@ def _plot_feature_histograms(args, results, out_dir):
     ax = axs[1]
     ax.hist(train_feature_vals[train_pos_ndx], bins=train_feature_bins,
             color='g', hatch='.', alpha=args.alpha,
-            weights=np.abs(train_weight)[train_pos_ndx])
+            # weights=np.abs(train_weight)[train_pos_ndx])
+            weights=train_weight[train_pos_ndx])
 
     ax.hist(train_feature_vals[train_neg_ndx], bins=train_feature_bins,
             color='r', hatch='\\', alpha=args.alpha,
-            weights=np.abs(train_weight)[train_neg_ndx])
+            # weights=np.abs(train_weight)[train_neg_ndx])
+            weights=train_weight[train_neg_ndx])
+    ax.axvline(test_val, color='k')
 
     ax.set_xlabel('value')
     ax.set_title(r'|$\alpha$|',)
-    ax.set_xlim(-0.25, 1.25)
+    # ax.set_xlim(-0.25, 1.25)
     ax.tick_params(axis='both', which='major')
 
     # weighted by TREX's global weights * similarity to the test instance
@@ -105,17 +117,22 @@ def _plot_feature_histograms(args, results, out_dir):
     ax = axs[2]
     ax.hist(train_feature_vals[train_pos_ndx], bins=train_feature_bins,
             color='g', hatch='.', alpha=args.alpha,
-            weights=np.abs(train_sim_weight)[train_pos_ndx])
+            # weights=np.abs(train_sim_weight)[train_pos_ndx])
+            weights=train_sim_weight[train_pos_ndx])
 
     ax.hist(train_feature_vals[train_neg_ndx], bins=train_feature_bins,
             color='r', hatch='\\', alpha=args.alpha,
-            weights=np.abs(train_sim_weight)[train_neg_ndx])
+            # weights=np.abs(train_sim_weight)[train_neg_ndx])
+            weights=train_sim_weight[train_neg_ndx])
+    ax.axvline(test_val, color='k')
+
     ax.set_xlabel('value')
-    ax.set_title(r'|$\alpha$| * Similarity')
-    ax.set_xlim(-0.25, 1.25)
+    ax.set_title(r'$\alpha$ * Similarity')
+    # ax.set_xlim(-0.25, 1.25)
     ax.tick_params(axis='both', which='major')
 
     plt.tight_layout()
+    plt.show()
     # plt.savefig(os.path.join(out_dir, 'feature_distribution.{}'.format(args.ext)))
 
 
@@ -127,12 +144,9 @@ def _plot_instance_histograms(args, logger, results, out_dir):
     """
     train_weight = results['train_weight']
     train_sim = results['train_sim']
-
-    fig, axs = plt.subplots(1, 2, figsize=(10, 5))
+    pred_label = results['trex_x_test_pred']
 
     train_sim_weight = train_sim * train_weight
-    all_vals = np.concatenate([train_weight, train_sim_weight])
-    bins = np.histogram(all_vals, bins=args.max_bins)[1]
 
     s = '[{:15}] mean: {:>12.7f}, median: {:>12.7f}, sum: {:>12.7f}'
     logger.info(s.format('weight', np.mean(train_weight),
@@ -142,12 +156,106 @@ def _plot_instance_histograms(args, logger, results, out_dir):
     logger.info(s.format('sim * weight', np.mean(train_sim_weight),
                 np.median(train_sim_weight), np.sum(train_sim_weight)))
 
+    all_vals = np.concatenate([train_weight, train_sim_weight])
+    bins = np.histogram(all_vals, bins=args.max_bins)[1]
+    bins = None
+
+    if args.coverage:
+
+        # ordering influential samples by biggest absolute influence
+        train_sim_weight_sum = np.sum(np.abs(train_sim_weight))
+        train_sim_weight_sorted = np.argsort(np.abs(train_sim_weight))[::-1]
+
+        pct_prediction = args.coverage * 100
+        logger.info('\nexplaining {}% of the prediction'.format(pct_prediction))
+
+        total = 0
+        n_samples = 0
+        for i, ndx in enumerate(train_sim_weight_sorted):
+            total += np.abs(train_sim_weight[ndx])
+            # logger.info('total: {} sum: {}'.format(total, train_sim_weight_sum))
+            if total / train_sim_weight_sum >= args.coverage:
+                n_samples = i
+                break
+
+        if n_samples == 0:
+            n_samples = len(train_weight)
+
+        indices = train_sim_weight_sorted[:n_samples]
+        pct_data = len(indices) / len(train_weight) * 100
+
+        logger.info('{:.2f}% of the data'.format(pct_data))
+        logger.info('no. influential samples: {:,}'.format(len(indices)))
+
+        v1 = train_weight[indices]
+        v2 = train_sim_weight[indices]
+
+    else:
+
+        # ordering influential samples by minimum no. needed to explain the predicted label
+        train_sim_weight_sum = np.sum(np.abs(train_sim_weight))
+        train_sim_weight_neg = np.where(train_sim_weight < 0)[0]
+        train_sim_weight_pos = np.where(train_sim_weight > 0)[0]
+
+        if pred_label == 0:
+            target = train_sim_weight_pos
+            new_ndx = np.argsort(train_sim_weight[train_sim_weight_neg])
+            ep = train_sim_weight_neg[new_ndx]
+        else:
+            target = train_sim_weight_neg
+            new_ndx = np.argsort(train_sim_weight[train_sim_weight_pos])[::-1]
+            ep = train_sim_weight_pos[new_ndx]
+
+        total = 0
+        coverage = 0
+        n_ep = 0
+        finished = False
+        target_sum = np.sum(np.abs(train_sim_weight[target]))
+
+        surplus = 0 if not args.surplus else (train_sim_weight_sum - target_sum) / args.surplus
+
+        for i, ndx in enumerate(ep):
+            total += np.abs(train_sim_weight[ndx])
+            # logger.info('total: {}, target: {}, sum: {}'.format(total, target_sum, train_sim_weight_sum))
+            if total > (target_sum + surplus):
+                n_ep = i
+                coverage = (total + target_sum) / train_sim_weight_sum
+                finished = True
+                break
+
+        if finished:
+            indices = np.concatenate([target, ep[:n_ep]])
+        else:
+            logger.info('did not finish')
+
+        pct_data = len(indices) / len(train_weight) * 100
+        pct_prediction = coverage * 100
+        pct_surplus = surplus / train_sim_weight_sum * 100
+
+        logger.info('no. influential samples: {:,}'.format(len(indices)))
+        logger.info('{:.2f}% of the data'.format(pct_data))
+        logger.info('{:.2f}% of the prediction'.format(pct_prediction))
+        logger.info('+{:.1f}% surplus of the prediction'.format(pct_surplus))
+
+        v1 = train_weight[indices]
+        v2 = train_sim_weight[indices]
+
+    # plot contributions
+    width = 5.5  # Neurips 2020
+    width, height = set_size(width=width * 3, fraction=1, subplots=(1, 4))
+    fig = plt.figure(figsize=(width, height * 1.25))
+
+    axs = []
+    axs.append(plt.subplot(141))
+    axs.append(plt.subplot(142, sharey=axs[0]))
+    axs.append(plt.subplot(143))
+    axs.append(plt.subplot(144))
+
     # plot weight distribution for the training samples
     ax = axs[0]
-    sns.distplot(train_weight, color='orange', ax=axs[0], kde=args.kde, bins=bins)
+    sns.distplot(v1, color='orange', ax=axs[0], kde=args.kde, bins=bins)
     ax.set_xlabel(r'$\alpha$')
     ax.set_ylabel('density')
-    ax.set_title('(a)')
     ax.tick_params(axis='both', which='major')
     if args.xlim:
         ax.set_xlim(-args.xlim, args.xlim)
@@ -155,44 +263,52 @@ def _plot_instance_histograms(args, logger, results, out_dir):
     # plot similarity x weight for the training samples
     i = 0 if args.overlay else 1
     ax = axs[i]
-    sns.distplot(train_sim_weight, color='green', ax=ax, kde=args.kde, bins=bins)
-    ax.set_xlabel(r'$\alpha$ * similarity')
-    ax.set_title('(b)')
+    sns.distplot(v2, color='green', ax=ax, kde=args.kde, bins=bins)
+    ax.set_xlabel(r'$\alpha * \gamma$')
+    ax.set_ylabel('density')
     ax.tick_params(axis='both', which='major')
     if args.xlim:
         ax.set_xlim(-args.xlim, args.xlim)
 
     plt.tight_layout()
-    # plt.savefig(os.path.join(out_dir, 'weight_distribution.{}'.format(args.ext)))
 
-    # plot contributions
-    width = 5.5  # Neurips 2020
-    width, height = set_size(width=width * 1.25, fraction=1, subplots=(1, 1))
-    fig, ax = plt.subplots(1, 1, figsize=(width, height))
+    ax = axs[2]
 
-    ax.scatter(train_weight, train_sim, alpha=args.alpha, color='green',
-               marker='x', label=r'$\gamma$')
-    ax.scatter(train_weight, train_sim_weight, alpha=args.alpha, color='orange',
-               marker='*', label=r'$\alpha * \gamma$')
+    # compute density
+    xy = np.vstack([train_weight[indices], train_sim[indices]])
+    z = gaussian_kde(xy)(xy)
+    ax.scatter(train_weight[indices], train_sim[indices], c=z, s=20, edgecolor='')
     ax.axhline(0, color='k')
     ax.axvline(0, color='k')
     ax.set_ylabel(r'$\gamma$')
     ax.set_xlabel(r'$\alpha$')
-    ax.legend(loc='lower right')
+
+    ax = axs[3]
+    xy = np.vstack([train_weight[indices], train_sim_weight[indices]])
+    z = gaussian_kde(xy)(xy)
+    ax.scatter(train_weight[indices], train_sim_weight[indices], c=z, s=20, edgecolor='')
+    ax.axhline(0, color='k')
+    ax.axvline(0, color='k')
+    ax.set_xlabel(r'$\alpha$')
+    ax.set_ylabel(r'$\alpha * \gamma$')
 
     ax2 = ax.twinx()
 
-    train_weight_sorted_ndx = np.argsort(train_weight)
-    train_weight_sorted = train_weight[train_weight_sorted_ndx]
-    train_sim_weight_sorted = train_sim_weight[train_weight_sorted_ndx]
+    train_weight_sorted_ndx = np.argsort(train_weight[indices])
+    train_weight_sorted = train_weight[indices][train_weight_sorted_ndx]
+    train_sim_weight_sorted = train_sim_weight[indices][train_weight_sorted_ndx]
     train_sim_weight_sorted_cumsum = np.cumsum(train_sim_weight_sorted)
 
     ax2.plot(train_weight_sorted, train_sim_weight_sorted_cumsum,
              label='contribution', color='k', linestyle='--')
-    ax2.set_ylabel(r'$\alpha * \gamma$')
+    ax2.set_ylabel(r'$\sum \alpha * \gamma$')
 
+    fig.suptitle('Explaining {:.1f}% of the prediction using {:.1f}% of the data'.format(pct_prediction, pct_data))
     plt.tight_layout()
-    plt.savefig(os.path.join(out_dir, 'contributions.{}'.format(args.ext)))
+    fig.tight_layout(rect=[0, 0.03, 1, 0.95])
+
+    setting = 'minimum_{:.1f}'.format(pct_surplus) if not args.coverage else '{:.1f}'.format(args.coverage)
+    plt.savefig(os.path.join(out_dir, 'plot_{}.{}'.format(setting, args.ext)))
 
 
 def experiment(args, logger, out_dir, seed):
@@ -207,46 +323,84 @@ def experiment(args, logger, out_dir, seed):
                               random_state=seed,
                               data_dir=args.data_dir,
                               return_feature=True)
+
     X_train, X_test, y_train, y_test, label, feature = data
 
-    logger.info('train instances: {:,}'.format(len(X_train)))
-    logger.info('test instances: {:,}'.format(len(X_test)))
-    logger.info('no. features: {:,}'.format(X_train.shape[1]))
+    logger.info('train shape: {}'.format(X_train.shape))
+    logger.info('test shape: {}'.format(X_test.shape))
+    logger.info('no. features: {:,}'.format(len(feature)))
+
+    logger.info('y_train label1: {:,}'.format(np.sum(y_train)))
+    logger.info('y_test label1: {:,}'.format(np.sum(y_test)))
 
     # train a tree ensemble
+    logger.info('training the tree ensemble...')
     tree = clf.fit(X_train, y_train)
     model_util.performance(tree, X_train, y_train, X_test, y_test, logger=logger)
 
+    # load a TREX model
+    model_dir = os.path.join(out_dir, '../models/')
+    os.makedirs(model_dir, exist_ok=True)
+    model_path = os.path.join(model_dir, 'explainer.pkl')
+
+    if args.load_trex and os.path.exists(model_path):
+        assert os.path.exists(model_path)
+        logger.info('loading TREX model from {}...'.format(model_path))
+        explainer = exp_util.load_model(model_path)
+
     # train TREX
-    logger.info('building TREX...')
-    explainer = trex.TreeExplainer(tree, X_train, y_train,
-                                   tree_kernel=args.tree_kernel,
-                                   random_state=seed,
-                                   kernel_model=args.kernel_model,
-                                   kernel_model_kernel=args.kernel_model_kernel,
-                                   true_label=args.true_label)
+    else:
+        logger.info('building TREX...')
+        explainer = trex.TreeExplainer(tree, X_train, y_train,
+                                       tree_kernel=args.tree_kernel,
+                                       random_state=seed,
+                                       kernel_model=args.kernel_model,
+                                       kernel_model_kernel=args.kernel_model_kernel,
+                                       true_label=args.true_label)
+        logger.info('saving TREX model to {}...'.format(model_path))
+        explainer.save(model_path)
 
     # extract predictions
-    logger.info('generating predictions...')
+    start = time.time()
+    logger.info('\ngenerating tree predictions...')
     y_test_pred_tree = tree.predict(X_test)
-    y_test_pred_trex = explainer.predict(X_test)
+    logger.info('time: {:.3f}s'.format(time.time() - start))
 
-    logger.info('generating probabilities...')
+    start = time.time()
+    logger.info('generating tree probabilities...')
     y_test_proba_tree = tree.predict_proba(X_test)[:, 1]
-    if args.kernel_model == 'lr':
-        y_test_proba_trex = explainer.predict_proba(X_test)[:, 1]
+    logger.info('time: {:.3f}s'.format(time.time() - start))
+
+    wrong_label0 = np.where((y_test_pred_tree == 1) & (y_test == 0))[0]
+    wrong_label1 = np.where((y_test_pred_tree == 0) & (y_test == 1))[0]
+    total_wrong = len(wrong_label0) + len(wrong_label1)
+    logger.info('wrong - label0: {}, label1: {}, total: {}'.format(
+                len(wrong_label0), len(wrong_label1), total_wrong))
+
+    if args.test_type == 'pos_correct':
+        correct_indices = np.where((y_test_pred_tree == 1) & (y_test == 1))[0]
+        np.random.seed(seed)
+        test_ndx = np.random.choice(correct_indices)
+
+    elif args.test_type == 'neg_correct':
+        correct_indices = np.where((y_test_pred_tree == 0) & (y_test == 0))[0]
+        np.random.seed(seed)
+        test_ndx = np.random.choice(correct_indices)
 
     # instances where pred=1 but label=0
-    if args.pos_pred:
+    elif args.test_type == 'pos_incorrect':
         missed_indices = np.where((y_test_pred_tree == 1) & (y_test == 0))[0]
         np.random.seed(seed)
         test_ndx = np.random.choice(missed_indices)
 
     # instances where pred=0 but label=1
-    else:
+    elif args.test_type == 'neg_incorrect':
         missed_indices = np.where((y_test_pred_tree == 0) & (y_test == 1))[0]
         np.random.seed(seed)
         test_ndx = np.random.choice(missed_indices)
+
+    else:
+        raise ValueError('unknown test_type!')
 
     x_test = X_test[[test_ndx]]
 
@@ -255,16 +409,20 @@ def experiment(args, logger, out_dir, seed):
     logger.info('tree pred: {} ({:.3f})'.format(y_test_pred_tree[test_ndx],
                                                 y_test_proba_tree[test_ndx]))
     if args.kernel_model == 'lr':
-        logger.info('TREX pred: {} ({:.3f})'.format(y_test_pred_trex[test_ndx],
-                                                    y_test_proba_trex[test_ndx]))
+        logger.info('TREX pred: {} ({:.3f})'.format(explainer.predict(x_test)[0],
+                                                    explainer.predict_proba(x_test)[:, 1][0]))
     else:
-        logger.info('TREX pred: {}'.format(y_test_pred_trex[test_ndx]))
+        logger.info('TREX pred: {}'.format(explainer.predict(x_test)[0]))
 
     # obtain most important features
-    logger.info('\ncomputing most influential features...')
     shap_explainer = shap.TreeExplainer(tree)
+    logger.info('\ncomputing SHAP values for x_test...')
     test_shap = shap_explainer.shap_values(x_test)
-    top_features = _get_top_features(x_test[0], test_shap[0], feature, k=args.topk)
+    top_features = _get_top_features(x_test[0], test_shap[0], feature,
+                                     k=args.topk, normalize=args.normalize_shap)
+
+    # for top_feature in top_features:
+    #     logger.info(top_feature)
 
     # get positive and negative training samples
     train_pos_ndx = np.where(y_train == 1)[0]
@@ -273,14 +431,54 @@ def experiment(args, logger, out_dir, seed):
     # get global weights and similarity to the test instance
     train_weight = explainer.get_weight()[0]
     sim = explainer.similarity(X_test[[test_ndx]])[0]
+    contributions = train_weight * sim
 
-    logger.info('collecting results...')
+    # weight_sort_ndx = np.argsort(train_weight)
+    # step_size = int(len(train_weight) / 20)
+
+    # # remove training samples in batches
+    # fig, ax = plt.subplots()
+
+    # scores = []
+    # pct_removed = []
+    # logger.info('removing samples from smallest to biggest...')
+    # for i in range(0, len(train_weight) - step_size, step_size):
+    #     keep_indices = weight_sort_ndx[i:]
+    #     new_X_train = X_train[keep_indices]
+    #     new_y_train = y_train[keep_indices]
+    #     new_tree = clf.fit(new_X_train, new_y_train)
+    #     if np.sum(new_y_train) > 0 and np.sum(new_y_train) < len(new_y_train):
+    #         scores.append(accuracy_score(y_test, new_tree.predict(X_test)))
+    #         pct_removed.append(i / len(train_weight) * 100)
+
+    # ax.plot(pct_removed, scores, marker='.', label='small to big')
+
+    # weight_sort_ndx = weight_sort_ndx[::-1]
+    # scores = []
+    # pct_removed = []
+    # logger.info('removing samples from biggest to smallest...')
+    # for i in range(0, len(train_weight) - step_size, step_size):
+    #     keep_indices = weight_sort_ndx[i:]
+    #     new_X_train = X_train[keep_indices]
+    #     new_y_train = y_train[keep_indices]
+    #     new_tree = clf.fit(new_X_train, new_y_train)
+    #     if np.sum(new_y_train) > 0 and np.sum(new_y_train) < len(new_y_train):
+    #         scores.append(accuracy_score(y_test, new_tree.predict(X_test)))
+    #         pct_removed.append(i / len(train_weight) * 100)
+
+    # ax.plot(pct_removed, scores, marker='.', label='big to small')
+
+    # ax.legend()
+    # plt.show()
+
+    logger.info('\ncollecting results...')
     results = explainer.get_params()
     results['test_ndx'] = test_ndx
     results['train_pos_ndx'] = train_pos_ndx
     results['train_neg_ndx'] = train_neg_ndx
     results['train_weight'] = train_weight
     results['train_sim'] = sim
+    results['trex_x_test_pred'] = explainer.predict(x_test)[0]
 
     # matplotlib settings
     plt.rc('font', family='serif')
@@ -293,11 +491,46 @@ def experiment(args, logger, out_dir, seed):
     plt.rc('lines', linewidth=1)
     plt.rc('lines', markersize=6)
 
+    # shap values for train and test
+    X_train_shap_fp = os.path.join(model_dir, 'X_train_shap.npy')
+    X_test_shap_fp = os.path.join(model_dir, 'X_test_shap.npy')
+
+    if os.path.exists(X_train_shap_fp):
+        X_train_shap = np.load(X_train_shap_fp)
+    else:
+        logger.info('\ncomputing SHAP values for X_train...')
+        X_train_shap = shap_explainer.shap_values(X_train)
+        np.save(X_train_shap_fp, X_train_shap)
+
+    if os.path.exists(X_test_shap_fp):
+        X_test_shap = np.load(X_test_shap_fp)
+    else:
+        logger.info('computing SHAP values for X_test...')
+        X_test_shap = shap_explainer.shap_values(X_test)
+        np.save(X_test_shap_fp, X_test_shap)
+
+    # shap.summary_plot(X_train_shap, X_train, feature_names=feature)
+    # shap.summary_plot(X_test_shap, X_test, feature_names=feature)
+
+    # contributions = explainer.explain(x_test)[0]
+    contributions_sum = np.sum(np.abs(contributions))
+    indices = np.argsort(np.abs(contributions))[::-1]
+
+    # feature-based explanation for test instance
+    logger.info('test {}'.format(test_ndx))
+    shap.summary_plot(test_shap, x_test, feature_names=feature)
+
+    # feature-based explanations for the most influential training instances
+    for ndx in indices[:args.topk]:
+        w = train_weight[ndx]
+        s = sim[ndx]
+        c = contributions[ndx] / contributions_sum
+        logger.info('train {}, weight: {}, sim: {}, contribution (normalized): {}'.format(ndx, w, s, c))
+        # shap.summary_plot(X_train_shap[[ndx]], X_train[[ndx]], feature_names=feature)
+
     # explain features
-    for target_feature, val, shap_val in top_features:
+    for target_feature, test_val, shap_val in top_features:
         feat_ndx = np.where(target_feature == feature)[0][0]
-        logger.info('{}, index: {}, val: {}, shap val: {}'.format(
-                    target_feature, feat_ndx, val, shap_val))
 
         train_feature_bins = np.histogram(X_train[:, feat_ndx], bins=args.max_bins)[1]
 
@@ -305,7 +538,7 @@ def experiment(args, logger, out_dir, seed):
         results['train_feature_vals'] = X_train[:, feat_ndx]
         results['train_feature_bins'] = train_feature_bins
 
-        _plot_feature_histograms(args, results, out_dir)
+        _plot_feature_histograms(args, results, test_val, out_dir)
 
     _plot_instance_histograms(args, logger, results, out_dir)
     np.save(os.path.join(out_dir, 'results.npy'), results)
@@ -341,7 +574,11 @@ if __name__ == '__main__':
     parser.add_argument('--kde', action='store_true', default=None, help='plot kde on weight distribution.')
     parser.add_argument('--overlay', action='store_true', default=None, help='overlay weight distributions.')
     parser.add_argument('--topk', type=int, default=1, help='number of features to show.')
-    parser.add_argument('--pos_pred', action='store_true', default=False, help='show positive prediction.')
+    parser.add_argument('--test_type', type=str, default='correct', help='instance to try and explain.')
+    parser.add_argument('--load_trex', action='store_true', default=False, help='load TREX.')
+    parser.add_argument('--normalize_shap', action='store_true', default=False, help='normalize SHAP values.')
+    parser.add_argument('--coverage', type=float, default=0.9, help='fraction of contributions to explain.')
+    parser.add_argument('--surplus', type=float, default=None, help='multiplier for surplus minimum contributions.')
 
     parser.add_argument('--tree_type', type=str, default='lgb', help='model to use.')
     parser.add_argument('--n_estimators', type=int, default=100, help='number of trees.')
@@ -372,7 +609,10 @@ class Args:
     kde = False
     overlay = False
     topk = 1
-    pos_pred = True
+    test_type = 'correct'
+    load_trex = False
+    normalize_shap = False
+    coverage = 0.1
 
     tree_type = 'lgb'
     n_estimators = 100

@@ -34,7 +34,7 @@ def _get_results(args, dataset, tree_kernel='None'):
     return res
 
 
-def _plot_graph(ax, res, xlabel=None, ylabel=None,
+def _plot_graph(args, ax, res, xlabel=None, ylabel=None,
                 alpha=0.5, s=100, title=''):
 
     # plot train
@@ -88,7 +88,7 @@ def main(args):
     d1_res_none = _get_results(args, d1)
 
     if d1_res_none:
-        _plot_graph(axs[0], d1_res_none, xlabel='tsne 0',
+        _plot_graph(args, axs[0], d1_res_none, xlabel='tsne 0',
                     ylabel='tsne 1', title='Original')
         axs[0].legend()
 
@@ -96,7 +96,7 @@ def main(args):
         d1_res_tree = _get_results(args, d1, tree_kernel=args.tree_kernel)
 
         if d1_res_tree:
-            _plot_graph(axs[1], d1_res_tree, xlabel='tsne 0',
+            _plot_graph(args, axs[1], d1_res_tree, xlabel='tsne 0',
                         ylabel=None, title='Tree kernel')
 
     if len(args.dataset) > 1:
@@ -104,7 +104,7 @@ def main(args):
         d2_res_tree = _get_results(args, d2, tree_kernel=args.tree_kernel)
 
         if d2_res_tree:
-            _plot_graph(axs[2], d2_res_tree, xlabel='tsne 0',
+            _plot_graph(args, axs[2], d2_res_tree, xlabel='tsne 0',
                         ylabel=None, title='Different train/test')
 
     os.makedirs(args.out_dir, exist_ok=True)

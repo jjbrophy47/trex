@@ -176,7 +176,7 @@ if __name__ == '__main__':
     parser.add_argument('--data_dir', type=str, default='data', help='data directory.')
     parser.add_argument('--out_dir', type=str, default='output/fidelity/', help='output directory.')
 
-    parser.add_argument('--val_frac', type=float, default=0.1, help='amount of training data to use for validation.')
+    parser.add_argument('--val_frac', type=float, default=0.05, help='amount of training data to use for validation.')
     parser.add_argument('--flip_frac', type=float, default=None, help='Fraction of train labels to flip.')
 
     parser.add_argument('--tree_type', type=str, default='cb', help='model to use.')

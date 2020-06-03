@@ -72,6 +72,7 @@ def main():
     np.save('train.npy', new_train.to_numpy())
     print('saving to test.npy...')
     np.save('test.npy', new_test.to_numpy())
+    np.save('feature.npy', feature_col)
 
 
 if __name__ == '__main__':

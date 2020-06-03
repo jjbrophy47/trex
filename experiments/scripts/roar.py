@@ -269,7 +269,7 @@ if __name__ == '__main__':
     parser.add_argument('--out_dir', type=str, default='output/roar/', help='directory to save results.')
 
     parser.add_argument('--train_frac', type=float, default=1.0, help='dataset to explain.')
-    parser.add_argument('--val_frac', type=float, default=0.1, help='Amount of data for validation.')
+    parser.add_argument('--val_frac', type=float, default=0.05, help='Amount of data for validation.')
     parser.add_argument('--test_frac', type=float, default=1.0, help='dataset to evaluate on.')
 
     parser.add_argument('--tree_type', type=str, default='cb', help='model to use.')

@@ -105,30 +105,41 @@ def _load_wine(test_size=0.2, random_state=69, return_feature=False):
     return result
 
 
-def _load_adult(data_dir='data'):
+def _load_adult(data_dir='data', return_feature=False):
     train = np.load(os.path.join(data_dir, 'adult/train.npy'))
     test = np.load(os.path.join(data_dir, 'adult/test.npy'))
+    feature = np.load(os.path.join(data_dir, 'adult/feature.npy'))
     label = ['<=50K', '>50k']
     X_train = train[:, :-1]
     y_train = train[:, -1].astype(np.int32)
     X_test = test[:, :-1]
     y_test = test[:, -1].astype(np.int32)
-    return X_train, X_test, y_train, y_test, label
+    result = (X_train, X_test, y_train, y_test, label)
+    if return_feature:
+        result += (feature,)
+    return result
 
 
-def _load_amazon(data_dir='data'):
+def _load_amazon(data_dir='data', return_feature=False):
     train = np.load(os.path.join(data_dir, 'amazon/train.npy'))
     test = np.load(os.path.join(data_dir, 'amazon/test.npy'))
+    feature = np.load(os.path.join(data_dir, 'amazon/feature.npy'))
     label = ['0', '1']
     X_train = train[:, 1:]
     y_train = train[:, 0].astype(np.int32)
     X_test = test[:, 1:]
     y_test = test[:, 0].astype(np.int32)
-    return X_train, X_test, y_train, y_test, label
+    result = (X_train, X_test, y_train, y_test, label)
+
+    if return_feature:
+        result += (feature,)
+
+    return result
 
 
-def _load_churn(data_dir='data', test_size=0.2, random_state=69):
+def _load_churn(data_dir='data', test_size=0.2, random_state=69, return_feature=False):
     data = np.load(os.path.join(data_dir, 'churn/data.npy'))
+    feature = np.load(os.path.join(data_dir, 'churn/feature.npy'))
     label = ['no', 'yes']
     X = data[:, :-1]
     y = data[:, -1].astype(np.int32)
@@ -136,9 +147,14 @@ def _load_churn(data_dir='data', test_size=0.2, random_state=69):
     if test_size is not None:
         X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=test_size,
                                                             random_state=random_state, stratify=y)
-        return X_train, X_test, y_train, y_test, label
+        result = (X_train, X_test, y_train, y_test, label)
     else:
-        return X, y, label
+        result = (X, y, label)
+
+    if return_feature:
+        result += (feature,)
+
+    return result
 
 
 def _load_creditcard(data_dir='data', test_size=0.2, random_state=69):
@@ -446,15 +462,21 @@ def _load_dota2(data_dir='data'):
     return X_train, X_test, y_train, y_test, label
 
 
-def _load_census(data_dir='data'):
+def _load_census(data_dir='data', return_feature=False):
     train = np.load(os.path.join(data_dir, 'census/train.npy'))
     test = np.load(os.path.join(data_dir, 'census/test.npy'))
+    feature = np.load(os.path.join(data_dir, 'census/feature.npy'))
     label = ['0', '1']
     X_train = train[:, :-1]
     y_train = train[:, -1].astype(np.int32)
     X_test = test[:, :-1]
     y_test = test[:, -1].astype(np.int32)
-    return X_train, X_test, y_train, y_test, label
+    result = (X_train, X_test, y_train, y_test, label)
+
+    if return_feature:
+        result += (feature,)
+
+    return result
 
 
 def get_data(dataset, test_size=0.2, random_state=69, data_dir='data', return_feature=False,
@@ -471,11 +493,11 @@ def get_data(dataset, test_size=0.2, random_state=69, data_dir='data', return_fe
     elif dataset == 'wine':
         return _load_wine(test_size=test_size, random_state=random_state, return_feature=return_feature)
     elif dataset == 'adult':
-        return _load_adult(data_dir=data_dir)
+        return _load_adult(data_dir=data_dir, return_feature=return_feature)
     elif dataset == 'census':
-        return _load_census(data_dir=data_dir)
+        return _load_census(data_dir=data_dir, return_feature=return_feature)
     elif dataset == 'amazon':
-        return _load_amazon(data_dir=data_dir)
+        return _load_amazon(data_dir=data_dir, return_feature=return_feature)
     elif dataset == 'banknote':
         return _load_banknote(test_size=test_size, random_state=random_state, data_dir=data_dir,
                               return_feature=return_feature)
@@ -483,7 +505,8 @@ def get_data(dataset, test_size=0.2, random_state=69, data_dir='data', return_fe
         return _load_wikipedia(test_size=test_size, random_state=random_state, data_dir=data_dir,
                                return_feature=return_feature)
     elif dataset == 'churn':
-        return _load_churn(data_dir=data_dir, test_size=test_size, random_state=random_state)
+        return _load_churn(data_dir=data_dir, test_size=test_size, random_state=random_state,
+                           return_feature=return_feature)
     elif dataset == 'creditcard':
         return _load_creditcard(data_dir=data_dir, test_size=test_size, random_state=random_state)
     elif dataset == 'heart':

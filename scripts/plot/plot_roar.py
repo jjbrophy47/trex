@@ -28,7 +28,8 @@ def get_results(args, dataset, method, score_ndx=0):
         return None
 
     pcts = np.load(pct_path)
-    res = np.load(method_path)[score_ndx]
+    res = np.load(method_path, allow_pickle=True)[()]
+    res = res[args.metric]
 
     return res, pcts
 
@@ -40,7 +41,6 @@ def main(args):
     labels = ['TREX', 'Random', 'MAPLE', 'LeafInfluence', 'TE-KNN']
     markers = ['1', '*', 'd', 'h', 'o']
     metric_mapping = {'auc': 'AUROC', 'acc': 'Accuracy'}
-    metric_ndx_mapping = {'auc': 0, 'acc': 1}
 
     # matplotlib settings
     plt.rc('font', family='serif')
@@ -66,8 +66,7 @@ def main(args):
         ax = axs[i]
 
         for j, method in enumerate(method_list):
-            res = get_results(args, dataset, method,
-                              score_ndx=metric_ndx_mapping[args.metric])
+            res = get_results(args, dataset, method)
 
             if res is not None:
                 res, pcts = res
