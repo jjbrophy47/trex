@@ -105,8 +105,11 @@ def _load_wine(test_size=0.2, random_state=69, return_feature=False):
     return result
 
 
-def _load_adult(data_dir='data', return_feature=False):
-    train = np.load(os.path.join(data_dir, 'adult/train.npy'))
+def _load_adult(data_dir='data', return_feature=False, mismatch=False):
+    if mismatch:
+        train = np.load(os.path.join(data_dir, 'adult/train_mismatch.npy'))
+    else:
+        train = np.load(os.path.join(data_dir, 'adult/train.npy'))
     test = np.load(os.path.join(data_dir, 'adult/test.npy'))
     feature = np.load(os.path.join(data_dir, 'adult/feature.npy'))
     label = ['<=50K', '>50k']
@@ -482,7 +485,7 @@ def _load_census(data_dir='data', return_feature=False):
 def get_data(dataset, test_size=0.2, random_state=69, data_dir='data', return_feature=False,
              return_manipulation=False, return_image_id=False, remove_missing_features=False,
              categories='alt.atheism|talk.religion.misc', remove=('headers', 'footers', 'quotes'),
-             return_raw=True):
+             return_raw=True, mismatch=False):
     """Returns a train and test set from the desired dataset."""
 
     # load dataset
@@ -493,7 +496,7 @@ def get_data(dataset, test_size=0.2, random_state=69, data_dir='data', return_fe
     elif dataset == 'wine':
         return _load_wine(test_size=test_size, random_state=random_state, return_feature=return_feature)
     elif dataset == 'adult':
-        return _load_adult(data_dir=data_dir, return_feature=return_feature)
+        return _load_adult(data_dir=data_dir, return_feature=return_feature, mismatch=mismatch)
     elif dataset == 'census':
         return _load_census(data_dir=data_dir, return_feature=return_feature)
     elif dataset == 'amazon':

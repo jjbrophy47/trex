@@ -11,8 +11,8 @@
 module load python3/3.6.1
 
 dataset='adult'
-n_estimators=250
-max_depth=10
+n_estimators=100
+max_depth=5
 check_pct=0.25
 
 rs_list=(2)

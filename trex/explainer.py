@@ -99,6 +99,9 @@ class TreeExplainer:
         self.temp_dir = os.path.join(temp_dir, str(uuid.uuid4()))
         self._validate()
 
+        if logger:
+            logger.info('transforming training data...')
+
         # extract feature representations from the tree ensemble
         self.extractor_ = TreeExtractor(self.tree, tree_kernel=self.tree_kernel)
         self.train_feature_ = self.extractor_.fit_transform(self.X_train)
@@ -119,6 +122,8 @@ class TreeExplainer:
         # train the kernel model on the tree ensemble feature representation
         if X_val is not None:
             assert X_val.shape[1] == X_train.shape[1]
+            if logger:
+                logger.info('transforming validation data...')
             X_val_feature = self.extractor_.transform(X_val)
 
             # get tree predictions on validation data

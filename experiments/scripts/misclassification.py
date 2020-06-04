@@ -25,6 +25,7 @@ from sklearn.base import clone
 from scipy.stats import pearsonr
 from scipy.stats import spearmanr
 from tqdm import tqdm
+from sklearn.linear_model import LogisticRegression
 
 import trex
 from utility import model_util
@@ -325,7 +326,8 @@ def experiment(args, logger, out_dir, seed):
     data = data_util.get_data(args.dataset,
                               random_state=seed,
                               data_dir=args.data_dir,
-                              return_feature=True)
+                              return_feature=True,
+                              mismatch=True)
 
     X_train, X_test, y_train, y_test, label, feature = data
 
@@ -364,7 +366,7 @@ def experiment(args, logger, out_dir, seed):
                                        X_val=X_val,
                                        logger=logger)
         logger.info('saving TREX model to {}...'.format(model_path))
-        explainer.save(model_path)
+        # explainer.save(model_path)
 
     # extract predictions
     start = time.time()
@@ -408,6 +410,11 @@ def experiment(args, logger, out_dir, seed):
     else:
         raise ValueError('unknown test_type!')
 
+    # pick an instance where the person is <= 17 from the adult dataset
+    indices = np.where(X_test[:, 0] <= 17)[0]
+    np.random.seed(seed)
+    test_ndx = np.random.choice(indices, size=1)[0]
+
     x_test = X_test[[test_ndx]]
 
     # show explanations for missed instances
@@ -427,6 +434,24 @@ def experiment(args, logger, out_dir, seed):
     top_features = _get_top_features(x_test[0], test_shap[0], feature,
                                      k=args.topk, normalize=args.normalize_shap)
 
+    # randomly select data to train on
+    logger.info('train on a random subset of data')
+    np.random.seed(seed)
+    indices = np.random.choice(X_train.shape[0], size=int(X_train.shape[0] * args.s_frac), replace=False)
+    logger.info('{}: {:,} -> {:,}'.format(args.s_frac, X_train.shape[0], len(indices)))
+
+    new_tree = clone(clf).fit(X_train[indices], y_train[indices])
+    model_util.performance(tree, X_train, y_train, X_test, y_test, logger=logger)
+    model_util.performance(new_tree, X_train, y_train, X_test, y_test, logger=logger)
+
+    logger.info('\ntraining 2 different LR models')
+    l1 = LogisticRegression().fit(X_train, y_train)
+    l2 = LogisticRegression().fit(X_train[indices], y_train[indices])
+    model_util.performance(l1, X_train, y_train, X_test, y_test, logger=logger)
+    model_util.performance(l2, X_train, y_train, X_test, y_test, logger=logger)
+
+    # return
+
     # for top_feature in top_features:
     #     logger.info(top_feature)
 
@@ -439,7 +464,44 @@ def experiment(args, logger, out_dir, seed):
     sim = explainer.similarity(X_test[[test_ndx]])[0]
     contributions = train_weight * sim
 
-    if True:
+    if False:
+
+        # retrain to find gold standard sample impacts
+        samples = 250
+        np.random.seed(seed)
+        indices = np.random.choice(X_train.shape[0], size=samples, replace=False)
+        impacts = []
+
+        x_test_label = y_test[test_ndx]
+        proba = tree.predict_proba(x_test)[:, 1]
+
+        for i in tqdm(indices):
+            new_X_train = np.delete(X_train, i, axis=0)
+            new_y_train = np.delete(y_train, i)
+            new_tree = clone(clf).fit(new_X_train, new_y_train)
+            new_proba = new_tree.predict_proba(x_test)[:, 1]
+            diff = proba - new_proba
+            if x_test_label == 0:
+                impact = diff
+            elif x_test_label == 1:
+                impact = diff * -1
+            impacts.append(impact)
+
+        fig, ax = plt.subplots()
+        ax.scatter(contributions[indices], impacts)
+        plt.show()
+
+    # # training on the biggest weighted training samples
+    # sort_ndx = np.argsort(np.abs(train_weight))[::-1]
+    # indices = sort_ndx[:50]
+
+    # logger.info('training on top training samples')
+    # new_tree = clone(clf).fit(X_train[indices], y_train[indices],
+    #                           sample_weight=np.abs(train_weight[indices]))
+    # model_util.performance(tree, X_train, y_train, X_test, y_test, logger=logger)
+    # model_util.performance(new_tree, X_train, y_train, X_test, y_test, logger=logger)
+
+    if False:
 
         np.random.seed(seed)
         X_test_sub_ndx = np.random.choice(X_test.shape[0], size=int(X_test.shape[0] * 0.25))
@@ -615,13 +677,35 @@ def experiment(args, logger, out_dir, seed):
     # shap.summary_plot(X_train_shap, X_train, feature_names=feature)
     # shap.summary_plot(X_test_shap, X_test, feature_names=feature)
 
-    # contributions = explainer.explain(x_test)[0]
-    contributions_sum = np.sum(np.abs(contributions))
-    indices = np.argsort(np.abs(contributions))[::-1]
-
     # feature-based explanation for test instance
     logger.info('test {}'.format(test_ndx))
+    logger.info('{}'.format(dict(zip(feature, X_test[test_ndx]))))
     shap.summary_plot(test_shap, x_test, feature_names=feature)
+
+    pos_target = np.where((X_train[:, 0] <= 17) & (y_train == 1))[0]
+    neg_target = np.where((X_train[:, 0] <= 17) & (y_train == 0))[0]
+
+    contributions_sum = np.sum(np.abs(contributions))
+    # indices = np.argsort(np.abs(contributions))[::-1]
+    indices = np.argsort(contributions)[::-1]
+
+    # feature-based explanations for the most influential training instances
+    for ndx in pos_target[:5]:
+        w = train_weight[ndx]
+        s = sim[ndx]
+        c = contributions[ndx] / contributions_sum
+        logger.info('train {}, weight: {}, sim: {}, contribution (normalized): {}'.format(ndx, w, s, c))
+        logger.info('{}'.format(dict(zip(feature, X_train[ndx]))))
+        shap.summary_plot(X_train_shap[[ndx]], X_train[[ndx]], feature_names=feature)
+
+    # feature-based explanations for the most influential training instances
+    for ndx in neg_target[:5]:
+        w = train_weight[ndx]
+        s = sim[ndx]
+        c = contributions[ndx] / contributions_sum
+        logger.info('train {}, weight: {}, sim: {}, contribution (normalized): {}'.format(ndx, w, s, c))
+        logger.info('{}'.format(dict(zip(feature, X_train[ndx]))))
+        shap.summary_plot(X_train_shap[[ndx]], X_train[[ndx]], feature_names=feature)
 
     # feature-based explanations for the most influential training instances
     for ndx in indices[:args.topk]:
@@ -629,7 +713,8 @@ def experiment(args, logger, out_dir, seed):
         s = sim[ndx]
         c = contributions[ndx] / contributions_sum
         logger.info('train {}, weight: {}, sim: {}, contribution (normalized): {}'.format(ndx, w, s, c))
-        # shap.summary_plot(X_train_shap[[ndx]], X_train[[ndx]], feature_names=feature)
+        logger.info('{}'.format(dict(zip(feature, X_train[ndx]))))
+        shap.summary_plot(X_train_shap[[ndx]], X_train[[ndx]], feature_names=feature)
 
     # explain features
     for target_feature, test_val, shap_val in top_features:

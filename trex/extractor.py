@@ -5,6 +5,7 @@ import os
 import json
 
 import scipy
+from scipy import sparse
 import numpy as np
 from sklearn.preprocessing import OneHotEncoder
 
@@ -104,6 +105,90 @@ class TreeExtractor:
 
         return X_feature
 
+    def _leaf_output_encoding(self, X, timeit=False):
+        """
+        Encodes each x in X as a concatenation of one-hot encodings, one for each tree.
+        Each one-hot encoding represents the class or output at the leaf x traversed to.
+        All one-hot encodings are concatenated, to get a vector of size n_trees * n_leaf_nodes.
+        Returns
+        -------
+        2D array of shape (n_samples, n_leaf_nodes).
+        """
+        assert X.ndim == 2, 'X is not 2d!'
+
+        if self.model_type_ == 'RandomForestClassifier':
+            exit('{} not currently supported!'.format(str(self.model)))
+
+            one_hot_preds = [tree.predict_proba(X) for tree in self.model.estimators_]
+            encoding = np.hstack(one_hot_preds)
+            self.num_trees_ = len(one_hot_preds)
+
+        elif self.model_type_ == 'GradientBoostingClassifier':
+            exit('{} not currently supported!'.format(str(self.model)))
+
+            one_hot_preds = [tree.predict(X) for est in self.model.estimators_ for tree in est]
+            encoding = np.vstack(one_hot_preds).T
+            self.num_trees_ = len(one_hot_preds)
+
+        elif self.model_type_ == 'LGBMClassifier':
+            assert_import('lightgbm')
+
+            leaf_pos = self.model.predict_proba(X, pred_leaf=True)
+            self.num_trees = leaf_pos.shape[1]
+
+            tree_info = self.model.booster_.dump_model()['tree_info']
+            n_leaves_per_tree = [tree['num_leaves'] for tree in tree_info]
+            n_total_leaves = np.sum(n_leaves_per_tree)
+
+            encoding = np.zeros((X.shape[0], n_total_leaves))
+            # encoding = sparse.lil_matrix((X.shape[0], n_total_leaves))
+
+            for i in range(X.shape[0]):  # per instance
+                start = 0
+                for j, n_leaves in enumerate(n_leaves_per_tree):  # per tree
+                    encoding[i][start + leaf_pos[i][j]] = self.model.booster_.get_leaf_output(j, leaf_pos[i][j])
+                    # encoding[i, start + leaf_pos[i][j]] = self.model.booster_.get_leaf_output(j, leaf_pos[i][j])
+                    start += n_leaves
+
+        elif self.model_type_ == 'CatBoostClassifier':
+            assert_import('catboost')
+
+            # for multiclass, leaf_values has n_classes times leaf_counts.sum() values, why is this?
+            # we only use the first segment of leaf_values: leaf_values[:leaf_counts.sum()]
+            leaf_pos = self.model.calc_leaf_indexes(catboost.Pool(X))  # 2d (n_samples, n_trees)
+            leaf_values = self.model.get_leaf_values()  # leaf values for all trees in a 1d array
+            leaf_counts = self.model.get_tree_leaf_counts()  # 1d array of leaf counts for each tree
+
+            n_total_leaves = np.sum(leaf_counts)
+
+            encoding = np.zeros((X.shape[0], n_total_leaves))
+
+            for i in range(X.shape[0]):  # per instance
+                for j in range(leaf_pos.shape[1]):  # per tree
+                    ndx = leaf_counts[:j].sum() + leaf_pos[i][j]
+                    encoding[i][ndx] = leaf_values[ndx]
+
+        elif self.model_type_ == 'XGBClassifier':
+            exit('{} not currently supported!'.format(str(self.model)))
+
+            assert_import('xgboost')
+            leaves = self.model.apply(X)
+            leaf_values = tree_model.parse_xgb(self.model, leaf_values=True)
+            self.num_trees_ = leaves.shape[1]
+
+            encoding = np.zeros(leaves.shape)
+            for i in range(leaves.shape[0]):  # per instance
+                for j in range(leaves.shape[1]):  # per tree
+                    encoding[i][j] = leaf_values[j][leaves[i][j]]
+
+        else:
+            exit('leaf output encoding not supported for {}'.format(self.model_type_))
+
+        if self.model_type_ == 'RandomForestClassifier' and self.sparse:
+            encoding = scipy.sparse.csr_matrix(encoding)
+
+        return encoding
+
     def _leaf_path_encoding(self, X, one_hot_enc=None):
         """
         Encodes each x in X as a binary vector whose length is equal to the number of
@@ -187,7 +272,7 @@ class TreeExtractor:
 
         return encoding
 
-    def _leaf_output_encoding(self, X, timeit=False):
+    def _leaf_output_encoding2(self, X, timeit=False):
         """
         Encodes each x in X as a concatenation of one-hot encodings, one for each tree.
         Each one-hot encoding represents the class or output at the leaf x traversed to.

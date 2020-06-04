@@ -25,11 +25,11 @@ for i in ${!rs_list[@]}; do
       --trex \
       --kernel_model 'svm'
 
-    # python3 experiments/scripts/runtime.py \
-    #   --dataset $dataset \
-    #   --n_estimators $n_estimators \
-    #   --max_depth $max_depth \
-    #   --rs ${rs_list[$i]} \
-    #   --trex \
-    #   --kernel_model 'lr'
+    python3 experiments/scripts/runtime.py \
+      --dataset $dataset \
+      --n_estimators $n_estimators \
+      --max_depth $max_depth \
+      --rs ${rs_list[$i]} \
+      --trex \
+      --kernel_model 'lr'
 done

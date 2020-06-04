@@ -6,7 +6,7 @@
 #SBATCH --time=5-00:00:00
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1
-#SBATCH --cpus-per-task=5
+#SBATCH --cpus-per-task=9
 #SBATCH --account=uoml
 module load python3/3.6.1
 
@@ -49,8 +49,8 @@ for i in ${!rs_list[@]}; do
       --kernel_model 'lr' \
       --kernel_model_kernel $kernel_model_kernel \
       --kernel_model_loss \
-      --maple \
       --teknn \
       --teknn_loss \
       --train_frac $train_frac
+      # --maple \
 done

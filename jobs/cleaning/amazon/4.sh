@@ -47,7 +47,7 @@ for i in ${!rs_list[@]}; do
       --kernel_model 'lr' \
       --kernel_model_kernel $kernel_model_kernel \
       --kernel_model_loss \
-      --maple \
       --teknn \
       --teknn_loss
+      # --maple \
 done
