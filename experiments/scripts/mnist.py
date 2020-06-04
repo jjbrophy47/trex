@@ -226,7 +226,7 @@ if __name__ == '__main__':
     parser.add_argument('--data_dir', type=str, default='data', help='dataset to explain.')
     parser.add_argument('--out_dir', type=str, default='output/mnist/', help='dataset to explain.')
 
-    parser.add_argument('--val_frac', type=float, default=0.1, help='validation dataset.')
+    parser.add_argument('--val_frac', type=float, default=0.05, help='validation dataset.')
 
     parser.add_argument('--tree_type', type=str, default='lgb', help='model to use.')
     parser.add_argument('--n_estimators', type=int, default=100, help='number of trees.')

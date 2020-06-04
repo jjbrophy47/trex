@@ -21,7 +21,10 @@ import numpy as np
 import seaborn as sns
 import matplotlib.pyplot as plt
 from scipy.stats import gaussian_kde
-# from sklearn.metrics import accuracy_score
+from sklearn.base import clone
+from scipy.stats import pearsonr
+from scipy.stats import spearmanr
+from tqdm import tqdm
 
 import trex
 from utility import model_util
@@ -335,7 +338,7 @@ def experiment(args, logger, out_dir, seed):
 
     # train a tree ensemble
     logger.info('training the tree ensemble...')
-    tree = clf.fit(X_train, y_train)
+    tree = clone(clf).fit(X_train, y_train)
     model_util.performance(tree, X_train, y_train, X_test, y_test, logger=logger)
 
     # load a TREX model
@@ -351,12 +354,15 @@ def experiment(args, logger, out_dir, seed):
     # train TREX
     else:
         logger.info('building TREX...')
+        X_val = exp_util.get_val_data(X_train, args.val_frac, seed)
         explainer = trex.TreeExplainer(tree, X_train, y_train,
                                        tree_kernel=args.tree_kernel,
                                        random_state=seed,
                                        kernel_model=args.kernel_model,
                                        kernel_model_kernel=args.kernel_model_kernel,
-                                       true_label=args.true_label)
+                                       true_label=args.true_label,
+                                       X_val=X_val,
+                                       logger=logger)
         logger.info('saving TREX model to {}...'.format(model_path))
         explainer.save(model_path)
 
@@ -432,6 +438,103 @@ def experiment(args, logger, out_dir, seed):
     train_weight = explainer.get_weight()[0]
     sim = explainer.similarity(X_test[[test_ndx]])[0]
     contributions = train_weight * sim
+
+    if True:
+
+        np.random.seed(seed)
+        X_test_sub_ndx = np.random.choice(X_test.shape[0], size=int(X_test.shape[0] * 0.25))
+        X_test_sub = X_test[X_test_sub_ndx]
+        y_test_sub = y_test[X_test_sub_ndx]
+
+        # get net contributions of training samples on test data
+        contributions_list = []
+        for i in tqdm(range(X_test_sub.shape[0])):
+            x_test_sim = explainer.similarity(X_test[[i]])[0]
+            x_test_contributions = train_weight * x_test_sim
+            contributions_list.append(x_test_contributions)
+        contributions_arr = np.vstack(contributions_list)
+        contributions_sum = np.sum(contributions_arr, axis=0)
+        # np.save(os.path.join(model_dir, 'contributions_sum'), contributions_sum)
+
+        contributions_sum_total = np.sum(contributions_sum)
+        sort_ndx = np.argsort(np.abs(contributions_sum))[::-1]
+        total = 0
+        indices = []
+        for ndx in sort_ndx:
+            total += contributions_sum[ndx]
+            indices.append(ndx)
+            if total / contributions_sum_total >= args.max_contribution:
+                break
+
+        indices = sort_ndx[:500]
+
+        # # random baseline
+        # np.random.seed(seed)
+        # indices = np.random.choice(X_train.shape[0], size=len(indices), replace=False)
+
+        # logger.info('{}: {}'.format(len(indices), sorted(indices)))
+
+        # nonzero_weight_ndx = np.where(np.abs(contributions_sum) > 0)[0]
+        # zero_weight_ndx = np.setdiff1d(np.arange(len(train_weight)), nonzero_weight_ndx)
+        # print(contributions_sum, len(contributions_sum))
+        # print(contributions_sum[indices], len(contributions_sum[indices]))
+
+        # train a new tree ensemble weighted using the weighted training samples
+        new_tree = clone(clf).fit(X_train[indices], y_train[indices],
+                                  sample_weight=np.abs(contributions_sum[indices]))
+        # new_tree = clone(clf).fit(X_train[indices], y_train[indices])
+        new_proba = new_tree.predict_proba(X_test_sub)[:, 1]
+        old_proba = tree.predict_proba(X_test_sub)[:, 1]
+
+        pcorr = pearsonr(new_proba, old_proba)[0]
+        scorr = spearmanr(new_proba, old_proba)[0]
+        logger.info('pearson: {:.3f}, spearman: {:.3f}'.format(pcorr, scorr))
+
+        model_util.performance(tree, X_train, y_train, X_test_sub, y_test_sub, logger=logger)
+        model_util.performance(new_tree, X_train[indices], y_train[indices],
+                               X_test_sub, y_test_sub, logger=logger)
+
+        fig, ax = plt.subplots()
+        ax.scatter(new_proba, old_proba, color='purple')
+        ax.set_ylabel('Original GBDT probability')
+        ax.set_xlabel('New GBDT probability')
+        ax.set_title('Dataset: {}\nTraining samples: {:,} -> {:,}\npearson: {:.3f}, spearman: {:.3f}'.format(
+                     args.dataset, len(X_train), len(indices), pcorr, scorr))
+        plt.show()
+
+        # random baseline
+        np.random.seed(seed)
+        indices = np.random.choice(X_train.shape[0], size=len(indices), replace=False)
+
+        # logger.info('{}: {}'.format(len(indices), sorted(indices)))
+
+        # nonzero_weight_ndx = np.where(np.abs(contributions_sum) > 0)[0]
+        # zero_weight_ndx = np.setdiff1d(np.arange(len(train_weight)), nonzero_weight_ndx)
+        # print(contributions_sum, len(contributions_sum))
+        # print(contributions_sum[indices], len(contributions_sum[indices]))
+
+        # train a new tree ensemble weighted using the weighted training samples
+        # new_tree = clone(clf).fit(X_train[indices], y_train[indices],
+        #                           sample_weight=np.abs(contributions_sum[indices]))
+        new_tree = clone(clf).fit(X_train[indices], y_train[indices])
+        new_proba = new_tree.predict_proba(X_test_sub)[:, 1]
+        old_proba = tree.predict_proba(X_test_sub)[:, 1]
+
+        pcorr = pearsonr(new_proba, old_proba)[0]
+        scorr = spearmanr(new_proba, old_proba)[0]
+        logger.info('pearson: {:.3f}, spearman: {:.3f}'.format(pcorr, scorr))
+
+        model_util.performance(tree, X_train, y_train, X_test_sub, y_test_sub, logger=logger)
+        model_util.performance(new_tree, X_train[indices], y_train[indices],
+                               X_test_sub, y_test_sub, logger=logger)
+
+        fig, ax = plt.subplots()
+        ax.scatter(new_proba, old_proba, color='purple')
+        ax.set_ylabel('Original GBDT probability')
+        ax.set_xlabel('New GBDT probability')
+        ax.set_title('Dataset: {}\nTraining samples: {:,} -> {:,}\npearson: {:.3f}, spearman: {:.3f}'.format(
+                     args.dataset, len(X_train), len(indices), pcorr, scorr))
+        plt.show()
 
     # weight_sort_ndx = np.argsort(train_weight)
     # step_size = int(len(train_weight) / 20)
@@ -568,6 +671,8 @@ if __name__ == '__main__':
     parser.add_argument('--data_dir', type=str, default='data', help='dataset to explain.')
     parser.add_argument('--out_dir', type=str, default='output/misclassification/', help='output directory.')
 
+    parser.add_argument('--val_frac', type=float, default=0.05, help='amount of training data to use for validation.')
+
     parser.add_argument('--max_bins', type=int, default=40, help='number of bins for feature values.')
     parser.add_argument('--alpha', type=float, default=0.5, help='transparency value.')
     parser.add_argument('--xlim', type=float, default=None, help='x limits on instance plots.')
@@ -579,6 +684,7 @@ if __name__ == '__main__':
     parser.add_argument('--normalize_shap', action='store_true', default=False, help='normalize SHAP values.')
     parser.add_argument('--coverage', type=float, default=0.9, help='fraction of contributions to explain.')
     parser.add_argument('--surplus', type=float, default=None, help='multiplier for surplus minimum contributions.')
+    parser.add_argument('--max_contribution', type=float, default=None, help='contribution level.')
 
     parser.add_argument('--tree_type', type=str, default='lgb', help='model to use.')
     parser.add_argument('--n_estimators', type=int, default=100, help='number of trees.')
@@ -603,6 +709,8 @@ class Args:
     data_dir = 'data'
     out_dir = 'output/misclassification/'
 
+    val_frac = 0.05
+
     max_bins = 40
     alpha = 0.5
     xlim = 0.05
@@ -613,6 +721,8 @@ class Args:
     load_trex = False
     normalize_shap = False
     coverage = 0.1
+    surplus = None
+    max_contribution = 0.9
 
     tree_type = 'lgb'
     n_estimators = 100

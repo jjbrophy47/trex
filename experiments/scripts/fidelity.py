@@ -14,7 +14,10 @@ sys.path.insert(0, here + '/../../')  # for libliner
 import numpy as np
 
 import trex
-from utility import model_util, data_util, print_util, exp_util
+from utility import print_util
+from utility import data_util
+from utility import model_util
+from utility import exp_util
 
 
 def _sigmoid(x):

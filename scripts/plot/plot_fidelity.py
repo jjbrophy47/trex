@@ -6,7 +6,8 @@ import argparse
 
 import numpy as np
 import matplotlib.pyplot as plt
-from scipy.stats import pearsonr, spearmanr
+from scipy.stats import pearsonr
+from scipy.stats import spearmanr
 
 
 def set_size(width, fraction=1, subplots=(1, 1)):
