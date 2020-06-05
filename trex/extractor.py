@@ -70,11 +70,14 @@ class TreeExtractor:
         if self.tree_kernel == 'leaf_path':
             X_feature, self.path_enc_ = self._leaf_path_encoding(X)
 
-        elif self.tree_kernel == 'feature_path':
-            X_feature = self._feature_path_encoding(X)
+        elif self.tree_kernel == 'tree_output':
+            X_feature = self._tree_output_encoding(X)
 
         elif self.tree_kernel == 'leaf_output':
             X_feature = self._leaf_output_encoding(X)
+
+        elif self.tree_kernel == 'feature_path':
+            X_feature = self._feature_path_encoding(X)
 
         return X_feature
 
@@ -97,11 +100,14 @@ class TreeExtractor:
             assert self.path_enc_ is not None, 'path_enc_ is not fitted!'
             X_feature, _ = self._leaf_path_encoding(X, one_hot_enc=self.path_enc_)
 
-        elif self.tree_kernel == 'feature_path':
-            X_feature = self._feature_path_encoding(X)
+        elif self.tree_kernel == 'tree_output':
+            X_feature = self._tree_output_encoding(X)
 
         elif self.tree_kernel == 'leaf_output':
             X_feature = self._leaf_output_encoding(X)
+
+        elif self.tree_kernel == 'feature_path':
+            X_feature = self._feature_path_encoding(X)
 
         return X_feature
 
@@ -272,7 +278,7 @@ class TreeExtractor:
 
         return encoding
 
-    def _leaf_output_encoding2(self, X, timeit=False):
+    def _tree_output_encoding(self, X, timeit=False):
         """
         Encodes each x in X as a concatenation of one-hot encodings, one for each tree.
         Each one-hot encoding represents the class or output at the leaf x traversed to.
@@ -341,7 +347,7 @@ class TreeExtractor:
         """
         Validate model inputs.
         """
-        tree_kernels = ['leaf_path', 'feature_path', 'leaf_output']
+        tree_kernels = ['leaf_path', 'tree_output', 'leaf_output', 'feature_path']
         assert self.tree_kernel in tree_kernels, '{} not supported!'.format(self.tree_kernel)
 
         if 'RandomForestClassifier' in str(self.model):

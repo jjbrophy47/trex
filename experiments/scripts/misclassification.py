@@ -347,6 +347,7 @@ def experiment(args, logger, out_dir, seed):
     os.makedirs(model_dir, exist_ok=True)
     model_path = os.path.join(model_dir, 'explainer.pkl')
 
+    print(model_path)
     if args.load_trex and os.path.exists(model_path):
         assert os.path.exists(model_path)
         logger.info('loading TREX model from {}...'.format(model_path))

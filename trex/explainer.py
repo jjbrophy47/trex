@@ -48,7 +48,7 @@ class TreeExplainer:
             Ground-truth train labels.
         kernel_model : str (default='svm', {'svm', 'lr'})
             Kernel model to approximate the tree ensemble.
-        tree_kernel : str (default='leaf_output', {'leaf_output', 'leaf_path', 'feature_path'})
+        tree_kernel : str (default='leaf_output', {'leaf_output', 'tree_output', leaf_path', 'feature_path'})
             Feature representation to extract from the tree ensemble.
         C : float (default=0.1)
             Regularization parameter for the kernel model. Lower C values result
@@ -370,7 +370,7 @@ class TreeExplainer:
         self.labels_ = dict(zip(self.classes_, np.arange(self.n_classes_)))
 
         # check tree_kernel
-        tree_types = ['leaf_path', 'feature_path', 'leaf_output']
+        tree_types = ['leaf_path', 'tree_output', 'leaf_output', 'feature_path']
         assert self.tree_kernel in tree_types, '{} unsupported!'.format(self.tree_kernel)
 
         # check model
