@@ -68,7 +68,7 @@ def _get_top_features(x, shap_vals, feature_list, k=1, normalize=False):
                     shap_vals[shap_sort_ndx]))[:k]
 
 
-def _plot_feature_histograms(args, results, test_val, out_dir):
+def _plot_feature_histograms(args, results, test_val, out_dir, plot_instances=False):
     """
     Plot the density of the most important feature weighted
     by training instance importance and similarity to the test instance.
@@ -82,17 +82,27 @@ def _plot_feature_histograms(args, results, test_val, out_dir):
     train_sim = results['train_sim']
     feature_name = results['target_feature']
 
-    # # plot
-    # fig, axs = plt.subplots(1, 3, figsize=(15, 5))
+    train_sim_weight = train_weight * train_sim
 
     # plot contributions
     width = 5.5  # Neurips 2020
-    width, height = set_size(width=width * 3, fraction=1, subplots=(1, 3))
-    fig, axs = plt.subplots(1, 3, figsize=(width, height))
+    width, height = set_size(width=width * 3, fraction=1, subplots=(1, 4))
+    fig, axs = plt.subplots(1, 4, figsize=(width, height * 1.25))
     axs = axs.flatten()
 
+    # gamma vs alpha
+    if plot_instances:
+        ax = axs[0]
+        xy = np.vstack([train_weight, train_sim])
+        z = gaussian_kde(xy)(xy)
+        ax.scatter(train_weight, train_sim, c=z, s=20, edgecolor='', rasterized=args.rasterize)
+        ax.axhline(0, color='k')
+        ax.axvline(0, color='k')
+        ax.set_ylabel(r'$\gamma$')
+        ax.set_xlabel(r'$\alpha$')
+
     # unweighted
-    ax = axs[0]
+    ax = axs[1]
     ax.hist(train_feature_vals[train_pos_ndx], bins=train_feature_bins,
             color='g', hatch='.', alpha=args.alpha, label='positive instances')
     ax.hist(train_feature_vals[train_neg_ndx], bins=train_feature_bins,
@@ -101,11 +111,11 @@ def _plot_feature_histograms(args, results, test_val, out_dir):
     ax.set_xlabel('value')
     ax.set_ylabel('density')
     ax.set_title('Unweighted')
-    ax.legend()
+    ax.ticklabel_format(style='sci', axis='y', scilimits=(0, 0))
     ax.tick_params(axis='both', which='major')
 
     # weighted by TREX's global weights
-    ax = axs[1]
+    ax = axs[2]
     ax.hist(train_feature_vals[train_pos_ndx], bins=train_feature_bins,
             color='g', hatch='.', alpha=args.alpha,
             weights=train_weight[train_pos_ndx])
@@ -114,28 +124,32 @@ def _plot_feature_histograms(args, results, test_val, out_dir):
             color='r', hatch='\\', alpha=args.alpha,
             weights=train_weight[train_neg_ndx])
     ax.axvline(test_val, color='k', linestyle='--')
-
+    ax.set_ylabel('density')
     ax.set_xlabel('value')
     ax.set_title(r'Weighted by $\alpha$',)
     ax.tick_params(axis='both', which='major')
 
     # weighted by TREX's global weights * similarity to the test instance
     train_sim_weight = train_weight * train_sim
-    ax = axs[2]
+    ax = axs[3]
     ax.hist(train_feature_vals[train_pos_ndx], bins=train_feature_bins,
             color='g', hatch='.', alpha=args.alpha,
-            weights=train_sim_weight[train_pos_ndx])
+            weights=train_sim_weight[train_pos_ndx],
+            label='pos samples')
 
     ax.hist(train_feature_vals[train_neg_ndx], bins=train_feature_bins,
             color='r', hatch='\\', alpha=args.alpha,
-            weights=train_sim_weight[train_neg_ndx])
+            weights=train_sim_weight[train_neg_ndx],
+            label='neg samples')
     ax.axvline(test_val, color='k', linestyle='--')
-
+    ax.legend()
+    ax.set_ylabel('density')
     ax.set_xlabel('value')
     ax.set_title(r'Weighted by $\alpha * \gamma$')
     ax.tick_params(axis='both', which='major')
 
     plt.tight_layout()
+    # plt.subplots_adjust(wspace=0.35, hspace=0)
     plt.savefig(os.path.join(out_dir, '{}.{}'.format(feature_name, args.ext)))
 
 
@@ -366,7 +380,7 @@ def experiment(args, logger, out_dir, seed):
                                        X_val=X_val,
                                        logger=logger)
         logger.info('saving TREX model to {}...'.format(model_path))
-        # explainer.save(model_path)
+        explainer.save(model_path)
 
     # extract predictions
     start = time.time()
@@ -647,11 +661,11 @@ def experiment(args, logger, out_dir, seed):
 
     # matplotlib settings
     plt.rc('font', family='serif')
-    plt.rc('xtick', labelsize=15)
-    plt.rc('ytick', labelsize=15)
-    plt.rc('axes', labelsize=16)
-    plt.rc('axes', titlesize=16)
-    plt.rc('legend', fontsize=16)
+    plt.rc('xtick', labelsize=18)
+    plt.rc('ytick', labelsize=18)
+    plt.rc('axes', labelsize=21)
+    plt.rc('axes', titlesize=21)
+    plt.rc('legend', fontsize=19)
     plt.rc('legend', title_fontsize=11)
     plt.rc('lines', linewidth=1)
     plt.rc('lines', markersize=6)
@@ -729,7 +743,9 @@ def experiment(args, logger, out_dir, seed):
         results['train_feature_vals'] = X_train[:, feat_ndx]
         results['train_feature_bins'] = train_feature_bins
 
-        _plot_feature_histograms(args, results, test_val, out_dir)
+        plot_instances = True if target_feature == 'age' else False
+        _plot_feature_histograms(args, results, test_val, out_dir,
+                                 plot_instances=plot_instances)
 
     _plot_instance_histograms(args, logger, results, out_dir)
     np.save(os.path.join(out_dir, 'results.npy'), results)
@@ -811,6 +827,7 @@ class Args:
     coverage = 0.1
     surplus = None
     max_contribution = 0.9
+    rasterize = False
 
     tree_type = 'lgb'
     n_estimators = 100

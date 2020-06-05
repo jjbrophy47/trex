@@ -14,7 +14,8 @@ dataset='census'
 n_estimators=250
 max_depth=5
 
-tree_kernels=('tree_output')
+tree_kernels=('leaf_path')
+train_frac=0.1
 
 for tree_kernel in ${tree_kernels[@]}; do
     python3 experiments/scripts/fidelity.py \
@@ -24,7 +25,8 @@ for tree_kernel in ${tree_kernels[@]}; do
       --max_depth $max_depth \
       --trex \
       --kernel_model 'svm' \
-      --val_frac 0.01
+      --val_frac 0.05 \
+      --train_frac $train_frac
 
     python3 experiments/scripts/fidelity.py \
       --dataset $dataset \
@@ -34,5 +36,6 @@ for tree_kernel in ${tree_kernels[@]}; do
       --trex \
       --kernel_model 'lr' \
       --teknn \
-      --val_frac 0.01
+      --val_frac 0.05 \
+      --train_frac $train_frac
 done

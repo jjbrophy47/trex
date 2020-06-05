@@ -86,6 +86,11 @@ def experiment(args, logger, out_dir, seed):
     X_train, X_test, y_train, y_test, label = data_util.get_data(args.dataset,
                                                                  random_state=args.rs,
                                                                  data_dir=args.data_dir)
+
+    # reduce train size
+    if args.train_frac < 1.0 and args.train_frac > 0.0:
+        n_train = int(X_train.shape[0] * args.train_frac)
+        X_train, y_train = X_train[:n_train], y_train[:n_train]
     data = X_train, y_train, X_test, y_test
 
     # corrupt the data if specified
@@ -179,6 +184,7 @@ if __name__ == '__main__':
     parser.add_argument('--data_dir', type=str, default='data', help='data directory.')
     parser.add_argument('--out_dir', type=str, default='output/fidelity/', help='output directory.')
 
+    parser.add_argument('--train_frac', type=float, default=1.0, help='amount of training data to use.')
     parser.add_argument('--val_frac', type=float, default=0.05, help='amount of training data to use for validation.')
     parser.add_argument('--flip_frac', type=float, default=None, help='Fraction of train labels to flip.')
 
