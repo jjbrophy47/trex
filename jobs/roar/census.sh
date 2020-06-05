@@ -23,5 +23,6 @@ python3 experiments/scripts/roar.py \
   --max_depth $max_depth \
   --trex \
   --kernel_model 'lr' \
-  --teknn
+  --teknn \
+  --val_frac 0.01
   # --maple

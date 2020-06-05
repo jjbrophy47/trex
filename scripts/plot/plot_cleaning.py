@@ -87,7 +87,8 @@ def main(args):
 
         rs_dir = os.path.join(args.in_dir, dataset, args.tree_type,
                               args.tree_kernel, 'rs1')
-        assert os.path.exists(rs_dir)
+        if not os.path.exists(rs_dir):
+            continue
         check_pct = np.load(os.path.join(rs_dir, 'check_pct.npy'))
         test_clean = np.load(os.path.join(rs_dir, 'test_clean.npy'))
 

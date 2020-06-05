@@ -33,7 +33,8 @@ for i in ${!rs_list[@]}; do
       --tree_kernel $tree_kernel \
       --kernel_model 'svm' \
       --kernel_model_kernel $kernel_model_kernel \
-      --kernel_model_loss
+      --kernel_model_loss \
+      --val_frac 0.01
 
     python3 experiments/scripts/cleaning.py \
       --dataset $dataset \
@@ -48,6 +49,7 @@ for i in ${!rs_list[@]}; do
       --kernel_model_kernel $kernel_model_kernel \
       --kernel_model_loss \
       --teknn \
-      --teknn_loss
+      --teknn_loss \
+      --val_frac 0.01
       # --maple \
 done

@@ -22,5 +22,6 @@ for i in ${!rs_list[@]}; do
       --n_estimators $n_estimators \
       --max_depth $max_depth \
       --rs ${rs_list[$i]} \
-      --teknn
+      --teknn \
+      --val_frac 0.01
 done

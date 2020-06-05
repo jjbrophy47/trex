@@ -23,7 +23,8 @@ for i in ${!rs_list[@]}; do
       --max_depth $max_depth \
       --rs ${rs_list[$i]} \
       --trex \
-      --kernel_model 'svm'
+      --kernel_model 'svm' \
+      --val_frac 0.01
 
     python3 experiments/scripts/runtime.py \
       --dataset $dataset \
@@ -31,5 +32,6 @@ for i in ${!rs_list[@]}; do
       --max_depth $max_depth \
       --rs ${rs_list[$i]} \
       --trex \
-      --kernel_model 'lr'
+      --kernel_model 'lr' \
+      --val_frac 0.01
 done

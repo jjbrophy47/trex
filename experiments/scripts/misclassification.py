@@ -80,9 +80,16 @@ def _plot_feature_histograms(args, results, test_val, out_dir):
     train_neg_ndx = results['train_neg_ndx']
     train_weight = results['train_weight']
     train_sim = results['train_sim']
+    feature_name = results['target_feature']
 
-    # plot
-    fig, axs = plt.subplots(1, 3, figsize=(15, 5))
+    # # plot
+    # fig, axs = plt.subplots(1, 3, figsize=(15, 5))
+
+    # plot contributions
+    width = 5.5  # Neurips 2020
+    width, height = set_size(width=width * 3, fraction=1, subplots=(1, 3))
+    fig, axs = plt.subplots(1, 3, figsize=(width, height))
+    axs = axs.flatten()
 
     # unweighted
     ax = axs[0]
@@ -90,11 +97,10 @@ def _plot_feature_histograms(args, results, test_val, out_dir):
             color='g', hatch='.', alpha=args.alpha, label='positive instances')
     ax.hist(train_feature_vals[train_neg_ndx], bins=train_feature_bins,
             color='r', hatch='\\', alpha=args.alpha, label='negative instances')
-    ax.axvline(test_val, color='k')
+    ax.axvline(test_val, color='k', linestyle='--')
     ax.set_xlabel('value')
     ax.set_ylabel('density')
     ax.set_title('Unweighted')
-    # ax.set_xlim(-0.25, 1.25)
     ax.legend()
     ax.tick_params(axis='both', which='major')
 
@@ -102,18 +108,15 @@ def _plot_feature_histograms(args, results, test_val, out_dir):
     ax = axs[1]
     ax.hist(train_feature_vals[train_pos_ndx], bins=train_feature_bins,
             color='g', hatch='.', alpha=args.alpha,
-            # weights=np.abs(train_weight)[train_pos_ndx])
             weights=train_weight[train_pos_ndx])
 
     ax.hist(train_feature_vals[train_neg_ndx], bins=train_feature_bins,
             color='r', hatch='\\', alpha=args.alpha,
-            # weights=np.abs(train_weight)[train_neg_ndx])
             weights=train_weight[train_neg_ndx])
-    ax.axvline(test_val, color='k')
+    ax.axvline(test_val, color='k', linestyle='--')
 
     ax.set_xlabel('value')
-    ax.set_title(r'|$\alpha$|',)
-    # ax.set_xlim(-0.25, 1.25)
+    ax.set_title(r'Weighted by $\alpha$',)
     ax.tick_params(axis='both', which='major')
 
     # weighted by TREX's global weights * similarity to the test instance
@@ -121,23 +124,19 @@ def _plot_feature_histograms(args, results, test_val, out_dir):
     ax = axs[2]
     ax.hist(train_feature_vals[train_pos_ndx], bins=train_feature_bins,
             color='g', hatch='.', alpha=args.alpha,
-            # weights=np.abs(train_sim_weight)[train_pos_ndx])
             weights=train_sim_weight[train_pos_ndx])
 
     ax.hist(train_feature_vals[train_neg_ndx], bins=train_feature_bins,
             color='r', hatch='\\', alpha=args.alpha,
-            # weights=np.abs(train_sim_weight)[train_neg_ndx])
             weights=train_sim_weight[train_neg_ndx])
-    ax.axvline(test_val, color='k')
+    ax.axvline(test_val, color='k', linestyle='--')
 
     ax.set_xlabel('value')
-    ax.set_title(r'$\alpha$ * Similarity')
-    # ax.set_xlim(-0.25, 1.25)
+    ax.set_title(r'Weighted by $\alpha * \gamma$')
     ax.tick_params(axis='both', which='major')
 
     plt.tight_layout()
-    plt.show()
-    # plt.savefig(os.path.join(out_dir, 'feature_distribution.{}'.format(args.ext)))
+    plt.savefig(os.path.join(out_dir, '{}.{}'.format(feature_name, args.ext)))
 
 
 def _plot_instance_histograms(args, logger, results, out_dir):
@@ -682,39 +681,42 @@ def experiment(args, logger, out_dir, seed):
     logger.info('{}'.format(dict(zip(feature, X_test[test_ndx]))))
     shap.summary_plot(test_shap, x_test, feature_names=feature)
 
-    pos_target = np.where((X_train[:, 0] <= 17) & (y_train == 1))[0]
-    neg_target = np.where((X_train[:, 0] <= 17) & (y_train == 0))[0]
+    # pos_target = np.where((X_train[:, 0] <= 17) & (y_train == 1))[0]
+    # neg_target = np.where((X_train[:, 0] <= 17) & (y_train == 0))[0]
 
     contributions_sum = np.sum(np.abs(contributions))
     # indices = np.argsort(np.abs(contributions))[::-1]
     indices = np.argsort(contributions)[::-1]
 
-    # feature-based explanations for the most influential training instances
-    for ndx in pos_target[:5]:
-        w = train_weight[ndx]
-        s = sim[ndx]
-        c = contributions[ndx] / contributions_sum
-        logger.info('train {}, weight: {}, sim: {}, contribution (normalized): {}'.format(ndx, w, s, c))
-        logger.info('{}'.format(dict(zip(feature, X_train[ndx]))))
-        shap.summary_plot(X_train_shap[[ndx]], X_train[[ndx]], feature_names=feature)
+    # # feature-based explanations for the most influential training instances
+    # for ndx in pos_target[:5]:
+    #     w = train_weight[ndx]
+    #     s = sim[ndx]
+    #     c = contributions[ndx] / contributions_sum
+    #     logger.info('train {}, weight: {}, sim: {}, contribution (normalized): {}'.format(ndx, w, s, c))
+    #     logger.info('{}'.format(dict(zip(feature, X_train[ndx]))))
+    #     shap.summary_plot(X_train_shap[[ndx]], X_train[[ndx]], feature_names=feature)
 
-    # feature-based explanations for the most influential training instances
-    for ndx in neg_target[:5]:
-        w = train_weight[ndx]
-        s = sim[ndx]
-        c = contributions[ndx] / contributions_sum
-        logger.info('train {}, weight: {}, sim: {}, contribution (normalized): {}'.format(ndx, w, s, c))
-        logger.info('{}'.format(dict(zip(feature, X_train[ndx]))))
-        shap.summary_plot(X_train_shap[[ndx]], X_train[[ndx]], feature_names=feature)
+    # # feature-based explanations for the most influential training instances
+    # for ndx in neg_target[:5]:
+    #     w = train_weight[ndx]
+    #     s = sim[ndx]
+    #     c = contributions[ndx] / contributions_sum
+    #     logger.info('train {}, weight: {}, sim: {}, contribution (normalized): {}'.format(ndx, w, s, c))
+    #     logger.info('{}'.format(dict(zip(feature, X_train[ndx]))))
+    #     shap.summary_plot(X_train_shap[[ndx]], X_train[[ndx]], feature_names=feature)
 
     # feature-based explanations for the most influential training instances
     for ndx in indices[:args.topk]:
         w = train_weight[ndx]
         s = sim[ndx]
         c = contributions[ndx] / contributions_sum
-        logger.info('train {}, weight: {}, sim: {}, contribution (normalized): {}'.format(ndx, w, s, c))
-        logger.info('{}'.format(dict(zip(feature, X_train[ndx]))))
-        shap.summary_plot(X_train_shap[[ndx]], X_train[[ndx]], feature_names=feature)
+        my_str = 'train {}, label: {}, weight: {}, sim: {}, contribution (normalized): {}'
+        logger.info(my_str.format(ndx, y_train[ndx], w, s, c))
+        for name, val in list(zip(feature, X_train[ndx])):
+            logger.info('  {}: {}'.format(name, val))
+        # logger.info('{}'.format(dict(zip(feature, X_train[ndx]))))
+        # shap.summary_plot(X_train_shap[[ndx]], X_train[[ndx]], feature_names=feature)
 
     # explain features
     for target_feature, test_val, shap_val in top_features:
