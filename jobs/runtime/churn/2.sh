@@ -14,6 +14,8 @@ dataset='churn'
 n_estimators=100
 max_depth=3
 
+tree_kernel='tree_output'
+
 rs_list=(1 2 3 4 5)
 
 for i in ${!rs_list[@]}; do

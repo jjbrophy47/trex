@@ -14,6 +14,8 @@ dataset='census'
 n_estimators=250
 max_depth=5
 
+tree_kernel='tree_output'
+
 rs_list=(1 2 3 4 5)
 
 for i in ${!rs_list[@]}; do
@@ -23,5 +25,6 @@ for i in ${!rs_list[@]}; do
       --max_depth $max_depth \
       --rs ${rs_list[$i]} \
       --teknn \
+      --tree_kernel $tree_kernel \
       --val_frac 0.01
 done

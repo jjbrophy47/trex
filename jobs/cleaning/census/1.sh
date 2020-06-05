@@ -18,7 +18,7 @@ check_pct=0.15
 rs_list=(1)
 
 verbose=1
-tree_kernel='leaf_output'
+tree_kernel='tree_output'
 kernel_model_kernel='linear'
 
 for i in ${!rs_list[@]}; do

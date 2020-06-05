@@ -14,6 +14,8 @@ dataset='amazon'
 n_estimators=250
 max_depth=5
 
+tree_kernel='tree_output'
+
 rs_list=(1 2 3 4 5)
 
 for i in ${!rs_list[@]}; do
@@ -22,5 +24,6 @@ for i in ${!rs_list[@]}; do
       --n_estimators $n_estimators \
       --max_depth $max_depth \
       --rs ${rs_list[$i]} \
+      --tree_kernel $tree_kernel \
       --teknn
 done

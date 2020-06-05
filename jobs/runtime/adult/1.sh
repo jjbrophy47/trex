@@ -14,6 +14,8 @@ dataset='adult'
 n_estimators=100
 max_depth=5
 
+tree_kernel='tree_output'
+
 rs_list=(1 2 3 4 5)
 
 for i in ${!rs_list[@]}; do
@@ -23,6 +25,7 @@ for i in ${!rs_list[@]}; do
       --max_depth $max_depth \
       --rs ${rs_list[$i]} \
       --trex \
+      --tree_kernel $tree_kernel \
       --kernel_model 'svm'
 
     python3 experiments/scripts/runtime.py \
@@ -31,5 +34,6 @@ for i in ${!rs_list[@]}; do
       --max_depth $max_depth \
       --rs ${rs_list[$i]} \
       --trex \
+      --tree_kernel $tree_kernel \
       --kernel_model 'lr'
 done

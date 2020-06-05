@@ -14,7 +14,7 @@ dataset='churn'
 n_estimators=100
 max_depth=3
 
-tree_kernel='leaf_output'
+tree_kernel='tree_output'
 
 python3 experiments/scripts/roar.py \
   --dataset $dataset \
