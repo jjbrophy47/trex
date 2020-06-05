@@ -53,12 +53,16 @@ def _trex_method(test_ndx, X_test, model, X_train, y_train,
     Explains the predictions of each test instance.
     """
 
+    # get validation
+    X_val = exp_util.get_val_data(X_train, args.val_frac, seed)
+
     start = time.time()
     explainer = trex.TreeExplainer(model, X_train, y_train,
                                    tree_kernel=args.tree_kernel,
                                    random_state=seed,
                                    kernel_model=args.kernel_model,
-                                   kernel_model_kernel=args.kernel_model_kernel)
+                                   kernel_model_kernel=args.kernel_model_kernel,
+                                   X_val=X_val)
     fine_tune = time.time() - start
 
     start = time.time()

@@ -108,7 +108,7 @@ def _plot_feature_histograms(args, results, test_val, out_dir, plot_instances=Fa
     ax.hist(train_feature_vals[train_neg_ndx], bins=train_feature_bins,
             color='r', hatch='\\', alpha=args.alpha, label='negative instances')
     ax.axvline(test_val, color='k', linestyle='--')
-    ax.set_xlabel('value')
+    ax.set_xlabel(feature_name.capitalize())
     ax.set_ylabel('density')
     ax.set_title('Unweighted')
     ax.ticklabel_format(style='sci', axis='y', scilimits=(0, 0))
@@ -125,7 +125,7 @@ def _plot_feature_histograms(args, results, test_val, out_dir, plot_instances=Fa
             weights=train_weight[train_neg_ndx])
     ax.axvline(test_val, color='k', linestyle='--')
     ax.set_ylabel('density')
-    ax.set_xlabel('value')
+    ax.set_xlabel(feature_name.capitalize())
     ax.set_title(r'Weighted by $\alpha$',)
     ax.tick_params(axis='both', which='major')
 
@@ -144,7 +144,7 @@ def _plot_feature_histograms(args, results, test_val, out_dir, plot_instances=Fa
     ax.axvline(test_val, color='k', linestyle='--')
     ax.legend()
     ax.set_ylabel('density')
-    ax.set_xlabel('value')
+    ax.set_xlabel(feature_name.capitalize())
     ax.set_title(r'Weighted by $\alpha * \gamma$')
     ax.tick_params(axis='both', which='major')
 
@@ -720,6 +720,13 @@ def experiment(args, logger, out_dir, seed):
     #     logger.info('train {}, weight: {}, sim: {}, contribution (normalized): {}'.format(ndx, w, s, c))
     #     logger.info('{}'.format(dict(zip(feature, X_train[ndx]))))
     #     shap.summary_plot(X_train_shap[[ndx]], X_train[[ndx]], feature_names=feature)
+
+    age17_indices = np.where(X_train[:, 0] <= 17)[0]
+    sim_above2p5 = np.where(sim > 2.2)[0]
+    overlap = np.intersect1d(age17_indices, sim_above2p5)
+
+    logger.info('n_points w/ sim > 2.35: {}'.format(len(sim_above2p5)))
+    logger.info('n_age17_points w/ sim > 2.5: {}'.format(len(overlap)))
 
     # feature-based explanations for the most influential training instances
     for ndx in indices[:args.topk]:
