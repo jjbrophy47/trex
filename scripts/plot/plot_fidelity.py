@@ -87,21 +87,11 @@ def main(args):
 
     # plot top row
     for i, dataset in enumerate(args.dataset):
-        _plot_graph(args, axs[i], dataset, method_list, 'leaf_output',
+        _plot_graph(args, axs[i], dataset, method_list, args.tree_kernel,
                     labels, colors, markers, corr=args.corr)
         axs[i].set_title(dataset.capitalize())
         axs[i].set_xlabel(xlabel)
     axs[0].set_ylabel(ylabel)
-
-    # # plot bottom row
-    # row = 1
-    # for i, dataset in enumerate(args.dataset):
-    #     _plot_graph(args, axs[row][i], dataset, method_list, 'leaf_path',
-    #                 labels, colors, markers, corr=args.corr)
-    # axs[row][i].set_xlabel(xlabel)
-
-    # axs[0].set_ylabel(ylabel)
-    # axs[1][0].set_ylabel(ylabel)
 
     os.makedirs(args.out_dir, exist_ok=True)
 
@@ -119,7 +109,7 @@ if __name__ == '__main__':
     parser.add_argument('--out_dir', type=str, default='output/plots/fidelity/', help='output directory.')
 
     parser.add_argument('--tree_type', type=str, default='cb', help='tree ensemble.')
-    parser.add_argument('--kernel_model', type=str, default='lr', help='kernel model.')
+    parser.add_argument('--tree_kernel', type=str, default='leaf_output', help='tree kernel.')
 
     parser.add_argument('--corr', type=str, default='pearson', help='statistical correlation.')
     parser.add_argument('--ext', type=str, default='png', help='output image format.')
@@ -135,7 +125,6 @@ class Args:
 
     tree_type = 'cb'
     tree_kernel = 'leaf_output'
-    kernel_model = 'lr'
 
     corr = 'pearson'
     ext = 'png'
