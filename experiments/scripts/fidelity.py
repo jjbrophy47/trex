@@ -133,6 +133,8 @@ def experiment(args, logger, out_dir, seed):
         results = _get_knn_predictions(tree, knn_clf, X_test, X_test_alt, y_train)
         logger.info('time: {:.3f}s'.format(time.time() - start))
 
+        results['n_neighbors'] = params['n_neighbors']
+
         # save results
         np.save(os.path.join(out_dir, 'tree.npy'), results['tree'])
         np.save(os.path.join(out_dir, 'teknn.npy'), results['teknn'])
@@ -155,6 +157,8 @@ def experiment(args, logger, out_dir, seed):
         logger.info('generating predictions...')
         results = _get_trex_predictions(tree, explainer, data)
         logger.info('time: {:.3f}s'.format(time.time() - start))
+
+        results['C'] = explainer.C
 
         # save data
         np.save(os.path.join(out_dir, 'tree.npy'), results['tree'])
