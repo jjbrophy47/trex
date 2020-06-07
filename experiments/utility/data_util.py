@@ -486,7 +486,9 @@ def get_data(dataset, test_size=0.2, random_state=69, data_dir='data', return_fe
              return_manipulation=False, return_image_id=False, remove_missing_features=False,
              categories='alt.atheism|talk.religion.misc', remove=('headers', 'footers', 'quotes'),
              return_raw=True, mismatch=False):
-    """Returns a train and test set from the desired dataset."""
+    """
+    Returns a train and test set from the desired dataset.
+    """
 
     # load dataset
     if dataset == 'iris':
@@ -549,8 +551,10 @@ def get_data(dataset, test_size=0.2, random_state=69, data_dir='data', return_fe
         exit('dataset {} not supported'.format(dataset))
 
 
-def flip_labels(arr, k=100, random_state=69, return_indices=True):
-    """Flips the label of random elements in an array; only for binary arrays."""
+def flip_labels(arr, k=100, random_state=69, return_indices=True, logger=None):
+    """
+    Flips the label of random elements in an array; only for binary arrays.
+    """
 
     assert arr.ndim == 1, 'arr is not 1d!'
     assert np.all(np.unique(arr) == np.array([0, 1])), 'arr is not binary!'
@@ -574,10 +578,12 @@ def flip_labels(arr, k=100, random_state=69, return_indices=True):
             zeros_flipped += 1
         new_arr[ndx] = 0 if new_arr[ndx] == 1 else 1
 
-    print('sum before: {}'.format(np.sum(arr)))
-    print('ones flipped: {}'.format(ones_flipped))
-    print('zeros flipped: {}'.format(zeros_flipped))
-    print('sum after: {}'.format(np.sum(new_arr)))
+    if logger:
+        logger.info('sum before: {:,}'.format(np.sum(arr)))
+        logger.info('ones flipped: {:,}'.format(ones_flipped))
+        logger.info('zeros flipped: {:,}'.format(zeros_flipped))
+        logger.info('sum after: {:,}'.format(np.sum(new_arr)))
+
     assert np.sum(new_arr) == np.sum(arr) - ones_flipped + zeros_flipped
 
     if return_indices:
@@ -587,7 +593,9 @@ def flip_labels(arr, k=100, random_state=69, return_indices=True):
 
 
 def flip_labels_with_indices(arr, indices):
-    """Flips the label of specified elements in an array; only for binary arrays."""
+    """
+    Flips the label of specified elements in an array; only for binary arrays.
+    """
 
     assert arr.ndim == 1, 'arr is not 1d!'
     assert np.all(np.unique(arr) == np.array([0, 1])), 'arr is not binary!'

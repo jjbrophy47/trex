@@ -28,13 +28,6 @@ def _plot_graph(args, ax, dataset, method_list, tree_kernel,
 
     in_dir = os.path.join(args.in_dir, dataset, args.tree_type, tree_kernel)
 
-    # # tree results
-    # tree_path = os.path.join(in_dir, 'tree.npy')
-    # if not os.path.exists(tree_path):
-    #     print(tree_path)
-    #     return
-    # tree_res = np.load(tree_path)
-
     for i, method in enumerate(method_list):
         tree_path = os.path.join(in_dir, method, 'tree.npy')
         method_path = os.path.join(in_dir, method, 'surrogate.npy')

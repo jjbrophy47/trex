@@ -17,7 +17,6 @@ import tqdm
 import numpy as np
 from sklearn.base import clone
 from sklearn.metrics import accuracy_score
-from sklearn.preprocessing import minmax_scale
 
 import trex
 from utility import model_util, data_util, exp_util, print_util
@@ -182,7 +181,7 @@ def _maple_method(explainer, X_train, noisy_ndx, interval, to_check=1):
     return ckpt_ndx, fix_ndx, train_weight, train_order
 
 
-def _knn_method(knn_clf, weights, X_train, noisy_ndx, interval, to_check=1):
+def _knn_method(knn_clf, X_train, noisy_ndx, interval, to_check=1):
     """
     Count impact by the number of times a training sample shows up in
     one another's neighborhoods, this can be weighted by 1 / distance.
@@ -199,10 +198,7 @@ def _knn_method(knn_clf, weights, X_train, noisy_ndx, interval, to_check=1):
     train_impact = np.zeros(X_train.shape[0])
     for i in tqdm.tqdm(range(X_train.shape[0])):
         distances, neighbor_ids = knn_clf.kneighbors([X_train[i]])
-        if weights == 'uniform':
-            train_impact[neighbor_ids[0]] += 1
-        else:
-            train_impact[neighbor_ids[0]] += 1 / distances[0]
+        train_impact[neighbor_ids[0]] += 1
 
     train_order = np.argsort(train_impact)[::-1][:n_check]
     ckpt_ndx, fix_ndx = _record_fixes(train_order, noisy_ndx, n_train, interval)
@@ -227,17 +223,14 @@ def experiment(args, logger, out_dir, seed):
         X_train, y_train = X_train[:n_train], y_train[:n_train]
     data = X_train, y_train, X_test, y_test
 
-    logger.info('train instances: {}'.format(len(X_train)))
-    logger.info('test instances: {}'.format(len(X_test)))
-    logger.info('no. features: {}'.format(X_train.shape[1]))
+    logger.info('no. train instances: {:,}'.format(len(X_train)))
+    logger.info('no. test instances: {:,}'.format(len(X_test)))
+    logger.info('no. features: {:,}'.format(X_train.shape[1]))
 
     # add noise
     y_train_noisy, noisy_ndx = data_util.flip_labels(y_train, k=args.flip_frac, random_state=seed)
     noisy_ndx = np.array(sorted(noisy_ndx))
-    logger.info('num noisy labels: {}'.format(len(noisy_ndx)))
-
-    # get validation
-    X_val = exp_util.get_val_data(X_train, args.val_frac, seed)
+    logger.info('no. noisy labels: {:,}'.format(len(noisy_ndx)))
 
     # train a tree ensemble on the clean and noisy labels
     model = clone(clf).fit(X_train, y_train)
@@ -259,15 +252,15 @@ def experiment(args, logger, out_dir, seed):
         predicted_labels = model_noisy.predict(X_train).flatten()
         incorrect_ndx = np.where(y_train_noisy != predicted_labels)[0]
         incorrect_corrupted_ndx = np.intersect1d(noisy_ndx, incorrect_ndx)
-        logger.info('incorrectly predicted corrupted labels: {}'.format(incorrect_corrupted_ndx.shape[0]))
-        logger.info('total number of incorrectly predicted labels: {}'.format(incorrect_ndx.shape[0]))
+        logger.info('incorrectly predicted corrupted labels: {:,}'.format(incorrect_corrupted_ndx.shape[0]))
+        logger.info('total number of incorrectly predicted labels: {:,}'.format(incorrect_ndx.shape[0]))
 
     # number of checkpoints to record
     n_check = int(len(y_train) * args.check_pct)
     interval = (n_check / len(y_train)) / args.n_plot_points
 
     # random method
-    logger.info('ordering by random...')
+    logger.info('\nordering by random...')
     start = time.time()
     ckpt_ndx, fix_ndx = _random_method(noisy_ndx, y_train, interval,
                                        to_check=n_check,
@@ -283,15 +276,17 @@ def experiment(args, logger, out_dir, seed):
     # tree loss method
     logger.info('ordering by tree loss...')
     start = time.time()
+
     y_train_proba = model_noisy.predict_proba(X_train)
     ckpt_ndx, fix_ndx, _, _ = _loss_method(noisy_ndx, y_train_proba, y_train_noisy, interval, to_check=n_check)
     _, tree_loss_res = _interval_performance(ckpt_ndx, fix_ndx, noisy_ndx, clf, data, acc_test_noisy)
+
     logger.info('time: {:3f}s'.format(time.time() - start))
-    np.save(os.path.join(out_dir, 'tree_loss.npy'), tree_loss_res)
+    np.save(os.path.join(out_dir, 'tree.npy'), tree_loss_res)
 
     # trex method
     if args.trex:
-        logger.info('ordering by TREX-{}...'.format(args.kernel_model))
+        logger.info('\nordering by TREX...')
         start = time.time()
         explainer = trex.TreeExplainer(model_noisy, X_train, y_train_noisy,
                                        tree_kernel=args.tree_kernel,
@@ -300,33 +295,29 @@ def experiment(args, logger, out_dir, seed):
                                        kernel_model=args.kernel_model,
                                        kernel_model_kernel=args.kernel_model_kernel,
                                        verbose=args.verbose,
-                                       X_val=X_val,
+                                       val_frac=args.val_frac,
                                        logger=logger)
-        logger.info('C: {}'.format(explainer.C))
+
         ckpt_ndx, fix_ndx, _ = _our_method(explainer, noisy_ndx, y_train, n_check, interval)
         check_pct, trex_res = _interval_performance(ckpt_ndx, fix_ndx, noisy_ndx, clf, data, acc_test_noisy)
-        logger.info('time: {:3f}s'.format(time.time() - start))
-        np.save(os.path.join(out_dir, 'trex_{}.npy'.format(args.kernel_model)), trex_res)
 
-    # trex loss method - if svm, squish decision values to between 0 and 1
-    if args.trex and args.kernel_model_loss:
-        logger.info('ordering by linear loss...')
+        logger.info('time: {:3f}s'.format(time.time() - start))
+        np.save(os.path.join(out_dir, 'method.npy'), trex_res)
+
+        # trex loss method
+        logger.info('\nordering by TREX loss...')
         start = time.time()
-        if args.kernel_model == 'svm':
-            y_train_proba = explainer.decision_function(X_train)
-            if y_train_proba.ndim == 1:
-                y_train_proba = exp_util.make_multiclass(y_train_proba)
-            y_train_proba = minmax_scale(y_train_proba)
-        else:
-            y_train_proba = explainer.predict_proba(X_train)
+
+        y_train_proba = explainer.predict_proba(X_train)
         ckpt_ndx, fix_ndx, _, _ = _loss_method(noisy_ndx, y_train_proba, y_train_noisy, interval, to_check=n_check)
         _, trex_loss_res = _interval_performance(ckpt_ndx, fix_ndx, noisy_ndx, clf, data, acc_test_noisy)
+
         logger.info('time: {:3f}s'.format(time.time() - start))
-        np.save(os.path.join(out_dir, 'trex_{}_loss.npy'.format(args.kernel_model)), trex_loss_res)
+        np.save(os.path.join(out_dir, 'method_loss.npy'), trex_loss_res)
 
     # influence method
     if args.tree_type == 'cb' and args.inf_k is not None:
-        logger.info('ordering by leafinfluence...')
+        logger.info('\nordering by leafinfluence...')
         start = time.time()
 
         model_path = '.model.json'
@@ -344,52 +335,54 @@ def experiment(args, logger, out_dir, seed):
         ckpt_ndx, fix_ndx, _, _ = _influence_method(leaf_influence, noisy_ndx, X_train, y_train, y_train_noisy,
                                                     interval, to_check=n_check)
         _, leafinfluence_res = _interval_performance(ckpt_ndx, fix_ndx, noisy_ndx, clf, data, acc_test_noisy)
+
         logger.info('time: {:3f}s'.format(time.time() - start))
-        np.save(os.path.join(out_dir, 'leafinfluence.npy'), leafinfluence_res)
+        np.save(os.path.join(out_dir, 'method.npy'), leafinfluence_res)
 
     # MAPLE method
     if args.maple:
-        logger.info('ordering by MAPLE...')
+        logger.info('\nordering by MAPLE...')
         start = time.time()
+
         train_label = y_train_noisy if args.true_label else model_noisy.predict(X_train)
         maple_exp = MAPLE(X_train, train_label, X_train, train_label, verbose=args.verbose, dstump=False)
         ckpt_ndx, fix_ndx, map_scores, map_order = _maple_method(maple_exp, X_train, noisy_ndx, interval,
                                                                  to_check=n_check)
         _, maple_res = _interval_performance(ckpt_ndx, fix_ndx, noisy_ndx, clf, data, acc_test_noisy)
-        logger.info('time: {:3f}s'.format(time.time() - start))
-        np.save(os.path.join(out_dir, 'maple.npy'), maple_res)
 
-    # TE-KNN method
+        logger.info('time: {:3f}s'.format(time.time() - start))
+        np.save(os.path.join(out_dir, 'method.npy'), maple_res)
+
+    # TEKNN method
     if args.teknn:
-        logger.info('ordering by teknn...')
+        logger.info('\nordering by teknn...')
         start = time.time()
 
         # transform the data
         extractor = trex.TreeExtractor(model_noisy, tree_kernel=args.tree_kernel)
         X_train_alt = extractor.fit_transform(X_train)
-        X_val_alt = extractor.transform(X_val)
         train_label = y_train if args.true_label else model_noisy.predict(X_train)
 
         # tune and train teknn
-        knn_clf, params = exp_util.tune_knn(X_train_alt, train_label, model_noisy, X_val, X_val_alt, logger=logger)
-        logger.info('n_neighbors: {}, weights: {}'.format(params['n_neighbors'], params['weights']))
-        weights = params['weights']
+        knn_clf = exp_util.tune_knn(model_noisy, X_train, X_train_alt, train_label, args.val_frac,
+                                    seed=seed, logger=logger)
 
-        ckpt_ndx, fix_ndx, _ = _knn_method(knn_clf, weights, X_train_alt, noisy_ndx, interval, to_check=n_check)
+        ckpt_ndx, fix_ndx, _ = _knn_method(knn_clf, X_train_alt, noisy_ndx, interval, to_check=n_check)
         _, teknn_res = _interval_performance(ckpt_ndx, fix_ndx, noisy_ndx, clf, data, acc_test_noisy)
-        logger.info('time: {:3f}s'.format(time.time() - start))
-        np.save(os.path.join(out_dir, 'teknn.npy'), teknn_res)
 
-    # te-knn loss method
-    if args.teknn and args.teknn_loss:
-        logger.info('ordering by teknn loss...')
+        logger.info('time: {:3f}s'.format(time.time() - start))
+        np.save(os.path.join(out_dir, 'method.npy'), teknn_res)
+
+        # TEKNN loss method
+        logger.info('\nordering by teknn loss...')
         start = time.time()
         y_train_proba = knn_clf.predict_proba(X_train_alt)
 
         ckpt_ndx, fix_ndx, _, _ = _loss_method(noisy_ndx, y_train_proba, y_train_noisy, interval, to_check=n_check)
         _, teknn_loss_res = _interval_performance(ckpt_ndx, fix_ndx, noisy_ndx, clf, data, acc_test_noisy)
+
         logger.info('time: {:3f}s'.format(time.time() - start))
-        np.save(os.path.join(out_dir, 'teknn_loss.npy'), teknn_loss_res)
+        np.save(os.path.join(out_dir, 'method_loss.npy'), teknn_loss_res)
 
 
 def main(args):
@@ -402,6 +395,16 @@ def main(args):
 
     out_dir = os.path.join(args.out_dir, dataset, args.tree_type,
                            args.tree_kernel, 'rs{}'.format(args.rs))
+
+    if args.trex:
+        out_dir = os.path.join(out_dir, args.kernel_model)
+    elif args.teknn:
+        out_dir = os.path.join(out_dir, 'teknn')
+    elif args.maple:
+        out_dir = os.path.join(out_dir, 'maple')
+    elif args.inf_k is not None:
+        out_dir = os.path.join(out_dir, 'leaf_influence')
+
     os.makedirs(out_dir, exist_ok=True)
     logger = print_util.get_logger(os.path.join(out_dir, 'log.txt'))
     logger.info(args)
@@ -415,35 +418,42 @@ def main(args):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Feature representation extractions for tree ensembles',
                                      formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+
+    # I/O settings
     parser.add_argument('--dataset', type=str, default='adult', help='dataset to explain.')
     parser.add_argument('--data_dir', type=str, default='data', help='data directory.')
     parser.add_argument('--out_dir', type=str, default='output/cleaning/', help='output directory.')
 
+    # data settings
     parser.add_argument('--train_frac', type=float, default=1.0, help='amount of training data to use.')
-    parser.add_argument('--val_frac', type=float, default=0.05, help='amount of training data to use for validation.')
+    parser.add_argument('--val_frac', type=float, default=0.1, help='amount of training data to use for validation.')
     parser.add_argument('--flip_frac', type=float, default=0.4, help='Fraction of train labels to flip.')
 
+    # tree settings
     parser.add_argument('--tree_type', type=str, default='cb', help='tree model to use.')
     parser.add_argument('--n_estimators', type=int, default=100, help='number of trees in random forest.')
     parser.add_argument('--max_depth', type=int, default=None, help='maximum depth in tree ensemble.')
 
+    # TREX settings
     parser.add_argument('--trex', action='store_true', default=False, help='Use TREX.')
-    parser.add_argument('--tree_kernel', type=str, default='leaf_output', help='type of encoding.')
+    parser.add_argument('--tree_kernel', type=str, default='tree_output', help='type of encoding.')
     parser.add_argument('--true_label', action='store_true', default=False, help='Train model on true labels.')
-    parser.add_argument('--kernel_model', type=str, default='lr', help='kernel model to use.')
+    parser.add_argument('--kernel_model', type=str, default='klr', help='kernel model to use.')
     parser.add_argument('--kernel_model_kernel', default='linear', help='Similarity kernel for the linear model.')
-    parser.add_argument('--kernel_model_loss', action='store_true', default=False, help='Include linear loss.')
 
-    parser.add_argument('--check_pct', type=float, default=0.3, help='Max percentage of train instances to check.')
-    parser.add_argument('--n_plot_points', type=int, default=10, help='Number of points to plot.')
-
+    # method settings
     parser.add_argument('--inf_k', type=int, default=None, help='Number of leaves to use for leafinfluence.')
     parser.add_argument('--maple', action='store_true', default=False, help='Whether to use MAPLE as a baseline.')
     parser.add_argument('--teknn', action='store_true', default=False, help='Use KNN on top of TREX features.')
-    parser.add_argument('--teknn_loss', action='store_true', default=False, help='Use KNN loss method.')
 
+    # plot settings
+    parser.add_argument('--check_pct', type=float, default=0.3, help='Max percentage of train instances to check.')
+    parser.add_argument('--n_plot_points', type=int, default=10, help='Number of points to plot.')
+
+    # experiment settings
     parser.add_argument('--rs', type=int, default=1, help='random state.')
     parser.add_argument('--verbose', type=int, default=0, help='Verbosity level.')
+
     args = parser.parse_args()
     main(args)
 
@@ -462,9 +472,9 @@ class Args:
     max_depth = None
 
     trex = True
-    tree_kernel = 'leaf_output'
+    tree_kernel = 'tree_output'
     true_label = False
-    kernel_model = 'lr'
+    kernel_model = 'klr'
     kernel_model_kernel = 'linear'
     kernel_model_loss = False
 

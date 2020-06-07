@@ -24,12 +24,24 @@ def get_results(dataset, method, args):
 
     # get results from each run
     res_list = []
+
+    # get method directory
+    method_dir = 'klr' if method in ['tree', 'random'] else method
+    if 'loss' in method:
+        method_dir = method.split('_')[0]
+
+    # get method name
+    method_name = 'method_loss' if 'loss' in method else 'method'
+    if method in ['tree', 'random']:
+        method_name = method
+
     for i in args.rs:
         res_path = os.path.join(args.in_dir, dataset, args.tree_type,
-                                args.tree_kernel, 'rs{}'.format(i),
-                                '{}.npy'.format(method))
+                                args.tree_kernel, 'rs{}'.format(i), method_dir,
+                                '{}.npy'.format(method_name))
 
         if not os.path.exists(res_path):
+            print(res_path)
             continue
 
         res = np.load(res_path)
@@ -49,8 +61,8 @@ def get_results(dataset, method, args):
 def main(args):
 
     # settings
-    method_list = ['trex_lr', 'trex_svm', 'random',
-                   'tree_loss', 'trex_lr_loss', 'trex_svm_loss',
+    method_list = ['klr', 'svm', 'random',
+                   'tree', 'klr_loss', 'svm_loss',
                    'maple', 'leafinfluence', 'teknn',
                    'teknn_loss']
     labels = ['TREX-KLR', 'TREX-SVM', 'Random',
@@ -86,9 +98,11 @@ def main(args):
         ax = axs[i]
 
         rs_dir = os.path.join(args.in_dir, dataset, args.tree_type,
-                              args.tree_kernel, 'rs1')
+                              args.tree_kernel, 'rs1', 'klr')
         if not os.path.exists(rs_dir):
+            print(rs_dir)
             continue
+
         check_pct = np.load(os.path.join(rs_dir, 'check_pct.npy'))
         test_clean = np.load(os.path.join(rs_dir, 'test_clean.npy'))
 
@@ -117,9 +131,11 @@ def main(args):
         ax.axhline(test_clean, color='k', linestyle='--')
 
     os.makedirs(args.out_dir, exist_ok=True)
+
     n_legend_cols = int(len(lines) / 2) if len(lines) > 3 else len(lines)
     fig.legend(tuple(lines), tuple(new_labels), loc='center', ncol=n_legend_cols,
                bbox_to_anchor=(0.525, 0.115))
+
     plt.tight_layout()
     fig.subplots_adjust(bottom=0.445, wspace=0.275)
     plt.savefig(os.path.join(args.out_dir, 'plot.{}'.format(args.ext)))
@@ -134,8 +150,7 @@ if __name__ == '__main__':
     parser.add_argument('--out_dir', type=str, default='output/plots/cleaning/', help='output directory.')
 
     parser.add_argument('--tree_type', type=str, default='cb', help='tree type.')
-    parser.add_argument('--tree_kernel', type=str, default='leaf_output', help='tree kernel.')
-    parser.add_argument('--kernel_model', type=str, default='lr', help='kernel model.')
+    parser.add_argument('--tree_kernel', type=str, default='tree_output', help='tree kernel.')
 
     parser.add_argument('--rs', type=int, nargs='+', default=[1, 2, 3, 4, 5], help='random state.')
     parser.add_argument('--ext', type=str, default='png', help='output image format.')
@@ -150,8 +165,7 @@ class Args:
     out_dir = 'output/plots/cleaning/'
 
     tree_type = 'cb'
-    tree_kernel = 'leaf_output'
-    kernel_model = 'lr'
+    tree_kernel = 'tree_output'
 
     rs = [1]
     ext = 'png'
