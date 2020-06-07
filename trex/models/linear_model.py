@@ -66,6 +66,10 @@ class SVM(BaseEstimator, ClassifierMixin):
     def decision_proba(self, X):
         return self._sigmoid(self.decision_function(X))
 
+    def predict_proba(self, X):
+        a = self.decision_proba(X).reshape(-1, 1)
+        return np.hstack([1 - a, a])
+
     def predict(self, X):
         return self.ovr_.predict(X)
 

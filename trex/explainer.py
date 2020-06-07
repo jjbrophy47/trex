@@ -11,6 +11,8 @@ import pickle
 import numpy as np
 from sklearn.utils.validation import check_X_y
 from sklearn.preprocessing import LabelEncoder
+from sklearn.base import clone
+from sklearn.model_selection import StratifiedKFold
 from scipy.stats import pearsonr
 
 from .extractor import TreeExtractor
@@ -30,7 +32,7 @@ class TreeExplainer:
                  dense_output=True,
                  true_label=False,
                  random_state=None,
-                 X_val=None,
+                 val_frac=0.1,
                  verbose=0,
                  C_grid=[1e-2, 1e-1, 1e0, 1e1, 1e2],
                  logger=None,
@@ -46,7 +48,7 @@ class TreeExplainer:
             Train instances in original feature space.
         y_train : 1d array-like (default=None)
             Ground-truth train labels.
-        kernel_model : str (default='svm', {'svm', 'lr'})
+        kernel_model : str (default='svm', {'svm', 'klr'})
             Kernel model to approximate the tree ensemble.
         tree_kernel : str (default='leaf_output', {'leaf_output', 'tree_output', leaf_path', 'feature_path'})
             Feature representation to extract from the tree ensemble.
@@ -55,7 +57,7 @@ class TreeExplainer:
             in stronger regularization.
         kernel_model_kernel : str (default='linear', {'linear', 'poly', 'rbf', 'sigmoid'})
             Kernel to use in the dual optimization of the kernel model.
-            If kernel_model='lr', only 'linear' is currently supported.
+            If kernel_model='klr', only 'linear' is currently supported.
         gamma : float (default='scale')
             Kernel coefficient for 'rbf', 'poly', and 'sigmoid'.
             If 'scale', gamma defaults to 1 / (n_features * X.var()).
@@ -75,8 +77,8 @@ class TreeExplainer:
             If False, predicted labels from the tree ensemble are used to train the kernel model.
         random_state : int (default=None)
             Random state to promote reproducibility.
-        X_val : 2d array-like
-            Used to tune the hyperparameters of KLR or SVM.
+        val_frac : float (default=0.1)
+            Fraction of training data used to tune the hyperparameters of KLR or SVM.
         temp_dir : str (default='.trex')
         """
 
@@ -100,66 +102,88 @@ class TreeExplainer:
         self._validate()
 
         if logger:
-            logger.info('transforming training data...')
+            logger.info('TREX:\ntransforming training data...')
 
         # extract feature representations from the tree ensemble
         self.extractor_ = TreeExtractor(self.tree, tree_kernel=self.tree_kernel)
         self.train_feature_ = self.extractor_.fit_transform(self.X_train)
 
         # choose ground truth or predicted labels to train the kernel model
-        if not true_label:
-            train_label = self.tree.predict(X_train).flatten()
-        else:
-            train_label = self.y_train
-
-        # create a kernel model to approximate the tree ensemble
-        clf = self._get_kernel_model(C=self.C)
+        train_label = self.y_train if true_label else self.tree.predict(X_train).flatten()
 
         # encode class labels into numbers between 0 and n_classes - 1
         self.le_ = LabelEncoder().fit(train_label)
         train_label = self.le_.transform(train_label)
 
         # train the kernel model on the tree ensemble feature representation
-        if X_val is not None:
-            assert X_val.shape[1] == X_train.shape[1]
+        if val_frac is not None:
             if logger:
-                logger.info('transforming validation data...')
-            X_val_feature = self.extractor_.transform(X_val)
+                logger.info('tuning...')
+            tune_start = time.time()
 
-            # get tree predictions on validation data
-            tree_val_proba = self.tree.predict_proba(X_val)[:, 1]
+            # select a fraction of the training data
+            n_samples = int(X_train.shape[0] * val_frac)
+            np.random.seed(self.random_state)
+            val_indices = np.random.choice(np.arange(X_train.shape[0]), size=n_samples)
 
-            best_score = 0
-            best_C = None
+            X_val = X_train[val_indices]
+            X_val_feature = self.train_feature_[val_indices]
+            y_val = train_label[val_indices]
 
-            # gridsearch on C values
-            for C in C_grid:
-                start = time.time()
+            # result containers
+            results = []
+            fold = 0
 
-                # fit a surrogate model
-                clf = self._get_kernel_model(C=C)
-                clf.fit(self.train_feature_, train_label)
+            # tune C
+            skf = StratifiedKFold(n_splits=2, shuffle=True, random_state=self.random_state)
+            for train_index, test_index in skf.split(X_val_feature, y_val):
+                fold += 1
 
-                # get surrogate model predictions on validation data
-                if self.kernel_model == 'svm':
-                    trex_proba = clf.decision_proba(X_val_feature)
-                else:
-                    trex_proba = clf.predict_proba(X_val_feature)[:, 1]
+                # obtain fold data
+                X_val_train = X_val[train_index]
+                X_val_test = X_val[test_index]
+                X_val_feature_train = X_val_feature[train_index]
+                X_val_feature_test = X_val_feature[test_index]
+                y_val_train = y_val[train_index]
 
-                # keep model with the best
-                pearson_corr = pearsonr(tree_val_proba, trex_proba)[0]
-                if pearson_corr > best_score:
-                    best_score = pearson_corr
-                    best_C = C
+                # gridsearch on C values
+                correlations = []
+                for C in C_grid:
 
-                if self.logger:
-                    self.logger.info('C={}: {:.3f}s; corr={:.3f}'.format(C, time.time() - start, pearson_corr))
+                    start = time.time()
 
-            self.C = best_C
-            clf = self._get_kernel_model(C=best_C)
-            self.kernel_model_ = clf.fit(self.train_feature_, train_label)
-        else:
-            self.kernel_model_ = clf.fit(self.train_feature_, train_label)
+                    # fit a tree ensemble and surrogate model
+                    m1 = clone(tree).fit(X_val_train, y_val_train)
+                    m2 = self._get_kernel_model(C=C).fit(X_val_feature_train, y_val_train)
+
+                    # generate predictions
+                    m1_proba = m1.predict_proba(X_val_test)[:, 1]
+                    m2_proba = m2.predict_proba(X_val_feature_test)[:, 1]
+
+                    # measure correlation
+                    correlation = pearsonr(m1_proba, m2_proba)[0]
+                    correlations.append(correlation)
+
+                    if self.logger:
+                        s = '[Fold {}] C={:<5}: {:.3f}s; corr={:.3f}'
+                        self.logger.info(s.format(fold, C, time.time() - start, correlation))
+
+                results.append(correlations)
+            results = np.vstack(results).mean(axis=0)
+            best_ndx = np.argmax(results)
+            self.C = C_grid[best_ndx]
+
+            if self.logger:
+                self.logger.info('chosen C: {}'.format(self.C))
+                self.logger.info('total tuning time: {:.3f}s'.format(time.time() - tune_start))
+                self.logger.info('training...')
+
+        train_start = time.time()
+        clf = self._get_kernel_model(C=self.C)
+        self.kernel_model_ = clf.fit(self.train_feature_, train_label)
+
+        if self.logger:
+            self.logger.info('total training time: {:.3f}s'.format(time.time() - train_start))
 
     def __str__(self):
         s = '\nTree Explainer:'
@@ -213,7 +237,6 @@ class TreeExplainer:
 
         Returns a 2d array of probabilities of shape (len(X), n_classes).
         """
-        assert self.kernel_model == 'lr', 'predict_proba only supports lr!'
         return self.kernel_model_.predict_proba(self.transform(X))
 
     def predict(self, X):
@@ -388,12 +411,12 @@ class TreeExplainer:
             exit('{} not currently supported!'.format(str(self.tree)))
 
         # check kernel model
-        assert self.kernel_model in ['svm', 'lr'], '{} unsupported'.format(self.kernel_model)
+        assert self.kernel_model in ['svm', 'klr'], '{} unsupported'.format(self.kernel_model)
 
         # check kernel model kernel
         kernel_types = ['linear', 'rbf', 'poly', 'sigmoid']
         assert self.kernel_model_kernel in kernel_types, '{} unsupported'.format(self.kernel_model_kernel)
 
         # check kernel for LR
-        if self.kernel_model == 'lr':
-            assert self.kernel_model_kernel == 'linear', "lr only supports 'linear' kernel"
+        if self.kernel_model == 'klr':
+            assert self.kernel_model_kernel == 'linear', "klr only supports 'linear' kernel"

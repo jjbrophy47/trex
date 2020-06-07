@@ -5,7 +5,6 @@ import os
 import json
 
 import scipy
-from scipy import sparse
 import numpy as np
 from sklearn.preprocessing import OneHotEncoder
 
@@ -147,13 +146,11 @@ class TreeExtractor:
             n_total_leaves = np.sum(n_leaves_per_tree)
 
             encoding = np.zeros((X.shape[0], n_total_leaves))
-            # encoding = sparse.lil_matrix((X.shape[0], n_total_leaves))
 
             for i in range(X.shape[0]):  # per instance
                 start = 0
                 for j, n_leaves in enumerate(n_leaves_per_tree):  # per tree
                     encoding[i][start + leaf_pos[i][j]] = self.model.booster_.get_leaf_output(j, leaf_pos[i][j])
-                    # encoding[i, start + leaf_pos[i][j]] = self.model.booster_.get_leaf_output(j, leaf_pos[i][j])
                     start += n_leaves
 
         elif self.model_type_ == 'CatBoostClassifier':

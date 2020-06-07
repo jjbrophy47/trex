@@ -22,10 +22,6 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 from scipy.stats import gaussian_kde
 from sklearn.base import clone
-from scipy.stats import pearsonr
-from scipy.stats import spearmanr
-from tqdm import tqdm
-from sklearn.linear_model import LogisticRegression
 
 import trex
 from utility import model_util
@@ -149,7 +145,6 @@ def _plot_feature_histograms(args, results, test_val, out_dir, plot_instances=Fa
     ax.tick_params(axis='both', which='major')
 
     plt.tight_layout()
-    # plt.subplots_adjust(wspace=0.35, hspace=0)
     plt.savefig(os.path.join(out_dir, '{}.{}'.format(feature_name, args.ext)))
 
 
@@ -161,7 +156,6 @@ def _plot_instance_histograms(args, logger, results, out_dir):
     """
     train_weight = results['train_weight']
     train_sim = results['train_sim']
-    pred_label = results['trex_x_test_pred']
 
     train_sim_weight = train_sim * train_weight
 
@@ -177,85 +171,10 @@ def _plot_instance_histograms(args, logger, results, out_dir):
     bins = np.histogram(all_vals, bins=args.max_bins)[1]
     bins = None
 
-    if args.coverage:
-
-        # ordering influential samples by biggest absolute influence
-        train_sim_weight_sum = np.sum(np.abs(train_sim_weight))
-        train_sim_weight_sorted = np.argsort(np.abs(train_sim_weight))[::-1]
-
-        pct_prediction = args.coverage * 100
-        logger.info('\nexplaining {}% of the prediction'.format(pct_prediction))
-
-        total = 0
-        n_samples = 0
-        for i, ndx in enumerate(train_sim_weight_sorted):
-            total += np.abs(train_sim_weight[ndx])
-            # logger.info('total: {} sum: {}'.format(total, train_sim_weight_sum))
-            if total / train_sim_weight_sum >= args.coverage:
-                n_samples = i
-                break
-
-        if n_samples == 0:
-            n_samples = len(train_weight)
-
-        indices = train_sim_weight_sorted[:n_samples]
-        pct_data = len(indices) / len(train_weight) * 100
-
-        logger.info('{:.2f}% of the data'.format(pct_data))
-        logger.info('no. influential samples: {:,}'.format(len(indices)))
-
-        v1 = train_weight[indices]
-        v2 = train_sim_weight[indices]
-
-    else:
-
-        # ordering influential samples by minimum no. needed to explain the predicted label
-        train_sim_weight_sum = np.sum(np.abs(train_sim_weight))
-        train_sim_weight_neg = np.where(train_sim_weight < 0)[0]
-        train_sim_weight_pos = np.where(train_sim_weight > 0)[0]
-
-        if pred_label == 0:
-            target = train_sim_weight_pos
-            new_ndx = np.argsort(train_sim_weight[train_sim_weight_neg])
-            ep = train_sim_weight_neg[new_ndx]
-        else:
-            target = train_sim_weight_neg
-            new_ndx = np.argsort(train_sim_weight[train_sim_weight_pos])[::-1]
-            ep = train_sim_weight_pos[new_ndx]
-
-        total = 0
-        coverage = 0
-        n_ep = 0
-        finished = False
-        target_sum = np.sum(np.abs(train_sim_weight[target]))
-
-        surplus = 0 if not args.surplus else (train_sim_weight_sum - target_sum) / args.surplus
-
-        for i, ndx in enumerate(ep):
-            total += np.abs(train_sim_weight[ndx])
-            # logger.info('total: {}, target: {}, sum: {}'.format(total, target_sum, train_sim_weight_sum))
-            if total > (target_sum + surplus):
-                n_ep = i
-                coverage = (total + target_sum) / train_sim_weight_sum
-                finished = True
-                break
-
-        if finished:
-            indices = np.concatenate([target, ep[:n_ep]])
-        else:
-            logger.info('did not finish')
-
-        pct_data = len(indices) / len(train_weight) * 100
-        pct_prediction = coverage * 100
-        pct_surplus = surplus / train_sim_weight_sum * 100
-
-        logger.info('no. influential samples: {:,}'.format(len(indices)))
-        logger.info('{:.2f}% of the data'.format(pct_data))
-        logger.info('{:.2f}% of the prediction'.format(pct_prediction))
-        logger.info('+{:.1f}% surplus of the prediction'.format(pct_surplus))
-
-        v1 = train_weight[indices]
-        v2 = train_sim_weight[indices]
+    # choose indices to show
+    indices = np.arange(len(train_weight))
+    v1 = train_weight[indices]
+    v2 = train_sim[indices]
 
     # plot contributions
     width = 5.5  # Neurips 2020
@@ -274,8 +193,6 @@ def _plot_instance_histograms(args, logger, results, out_dir):
     ax.set_xlabel(r'$\alpha$')
     ax.set_ylabel('density')
     ax.tick_params(axis='both', which='major')
-    if args.xlim:
-        ax.set_xlim(-args.xlim, args.xlim)
 
     # plot similarity x weight for the training samples
     i = 0 if args.overlay else 1
@@ -284,14 +201,10 @@ def _plot_instance_histograms(args, logger, results, out_dir):
     ax.set_xlabel(r'$\alpha * \gamma$')
     ax.set_ylabel('density')
     ax.tick_params(axis='both', which='major')
-    if args.xlim:
-        ax.set_xlim(-args.xlim, args.xlim)
-
-    plt.tight_layout()
 
     ax = axs[2]
 
-    # compute density
+    # alpha vs gamma
     xy = np.vstack([train_weight[indices], train_sim[indices]])
     z = gaussian_kde(xy)(xy)
     ax.scatter(train_weight[indices], train_sim[indices], c=z, s=20, edgecolor='')
@@ -300,6 +213,7 @@ def _plot_instance_histograms(args, logger, results, out_dir):
     ax.set_ylabel(r'$\gamma$')
     ax.set_xlabel(r'$\alpha$')
 
+    # alpha vs alpha * gamma
     ax = axs[3]
     xy = np.vstack([train_weight[indices], train_sim_weight[indices]])
     z = gaussian_kde(xy)(xy)
@@ -309,23 +223,21 @@ def _plot_instance_histograms(args, logger, results, out_dir):
     ax.set_xlabel(r'$\alpha$')
     ax.set_ylabel(r'$\alpha * \gamma$')
 
-    ax2 = ax.twinx()
-
+    # cum sum of alpha * gamma
     train_weight_sorted_ndx = np.argsort(train_weight[indices])
     train_weight_sorted = train_weight[indices][train_weight_sorted_ndx]
     train_sim_weight_sorted = train_sim_weight[indices][train_weight_sorted_ndx]
     train_sim_weight_sorted_cumsum = np.cumsum(train_sim_weight_sorted)
 
+    ax2 = ax.twinx()
     ax2.plot(train_weight_sorted, train_sim_weight_sorted_cumsum,
              label='contribution', color='k', linestyle='--')
     ax2.set_ylabel(r'$\sum \alpha * \gamma$')
 
-    fig.suptitle('Explaining {:.1f}% of the prediction using {:.1f}% of the data'.format(pct_prediction, pct_data))
     plt.tight_layout()
     fig.tight_layout(rect=[0, 0.03, 1, 0.95])
 
-    setting = 'minimum_{:.1f}'.format(pct_surplus) if not args.coverage else '{:.1f}'.format(args.coverage)
-    plt.savefig(os.path.join(out_dir, 'plot_{}.{}'.format(setting, args.ext)))
+    plt.savefig(os.path.join(out_dir, 'instances.{}'.format(args.ext)))
 
 
 def experiment(args, logger, out_dir, seed):
@@ -357,11 +269,10 @@ def experiment(args, logger, out_dir, seed):
     model_util.performance(tree, X_train, y_train, X_test, y_test, logger=logger)
 
     # load a TREX model
-    model_dir = os.path.join(out_dir, '../models/')
+    model_dir = os.path.join(out_dir, '/models/')
     os.makedirs(model_dir, exist_ok=True)
     model_path = os.path.join(model_dir, 'explainer.pkl')
 
-    print(model_path)
     if args.load_trex and os.path.exists(model_path):
         assert os.path.exists(model_path)
         logger.info('loading TREX model from {}...'.format(model_path))
@@ -399,11 +310,15 @@ def experiment(args, logger, out_dir, seed):
     logger.info('wrong - label0: {}, label1: {}, total: {}'.format(
                 len(wrong_label0), len(wrong_label1), total_wrong))
 
+    # choose a test instance to explain
+
+    # instances where pred=1 and label=1
     if args.test_type == 'pos_correct':
         correct_indices = np.where((y_test_pred_tree == 1) & (y_test == 1))[0]
         np.random.seed(seed)
         test_ndx = np.random.choice(correct_indices)
 
+    # instances where pred=0 and label=0
     elif args.test_type == 'neg_correct':
         correct_indices = np.where((y_test_pred_tree == 0) & (y_test == 0))[0]
         np.random.seed(seed)
@@ -431,7 +346,7 @@ def experiment(args, logger, out_dir, seed):
 
     x_test = X_test[[test_ndx]]
 
-    # show explanations for missed instances
+    # show predictions for this test instance
     logger.info('\ntest index: {}, label: {}'.format(test_ndx, y_test[test_ndx]))
     logger.info('tree pred: {} ({:.3f})'.format(y_test_pred_tree[test_ndx],
                                                 y_test_proba_tree[test_ndx]))
@@ -448,207 +363,14 @@ def experiment(args, logger, out_dir, seed):
     top_features = _get_top_features(x_test[0], test_shap[0], feature,
                                      k=args.topk, normalize=args.normalize_shap)
 
-    # randomly select data to train on
-    logger.info('train on a random subset of data')
-    np.random.seed(seed)
-    indices = np.random.choice(X_train.shape[0], size=int(X_train.shape[0] * args.s_frac), replace=False)
-    logger.info('{}: {:,} -> {:,}'.format(args.s_frac, X_train.shape[0], len(indices)))
-
-    new_tree = clone(clf).fit(X_train[indices], y_train[indices])
-    model_util.performance(tree, X_train, y_train, X_test, y_test, logger=logger)
-    model_util.performance(new_tree, X_train, y_train, X_test, y_test, logger=logger)
-
-    logger.info('\ntraining 2 different LR models')
-    l1 = LogisticRegression().fit(X_train, y_train)
-    l2 = LogisticRegression().fit(X_train[indices], y_train[indices])
-    model_util.performance(l1, X_train, y_train, X_test, y_test, logger=logger)
-    model_util.performance(l2, X_train, y_train, X_test, y_test, logger=logger)
-
-    # return
-
-    # for top_feature in top_features:
-    #     logger.info(top_feature)
-
     # get positive and negative training samples
     train_pos_ndx = np.where(y_train == 1)[0]
     train_neg_ndx = np.where(y_train == 0)[0]
 
     # get global weights and similarity to the test instance
     train_weight = explainer.get_weight()[0]
-    sim = explainer.similarity(X_test[[test_ndx]])[0]
-    contributions = train_weight * sim
-
-    if False:
-
-        # retrain to find gold standard sample impacts
-        samples = 250
-        np.random.seed(seed)
-        indices = np.random.choice(X_train.shape[0], size=samples, replace=False)
-        impacts = []
-
-        x_test_label = y_test[test_ndx]
-        proba = tree.predict_proba(x_test)[:, 1]
-
-        for i in tqdm(indices):
-            new_X_train = np.delete(X_train, i, axis=0)
-            new_y_train = np.delete(y_train, i)
-            new_tree = clone(clf).fit(new_X_train, new_y_train)
-            new_proba = new_tree.predict_proba(x_test)[:, 1]
-            diff = proba - new_proba
-            if x_test_label == 0:
-                impact = diff
-            elif x_test_label == 1:
-                impact = diff * -1
-            impacts.append(impact)
-
-        fig, ax = plt.subplots()
-        ax.scatter(contributions[indices], impacts)
-        plt.show()
-
-    # # training on the biggest weighted training samples
-    # sort_ndx = np.argsort(np.abs(train_weight))[::-1]
-    # indices = sort_ndx[:50]
-
-    # logger.info('training on top training samples')
-    # new_tree = clone(clf).fit(X_train[indices], y_train[indices],
-    #                           sample_weight=np.abs(train_weight[indices]))
-    # model_util.performance(tree, X_train, y_train, X_test, y_test, logger=logger)
-    # model_util.performance(new_tree, X_train, y_train, X_test, y_test, logger=logger)
-
-    if False:
-
-        np.random.seed(seed)
-        X_test_sub_ndx = np.random.choice(X_test.shape[0], size=int(X_test.shape[0] * 0.25))
-        X_test_sub = X_test[X_test_sub_ndx]
-        y_test_sub = y_test[X_test_sub_ndx]
-
-        # get net contributions of training samples on test data
-        contributions_list = []
-        for i in tqdm(range(X_test_sub.shape[0])):
-            x_test_sim = explainer.similarity(X_test[[i]])[0]
-            x_test_contributions = train_weight * x_test_sim
-            contributions_list.append(x_test_contributions)
-        contributions_arr = np.vstack(contributions_list)
-        contributions_sum = np.sum(contributions_arr, axis=0)
-        # np.save(os.path.join(model_dir, 'contributions_sum'), contributions_sum)
-
-        contributions_sum_total = np.sum(contributions_sum)
-        sort_ndx = np.argsort(np.abs(contributions_sum))[::-1]
-        total = 0
-        indices = []
-        for ndx in sort_ndx:
-            total += contributions_sum[ndx]
-            indices.append(ndx)
-            if total / contributions_sum_total >= args.max_contribution:
-                break
-
-        indices = sort_ndx[:500]
-
-        # # random baseline
-        # np.random.seed(seed)
-        # indices = np.random.choice(X_train.shape[0], size=len(indices), replace=False)
-
-        # logger.info('{}: {}'.format(len(indices), sorted(indices)))
-
-        # nonzero_weight_ndx = np.where(np.abs(contributions_sum) > 0)[0]
-        # zero_weight_ndx = np.setdiff1d(np.arange(len(train_weight)), nonzero_weight_ndx)
-        # print(contributions_sum, len(contributions_sum))
-        # print(contributions_sum[indices], len(contributions_sum[indices]))
-
-        # train a new tree ensemble weighted using the weighted training samples
-        new_tree = clone(clf).fit(X_train[indices], y_train[indices],
-                                  sample_weight=np.abs(contributions_sum[indices]))
-        # new_tree = clone(clf).fit(X_train[indices], y_train[indices])
-        new_proba = new_tree.predict_proba(X_test_sub)[:, 1]
-        old_proba = tree.predict_proba(X_test_sub)[:, 1]
-
-        pcorr = pearsonr(new_proba, old_proba)[0]
-        scorr = spearmanr(new_proba, old_proba)[0]
-        logger.info('pearson: {:.3f}, spearman: {:.3f}'.format(pcorr, scorr))
-
-        model_util.performance(tree, X_train, y_train, X_test_sub, y_test_sub, logger=logger)
-        model_util.performance(new_tree, X_train[indices], y_train[indices],
-                               X_test_sub, y_test_sub, logger=logger)
-
-        fig, ax = plt.subplots()
-        ax.scatter(new_proba, old_proba, color='purple')
-        ax.set_ylabel('Original GBDT probability')
-        ax.set_xlabel('New GBDT probability')
-        ax.set_title('Dataset: {}\nTraining samples: {:,} -> {:,}\npearson: {:.3f}, spearman: {:.3f}'.format(
-                     args.dataset, len(X_train), len(indices), pcorr, scorr))
-        plt.show()
-
-        # random baseline
-        np.random.seed(seed)
-        indices = np.random.choice(X_train.shape[0], size=len(indices), replace=False)
-
-        # logger.info('{}: {}'.format(len(indices), sorted(indices)))
-
-        # nonzero_weight_ndx = np.where(np.abs(contributions_sum) > 0)[0]
-        # zero_weight_ndx = np.setdiff1d(np.arange(len(train_weight)), nonzero_weight_ndx)
-        # print(contributions_sum, len(contributions_sum))
-        # print(contributions_sum[indices], len(contributions_sum[indices]))
-
-        # train a new tree ensemble weighted using the weighted training samples
-        # new_tree = clone(clf).fit(X_train[indices], y_train[indices],
-        #                           sample_weight=np.abs(contributions_sum[indices]))
-        new_tree = clone(clf).fit(X_train[indices], y_train[indices])
-        new_proba = new_tree.predict_proba(X_test_sub)[:, 1]
-        old_proba = tree.predict_proba(X_test_sub)[:, 1]
-
-        pcorr = pearsonr(new_proba, old_proba)[0]
-        scorr = spearmanr(new_proba, old_proba)[0]
-        logger.info('pearson: {:.3f}, spearman: {:.3f}'.format(pcorr, scorr))
-
-        model_util.performance(tree, X_train, y_train, X_test_sub, y_test_sub, logger=logger)
-        model_util.performance(new_tree, X_train[indices], y_train[indices],
-                               X_test_sub, y_test_sub, logger=logger)
-
-        fig, ax = plt.subplots()
-        ax.scatter(new_proba, old_proba, color='purple')
-        ax.set_ylabel('Original GBDT probability')
-        ax.set_xlabel('New GBDT probability')
-        ax.set_title('Dataset: {}\nTraining samples: {:,} -> {:,}\npearson: {:.3f}, spearman: {:.3f}'.format(
-                     args.dataset, len(X_train), len(indices), pcorr, scorr))
-        plt.show()
-
-    # weight_sort_ndx = np.argsort(train_weight)
-    # step_size = int(len(train_weight) / 20)
-
-    # # remove training samples in batches
-    # fig, ax = plt.subplots()
-
-    # scores = []
-    # pct_removed = []
-    # logger.info('removing samples from smallest to biggest...')
-    # for i in range(0, len(train_weight) - step_size, step_size):
-    #     keep_indices = weight_sort_ndx[i:]
-    #     new_X_train = X_train[keep_indices]
-    #     new_y_train = y_train[keep_indices]
-    #     new_tree = clf.fit(new_X_train, new_y_train)
-    #     if np.sum(new_y_train) > 0 and np.sum(new_y_train) < len(new_y_train):
-    #         scores.append(accuracy_score(y_test, new_tree.predict(X_test)))
-    #         pct_removed.append(i / len(train_weight) * 100)
-
-    # ax.plot(pct_removed, scores, marker='.', label='small to big')
-
-    # weight_sort_ndx = weight_sort_ndx[::-1]
-    # scores = []
-    # pct_removed = []
-    # logger.info('removing samples from biggest to smallest...')
-    # for i in range(0, len(train_weight) - step_size, step_size):
-    #     keep_indices = weight_sort_ndx[i:]
-    #     new_X_train = X_train[keep_indices]
-    #     new_y_train = y_train[keep_indices]
-    #     new_tree = clf.fit(new_X_train, new_y_train)
-    #     if np.sum(new_y_train) > 0 and np.sum(new_y_train) < len(new_y_train):
-    #         scores.append(accuracy_score(y_test, new_tree.predict(X_test)))
-    #         pct_removed.append(i / len(train_weight) * 100)
-
-    # ax.plot(pct_removed, scores, marker='.', label='big to small')
-
-    # ax.legend()
-    # plt.show()
+    train_sim = explainer.similarity(X_test[[test_ndx]])[0]
+    contributions = train_weight * train_sim
 
     logger.info('\ncollecting results...')
     results = explainer.get_params()
@@ -656,8 +378,52 @@ def experiment(args, logger, out_dir, seed):
     results['train_pos_ndx'] = train_pos_ndx
     results['train_neg_ndx'] = train_neg_ndx
     results['train_weight'] = train_weight
-    results['train_sim'] = sim
+    results['train_sim'] = train_sim
     results['trex_x_test_pred'] = explainer.predict(x_test)[0]
+
+    # shap values for train and test
+    X_train_shap_fp = os.path.join(model_dir, 'X_train_shap.npy')
+    X_test_shap_fp = os.path.join(model_dir, 'X_test_shap.npy')
+
+    if args.load_shap and os.path.exists(X_train_shap_fp):
+        X_train_shap = np.load(X_train_shap_fp)
+    else:
+        logger.info('\ncomputing SHAP values for X_train...')
+        X_train_shap = shap_explainer.shap_values(X_train)
+        np.save(X_train_shap_fp, X_train_shap)
+
+    if args.load_shap and os.path.exists(X_test_shap_fp):
+        X_test_shap = np.load(X_test_shap_fp)
+    else:
+        logger.info('computing SHAP values for X_test...')
+        X_test_shap = shap_explainer.shap_values(X_test)
+        np.save(X_test_shap_fp, X_test_shap)
+
+    if args.summary_plot:
+        shap.summary_plot(X_train_shap, X_train, feature_names=feature)
+        shap.summary_plot(X_test_shap, X_test, feature_names=feature)
+
+    # feature-based explanation for test instance
+    logger.info('test {}'.format(test_ndx))
+    logger.info('{}'.format(dict(zip(feature, X_test[test_ndx]))))
+    shap.summary_plot(test_shap, x_test, feature_names=feature)
+
+    contributions_sum = np.sum(np.abs(contributions))
+    indices = np.argsort(contributions)[::-1]
+
+    # feature-based explanations for the most influential training instances
+    for ndx in indices[:args.topk]:
+        w = train_weight[ndx]
+        s = train_sim[ndx]
+        c = contributions[ndx] / contributions_sum
+        my_str = 'train {}, label: {}, weight: {}, sim: {}, contribution (normalized): {}'
+        logger.info(my_str.format(ndx, y_train[ndx], w, s, c))
+
+        if args.summary_plot:
+            shap.summary_plot(X_train_shap[[ndx]], X_train[[ndx]], feature_names=feature)
+        else:
+            for name, val in list(zip(feature, X_train[ndx])):
+                logger.info('  {}: {}'.format(name, val))
 
     # matplotlib settings
     plt.rc('font', family='serif')
@@ -670,77 +436,7 @@ def experiment(args, logger, out_dir, seed):
     plt.rc('lines', linewidth=1)
     plt.rc('lines', markersize=6)
 
-    # shap values for train and test
-    X_train_shap_fp = os.path.join(model_dir, 'X_train_shap.npy')
-    X_test_shap_fp = os.path.join(model_dir, 'X_test_shap.npy')
-
-    if os.path.exists(X_train_shap_fp):
-        X_train_shap = np.load(X_train_shap_fp)
-    else:
-        logger.info('\ncomputing SHAP values for X_train...')
-        X_train_shap = shap_explainer.shap_values(X_train)
-        np.save(X_train_shap_fp, X_train_shap)
-
-    if os.path.exists(X_test_shap_fp):
-        X_test_shap = np.load(X_test_shap_fp)
-    else:
-        logger.info('computing SHAP values for X_test...')
-        X_test_shap = shap_explainer.shap_values(X_test)
-        np.save(X_test_shap_fp, X_test_shap)
-
-    # shap.summary_plot(X_train_shap, X_train, feature_names=feature)
-    # shap.summary_plot(X_test_shap, X_test, feature_names=feature)
-
-    # feature-based explanation for test instance
-    logger.info('test {}'.format(test_ndx))
-    logger.info('{}'.format(dict(zip(feature, X_test[test_ndx]))))
-    shap.summary_plot(test_shap, x_test, feature_names=feature)
-
-    # pos_target = np.where((X_train[:, 0] <= 17) & (y_train == 1))[0]
-    # neg_target = np.where((X_train[:, 0] <= 17) & (y_train == 0))[0]
-
-    contributions_sum = np.sum(np.abs(contributions))
-    # indices = np.argsort(np.abs(contributions))[::-1]
-    indices = np.argsort(contributions)[::-1]
-
-    # # feature-based explanations for the most influential training instances
-    # for ndx in pos_target[:5]:
-    #     w = train_weight[ndx]
-    #     s = sim[ndx]
-    #     c = contributions[ndx] / contributions_sum
-    #     logger.info('train {}, weight: {}, sim: {}, contribution (normalized): {}'.format(ndx, w, s, c))
-    #     logger.info('{}'.format(dict(zip(feature, X_train[ndx]))))
-    #     shap.summary_plot(X_train_shap[[ndx]], X_train[[ndx]], feature_names=feature)
-
-    # # feature-based explanations for the most influential training instances
-    # for ndx in neg_target[:5]:
-    #     w = train_weight[ndx]
-    #     s = sim[ndx]
-    #     c = contributions[ndx] / contributions_sum
-    #     logger.info('train {}, weight: {}, sim: {}, contribution (normalized): {}'.format(ndx, w, s, c))
-    #     logger.info('{}'.format(dict(zip(feature, X_train[ndx]))))
-    #     shap.summary_plot(X_train_shap[[ndx]], X_train[[ndx]], feature_names=feature)
-
-    age17_indices = np.where(X_train[:, 0] <= 17)[0]
-    sim_above2p5 = np.where(sim > 2.2)[0]
-    overlap = np.intersect1d(age17_indices, sim_above2p5)
-
-    logger.info('n_points w/ sim > 2.35: {}'.format(len(sim_above2p5)))
-    logger.info('n_age17_points w/ sim > 2.5: {}'.format(len(overlap)))
-
-    # feature-based explanations for the most influential training instances
-    for ndx in indices[:args.topk]:
-        w = train_weight[ndx]
-        s = sim[ndx]
-        c = contributions[ndx] / contributions_sum
-        my_str = 'train {}, label: {}, weight: {}, sim: {}, contribution (normalized): {}'
-        logger.info(my_str.format(ndx, y_train[ndx], w, s, c))
-        for name, val in list(zip(feature, X_train[ndx])):
-            logger.info('  {}: {}'.format(name, val))
-        # logger.info('{}'.format(dict(zip(feature, X_train[ndx]))))
-        # shap.summary_plot(X_train_shap[[ndx]], X_train[[ndx]], feature_names=feature)
-
-    # explain features
+    # explain features and instances
     for target_feature, test_val, shap_val in top_features:
         feat_ndx = np.where(target_feature == feature)[0][0]
 
@@ -778,36 +474,40 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Feature representation extractions for tree ensembles',
                                      formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
+    # I/O settings
     parser.add_argument('--dataset', type=str, default='nc17_mfc18', help='dataset to explain.')
     parser.add_argument('--data_dir', type=str, default='data', help='dataset to explain.')
     parser.add_argument('--out_dir', type=str, default='output/misclassification/', help='output directory.')
 
-    parser.add_argument('--val_frac', type=float, default=0.05, help='amount of training data to use for validation.')
-
+    # plot settings
     parser.add_argument('--max_bins', type=int, default=40, help='number of bins for feature values.')
     parser.add_argument('--alpha', type=float, default=0.5, help='transparency value.')
-    parser.add_argument('--xlim', type=float, default=None, help='x limits on instance plots.')
     parser.add_argument('--kde', action='store_true', default=None, help='plot kde on weight distribution.')
     parser.add_argument('--overlay', action='store_true', default=None, help='overlay weight distributions.')
+    parser.add_argument('--summary_plot', action='store_true', default=None, help='show summary plot for SHAP.')
+    parser.add_argument('--rasterize', action='store_true', default=None, help='rasterize dense instance plots.')
+
+    # explanation settings
     parser.add_argument('--topk', type=int, default=1, help='number of features to show.')
     parser.add_argument('--test_type', type=str, default='correct', help='instance to try and explain.')
     parser.add_argument('--load_trex', action='store_true', default=False, help='load TREX.')
+    parser.add_argument('--load_shap', action='store_true', default=False, help='load SHAP values.')
     parser.add_argument('--normalize_shap', action='store_true', default=False, help='normalize SHAP values.')
-    parser.add_argument('--coverage', type=float, default=0.9, help='fraction of contributions to explain.')
-    parser.add_argument('--surplus', type=float, default=None, help='multiplier for surplus minimum contributions.')
-    parser.add_argument('--max_contribution', type=float, default=None, help='contribution level.')
 
+    # tree ensemble settings
     parser.add_argument('--tree_type', type=str, default='lgb', help='model to use.')
     parser.add_argument('--n_estimators', type=int, default=100, help='number of trees.')
     parser.add_argument('--max_depth', type=int, default=None, help='maximum depth.')
 
+    # TREX settings
     parser.add_argument('--tree_kernel', type=str, default='leaf_output', help='type of encoding.')
     parser.add_argument('--kernel_model', type=str, default='lr', help='kernel model to use.')
     parser.add_argument('--kernel_model_kernel', type=str, default='linear', help='similarity kernel')
+    parser.add_argument('--val_frac', type=float, default=0.1, help='amount of validation data.')
     parser.add_argument('--true_label', action='store_true', default=False, help='train TREX on the true labels.')
 
+    # extra settings
     parser.add_argument('--ext', type=str, default='png', help='output image format.')
-
     parser.add_argument('--rs', type=int, default=1, help='random state.')
     parser.add_argument('--verbose', type=int, default=0, help='Verbosity level.')
 
@@ -820,25 +520,23 @@ class Args:
     data_dir = 'data'
     out_dir = 'output/misclassification/'
 
-    val_frac = 0.05
-
     max_bins = 40
     alpha = 0.5
-    xlim = 0.05
     kde = False
     overlay = False
+    summary_plot = False
+    rasterize = False
+
     topk = 1
     test_type = 'correct'
     load_trex = False
+    load_shap = False
     normalize_shap = False
-    coverage = 0.1
-    surplus = None
-    max_contribution = 0.9
-    rasterize = False
 
     tree_type = 'lgb'
     n_estimators = 100
     max_depth = None
+    val_frac = 0.1
 
     tree_kernel = 'leaf_output'
     kernel_model = 'lr'
@@ -846,6 +544,5 @@ class Args:
     true_label = False
 
     ext = 'pdf'
-
     rs = 1
     verbose = 0

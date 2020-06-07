@@ -25,6 +25,9 @@ def _sigmoid(x):
 
 
 def _get_knn_predictions(tree, knn_clf, X_test, X_test_alt, y_train):
+    """
+    Generate predictions for TEKNN.
+    """
 
     multiclass = True if len(np.unique(y_train)) > 2 else False
 
@@ -46,6 +49,9 @@ def _get_knn_predictions(tree, knn_clf, X_test, X_test_alt, y_train):
 
 
 def _get_trex_predictions(tree, explainer, data):
+    """
+    Generate predictions for TREX.
+    """
 
     X_train, y_train, X_test, y_test = data
     multiclass = True if len(np.unique(y_train)) > 2 else False
@@ -93,16 +99,7 @@ def experiment(args, logger, out_dir, seed):
         X_train, y_train = X_train[:n_train], y_train[:n_train]
     data = X_train, y_train, X_test, y_test
 
-    # corrupt the data if specified
-    if args.flip_frac is not None:
-        y_train, noisy_ndx = data_util.flip_labels(y_train, k=args.flip_frac, random_state=args.rs)
-        noisy_ndx = np.array(sorted(noisy_ndx))
-        print('num noisy labels: {}'.format(len(noisy_ndx)))
-
-    X_val = exp_util.get_val_data(X_train, args.val_frac, seed)
-
     logger.info('train instances: {}'.format(len(X_train)))
-    logger.info('val instances: {}'.format(len(X_val)))
     logger.info('test instances: {}'.format(len(X_test)))
     logger.info('no. features: {}'.format(X_train.shape[1]))
 
@@ -118,31 +115,28 @@ def experiment(args, logger, out_dir, seed):
         extractor = trex.TreeExtractor(tree, tree_kernel=args.tree_kernel)
         X_train_alt = extractor.fit_transform(X_train)
         X_test_alt = extractor.transform(X_test)
-        X_val_alt = extractor.transform(X_val)
         train_label = y_train if args.true_label else tree.predict(X_train)
 
         # tune and train teknn
         start = time.time()
-        logger.info('tuning TE-KNN...')
-        knn_clf, params = exp_util.tune_knn(X_train_alt, train_label, tree, X_val, X_val_alt, logger=logger)
-        logger.info('n_neighbors: {}, weights: {}'.format(params['n_neighbors'], params['weights']))
-        logger.info('time: {:.3f}s'.format(time.time() - start))
+        logger.info('TE-KNN...')
+        knn_clf = exp_util.tune_knn(tree, X_train, X_train_alt, train_label, args.val_frac,
+                                    seed=seed, logger=logger)
 
         start = time.time()
         logger.info('generating predictions...')
         results = _get_knn_predictions(tree, knn_clf, X_test, X_test_alt, y_train)
         logger.info('time: {:.3f}s'.format(time.time() - start))
 
-        results['n_neighbors'] = params['n_neighbors']
+        results['n_neighbors'] = knn_clf.get_params()['n_neighbors']
 
         # save results
         np.save(os.path.join(out_dir, 'tree.npy'), results['tree'])
-        np.save(os.path.join(out_dir, 'teknn.npy'), results['teknn'])
+        np.save(os.path.join(out_dir, 'surrogate.npy'), results['teknn'])
 
     if args.trex:
 
         start = time.time()
-        logger.info('tuning TREX-{}...'.format(args.kernel_model))
         explainer = trex.TreeExplainer(tree, X_train, y_train,
                                        tree_kernel=args.tree_kernel,
                                        kernel_model=args.kernel_model,
@@ -150,10 +144,9 @@ def experiment(args, logger, out_dir, seed):
                                        random_state=args.rs,
                                        logger=logger,
                                        true_label=not args.true_label,
-                                       X_val=X_val)
-        logger.info('C: {}'.format(explainer.C))
-        logger.info('time: {:.3f}s'.format(time.time() - start))
+                                       val_frac=args.val_frac)
 
+        start = time.time()
         logger.info('generating predictions...')
         results = _get_trex_predictions(tree, explainer, data)
         logger.info('time: {:.3f}s'.format(time.time() - start))
@@ -162,7 +155,7 @@ def experiment(args, logger, out_dir, seed):
 
         # save data
         np.save(os.path.join(out_dir, 'tree.npy'), results['tree'])
-        np.save(os.path.join(out_dir, 'trex_{}.npy'.format(args.kernel_model)), results['trex'])
+        np.save(os.path.join(out_dir, 'surrogate.npy'.format(args.kernel_model)), results['trex'])
 
 
 def main(args):
@@ -171,6 +164,12 @@ def main(args):
     dataset = args.dataset
 
     out_dir = os.path.join(args.out_dir, dataset, args.tree_type, args.tree_kernel)
+
+    if args.trex:
+        out_dir = os.path.join(out_dir, args.kernel_model)
+    elif args.teknn:
+        out_dir = os.path.join(out_dir, 'teknn')
+
     os.makedirs(out_dir, exist_ok=True)
     logger = print_util.get_logger(os.path.join(out_dir, 'log.txt'))
     logger.info(args)
@@ -184,21 +183,21 @@ def main(args):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Feature representation extractions for tree ensembles',
                                      formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+
     parser.add_argument('--dataset', type=str, default='churn', help='dataset to explain.')
     parser.add_argument('--data_dir', type=str, default='data', help='data directory.')
     parser.add_argument('--out_dir', type=str, default='output/fidelity/', help='output directory.')
 
     parser.add_argument('--train_frac', type=float, default=1.0, help='amount of training data to use.')
-    parser.add_argument('--val_frac', type=float, default=0.05, help='amount of training data to use for validation.')
-    parser.add_argument('--flip_frac', type=float, default=None, help='Fraction of train labels to flip.')
+    parser.add_argument('--val_frac', type=float, default=0.1, help='amount of training data to use for validation.')
 
     parser.add_argument('--tree_type', type=str, default='cb', help='model to use.')
     parser.add_argument('--n_estimators', type=int, default=100, help='number of trees in tree ensemble.')
     parser.add_argument('--max_depth', type=int, default=None, help='maximum depth in tree ensemble.')
 
-    parser.add_argument('--tree_kernel', type=str, default='leaf_output', help='type of encoding.')
+    parser.add_argument('--tree_kernel', type=str, default='tree_output', help='type of encoding.')
     parser.add_argument('--true_label', action='store_true', default=False, help='Use true labels for explainer.')
-    parser.add_argument('--kernel_model', type=str, default='lr', help='linear model to use.')
+    parser.add_argument('--kernel_model', type=str, default='klr', help='linear model to use.')
     parser.add_argument('--kernel_model_kernel', type=str, default='linear', help='Similarity kernel.')
 
     parser.add_argument('--trex', action='store_true', default=False, help='use TREX as surrogate model.')
@@ -216,16 +215,16 @@ class Args:
     data_dir = 'data'
     out_dir = 'output/fidelity/'
 
+    train_frac = 1.0
     val_frac = 0.1
-    flip_frac = None
 
     tree_type = 'cb'
     n_estimators = 100
     max_depth = None
 
-    tree_kernel = 'leaf_output'
+    tree_kernel = 'tree_output'
     true_label = False
-    kernel_model = 'lr'
+    kernel_model = 'klr'
     kernel_model_kernel = 'linear'
 
     trex = True

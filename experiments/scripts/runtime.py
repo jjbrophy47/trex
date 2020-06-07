@@ -60,9 +60,12 @@ def _trex_method(test_ndx, X_test, model, X_train, y_train,
     explainer = trex.TreeExplainer(model, X_train, y_train,
                                    tree_kernel=args.tree_kernel,
                                    random_state=seed,
+                                   true_label=args.true_label,
                                    kernel_model=args.kernel_model,
                                    kernel_model_kernel=args.kernel_model_kernel,
-                                   X_val=X_val)
+                                   verbose=args.verbose,
+                                   X_val=X_val,
+                                   logger=logger)
     fine_tune = time.time() - start
 
     start = time.time()
@@ -273,6 +276,7 @@ if __name__ == '__main__':
     parser.add_argument('--dstump', action='store_true', default=False, help='Enable DSTUMP with Maple.')
 
     parser.add_argument('--rs', type=int, default=1, help='Random state.')
+    parser.add_argument('--verbose', type=int, default=0, help='Verbosity level.')
 
     args = parser.parse_args()
     main(args)

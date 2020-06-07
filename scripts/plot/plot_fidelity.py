@@ -28,20 +28,22 @@ def _plot_graph(args, ax, dataset, method_list, tree_kernel,
 
     in_dir = os.path.join(args.in_dir, dataset, args.tree_type, tree_kernel)
 
-    # tree results
-    tree_path = os.path.join(in_dir, 'tree.npy')
-    if not os.path.exists(tree_path):
-        print(tree_path)
-        return
-    tree_res = np.load(tree_path)
+    # # tree results
+    # tree_path = os.path.join(in_dir, 'tree.npy')
+    # if not os.path.exists(tree_path):
+    #     print(tree_path)
+    #     return
+    # tree_res = np.load(tree_path)
 
     for i, method in enumerate(method_list):
-        method_path = os.path.join(in_dir, '{}.npy'.format(method))
+        tree_path = os.path.join(in_dir, method, 'tree.npy')
+        method_path = os.path.join(in_dir, method, 'surrogate.npy')
 
         if not os.path.exists(method_path):
             print(method_path)
             continue
 
+        tree_res = np.load(tree_path)
         method_res = np.load(method_path)
         if 'svm' in method:
             method_res = _sigmoid(method_res)
@@ -59,7 +61,7 @@ def _plot_graph(args, ax, dataset, method_list, tree_kernel,
 
 def main(args):
 
-    method_list = ['trex_lr', 'trex_svm', 'teknn']
+    method_list = ['klr', 'svm', 'teknn']
     labels = ['KLR', 'SVM', 'KNN']
     colors = ['cyan', 'blue', 'purple']
     markers = ['1', '2', '*']

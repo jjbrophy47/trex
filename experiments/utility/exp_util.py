@@ -12,6 +12,8 @@ import tqdm
 import numpy as np
 from scipy.stats import pearsonr
 from sklearn.neighbors import KNeighborsClassifier
+from sklearn.model_selection import StratifiedKFold
+from sklearn.base import clone
 
 from influence_boosting.influence.leaf_influence import CBLeafInfluenceEnsemble
 
@@ -45,40 +47,84 @@ def load_model(model_path):
         return pickle.loads(f.read())
 
 
-def tune_knn(X_train, y_train, tree, X_val_tree, X_val_knn, logger=None):
+def tune_knn(tree, X_train, X_train_feature, y_train, val_frac, seed, logger=None):
     """
     Tunes KNN by choosing hyperparameters that give the best pearson
     correlation to the tree predictions.
     """
-    knn_n_neighbors_grid = [3, 5, 7, 9, 11, 13, 15, 31, 45, 61]
-    knn_weights_grid = ['uniform']
+    n_neighbors_grid = [3, 5, 7, 9, 11, 13, 15, 31, 45, 61]
 
-    best_score = 0
-    best_n_neighbors = None
-    best_weights = None
+    if not val_frac:
+        knn_clf = KNeighborsClassifier(n_neighbors=3, weights='uniform')
+        knn_clf = knn_clf.fit(X_train_feature, y_train)
 
-    for n_neighbors in knn_n_neighbors_grid:
-        for weights in knn_weights_grid:
+    tune_start = time.time()
+
+    # select a fraction of the training data
+    n_samples = int(X_train.shape[0] * val_frac)
+    np.random.seed(seed)
+    val_indices = np.random.choice(np.arange(X_train.shape[0]), size=n_samples)
+
+    X_val = X_train[val_indices]
+    X_val_feature = X_train_feature[val_indices]
+    y_val = y_train[val_indices]
+
+    # result containers
+    results = []
+    fold = 0
+
+    # tune C
+    skf = StratifiedKFold(n_splits=2, shuffle=True, random_state=seed)
+    for train_index, test_index in skf.split(X_val_feature, y_val):
+        fold += 1
+
+        # obtain fold data
+        X_val_train = X_val[train_index]
+        X_val_test = X_val[test_index]
+        X_val_feature_train = X_val_feature[train_index]
+        X_val_feature_test = X_val_feature[test_index]
+        y_val_train = y_val[train_index]
+
+        # gridsearch n_neighbors
+        correlations = []
+        for n_neighbors in n_neighbors_grid:
             start = time.time()
-            knn_model = KNeighborsClassifier(n_neighbors=n_neighbors, weights=weights)
-            knn_model = knn_model.fit(X_train, y_train)
-            tree_val_proba = tree.predict_proba(X_val_tree)[:, 1]
-            knn_val_proba = knn_model.predict_proba(X_val_knn)[:, 1]
-            pearson_corr = pearsonr(tree_val_proba, knn_val_proba)[0]
 
-            if pearson_corr > best_score:
-                best_score = pearson_corr
-                best_n_neighbors = n_neighbors
-                best_weights = weights
+            # fit a tree ensemble and surrogate model
+            m1 = clone(tree).fit(X_val_train, y_val_train)
+            m2 = KNeighborsClassifier(n_neighbors=n_neighbors,
+                                      weights='uniform').fit(X_val_feature_train, y_val_train)
+
+            # generate predictions
+            m1_proba = m1.predict_proba(X_val_test)[:, 1]
+            m2_proba = m2.predict_proba(X_val_feature_test)[:, 1]
+
+            # measure correlation
+            correlation = pearsonr(m1_proba, m2_proba)[0]
+            correlations.append(correlation)
 
             if logger:
-                log_str = 'n_neighbors={}, weights={}: {:.3f}s; corr={}'
-                logger.info(log_str.format(n_neighbors, weights, time.time() - start, pearson_corr))
+                s = '[Fold {}] n_neighbors={:<2}: {:.3f}s; corr={:.3f}'
+                logger.info(s.format(fold, n_neighbors, time.time() - start, correlation))
 
-    knn_clf = KNeighborsClassifier(n_neighbors=best_n_neighbors, weights=best_weights)
-    knn_clf = knn_clf.fit(X_train, y_train)
-    params = {'n_neighbors': best_n_neighbors, 'weights': best_weights}
-    return knn_clf, params
+        results.append(correlations)
+    results = np.vstack(results).mean(axis=0)
+    best_ndx = np.argmax(results)
+    best_n_neighbors = n_neighbors_grid[best_ndx]
+
+    if logger:
+        logger.info('chosen n_neighbors: {}'.format(best_n_neighbors))
+        logger.info('total tuning time: {:.3f}s'.format(time.time() - tune_start))
+        logger.info('training...')
+
+    train_start = time.time()
+    knn_clf = KNeighborsClassifier(n_neighbors=best_n_neighbors, weights='uniform')
+    knn_clf = knn_clf.fit(X_train_feature, y_train)
+
+    if logger:
+        logger.info('total training time: {:.3f}s'.format(time.time() - train_start))
+
+    return knn_clf
 
 
 def log_loss_increase(yhat1, yhat2, y_true, sort='ascending', k=50):
