@@ -25,7 +25,7 @@ python3 experiments/scripts/cleaning.py \
   --n_estimators $n_estimators \
   --max_depth $max_depth \
   --check_pct $check_pct \
-  --rs ${rs_list[$i]} \
+  --rs $rs \
   --verbose $verbose \
   --maple \
   --train_frac $train_frac
