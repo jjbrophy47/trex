@@ -31,7 +31,7 @@ for tree_kernel in ${tree_kernels[@]}; do
       --n_estimators $n_estimators \
       --max_depth $max_depth \
       --trex \
-      --kernel_model 'lr'
+      --kernel_model 'klr'
 
     python3 experiments/scripts/fidelity.py \
       --dataset $dataset \
