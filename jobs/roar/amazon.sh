@@ -3,7 +3,7 @@
 #SBATCH --job-name=roar
 #SBATCH --output=jobs/logs/roar/amazon
 #SBATCH --error=jobs/errors/roar/amazon
-#SBATCH --time=5-00:00:00
+#SBATCH --time=7-00:00:00
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=5
@@ -14,14 +14,39 @@ dataset='amazon'
 n_estimators=250
 max_depth=5
 
-tree_kernel='tree_output'
+tree_kernels=('tree_output' 'leaf_path' 'leaf_output')
+rs_list=(1 2 3 4 5 6 7 8 9 10)
+test_frac=0.05
 
-python3 experiments/scripts/roar.py \
-  --dataset $dataset \
-  --tree_kernel $tree_kernel \
-  --n_estimators $n_estimators \
-  --max_depth $max_depth \
-  --trex \
-  --kernel_model 'lr' \
-  --teknn
-  # --maple
+for tree_kernel in ${tree_kernels[@]}; do
+    for rs in ${!rs_list[@]}; do
+
+        python3 experiments/scripts/roar.py \
+          --dataset $dataset \
+          --tree_kernel $tree_kernel \
+          --n_estimators $n_estimators \
+          --max_depth $max_depth \
+          --rs $rs \
+          --test_frac $test_frac \
+          --trex \
+          --kernel_model 'klr'
+
+        python3 experiments/scripts/roar.py \
+          --dataset $dataset \
+          --tree_kernel $tree_kernel \
+          --n_estimators $n_estimators \
+          --max_depth $max_depth \
+          --rs $rs \
+          --test_frac $test_frac \
+          --teknn
+
+        python3 experiments/scripts/roar.py \
+          --dataset $dataset \
+          --tree_kernel $tree_kernel \
+          --n_estimators $n_estimators \
+          --max_depth $max_depth \
+          --rs $rs \
+          --test_frac $test_frac \
+          --maple
+    done
+done

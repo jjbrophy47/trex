@@ -55,6 +55,7 @@ def get_results(dataset, method, args):
     res = np.vstack(res_list)
     res_mean = np.mean(res, axis=0)
     res_std = sem(res, axis=0)
+
     return res_mean, res_std
 
 

@@ -24,6 +24,7 @@ import trex
 from utility import model_util
 from utility import data_util
 from utility import print_util
+from utility import exp_util
 from influence_boosting.influence.leaf_influence import CBLeafInfluenceEnsemble
 from maple.MAPLE import MAPLE
 
@@ -81,17 +82,28 @@ def _trex_method(args, tree, X_test, X_train, y_train, seed, logger):
     # sort instances with highest positive influence first
     contributions_sum = np.zeros(X_train.shape[0])
 
+    train_weight = explainer.get_weight()[0]
     for i in tqdm.tqdm(range(X_test.shape[0])):
-        contributions = explainer.explain(X_test[i].reshape(1, -1))[0]
+        # contributions = explainer.explain(X_test[i].reshape(1, -1))[0]
 
-        if args.kernel_model == 'svm':
-            n_sv = len(np.where(contributions != 0)[0])
-            sv_pct = (n_sv / X_train.shape[0]) * 100
-            logger.info('support vectors: {} ({:.2f}%)'.format(n_sv, sv_pct))
+        # pred_label = explainer.predict(X_test[i])
+        train_sim = explainer.similarity(X_test[[i]])[0]
+        contributions = train_weight * train_sim
+
+        # if args.kernel_model == 'svm':
+        #     n_sv = len(np.where(contributions != 0)[0])
+        #     sv_pct = (n_sv / X_train.shape[0]) * 100
+        #     logger.info('support vectors: {} ({:.2f}%)'.format(n_sv, sv_pct))
 
         # contributions_sum += np.abs(contributions)
         contributions_sum += contributions
+
+    print(len(np.where(contributions_sum > 0)[0]))
+    print(len(np.where(contributions_sum < 0)[0]))
+    print(len(np.where(contributions_sum == 0)[0]))
+
     train_order = np.argsort(contributions_sum)[::-1]
+
     return train_order
 
 
@@ -154,31 +166,43 @@ def _teknn_method(args, model, X_test, X_train, y_train, y_test, seed, logger):
     knn_clf = exp_util.tune_knn(model, X_train, X_train_alt, train_label, args.val_frac,
                                 seed=seed, logger=logger)
 
-
-
-
-
-
-
-    # transform the data
-    extractor = trex.TreeExtractor(model, tree_kernel=args.tree_kernel)
-    X_train_alt = extractor.fit_transform(X_train)
-    X_test_alt = extractor.transform(X_test)
-
-    # setup aggregate data container
+    # results container
     contributions_sum = np.zeros(X_train.shape[0])
-    train_label = y_train if args.true_label else model.predict(X_train)
 
-    # compute the contribution of all training samples for each test instance
+    # compute the contribution of all training samples on each test instance
     for i in tqdm.tqdm(range(X_test.shape[0])):
-        distances = np.linalg.norm(X_test_alt[i] - X_train_alt, axis=1)
-        contributions = np.divide(1, distances, out=np.zeros_like(distances), where=distances != 0)
+        x_test_alt = extractor.transform(X_test[[i]])
+        pred_label = int(knn_clf.predict(x_test_alt)[0])
+        distances, neighbor_ids = knn_clf.kneighbors(x_test_alt)
 
-        neg_ndx = np.where(train_label != y_test[i])[0]
-        contributions[neg_ndx] *= -1
-        contributions_sum += contributions
+        for neighbor_id in neighbor_ids[0]:
+            contribution = 1 if y_train[neighbor_id] == pred_label else -1
+            contributions_sum[neighbor_id] += contribution
+
+    # # transform the data
+    # extractor = trex.TreeExtractor(model, tree_kernel=args.tree_kernel)
+    # X_train_alt = extractor.fit_transform(X_train)
+    # X_test_alt = extractor.transform(X_test)
+
+    # # setup aggregate data container
+    # contributions_sum = np.zeros(X_train.shape[0])
+    # train_label = y_train if args.true_label else model.predict(X_train)
+
+    # # compute the contribution of all training samples for each test instance
+    # for i in tqdm.tqdm(range(X_test.shape[0])):
+    #     distances = np.linalg.norm(X_test_alt[i] - X_train_alt, axis=1)
+    #     contributions = np.divide(1, distances, out=np.zeros_like(distances), where=distances != 0)
+
+    #     neg_ndx = np.where(train_label != y_test[i])[0]
+    #     contributions[neg_ndx] *= -1
+    #     contributions_sum += contributions
+
+    print(len(np.where(contributions_sum > 0)[0]))
+    print(len(np.where(contributions_sum < 0)[0]))
+    print(len(np.where(contributions_sum == 0)[0]))
 
     train_order = np.argsort(contributions_sum)[::-1]
+
     return train_order
 
 
@@ -261,7 +285,7 @@ def experiment(args, logger, out_dir, seed):
     if args.teknn:
         logger.info('\nordering by teknn...')
         start = time.time()
-        train_order = _teknn_method(args, model, X_test, X_train, y_train, y_test, logger)
+        train_order = _teknn_method(args, model, X_test, X_train, y_train, y_test, seed, logger)
         knn_res = _measure_performance(train_order, pcts, X_test, y_test, X_train, y_train, clf)
         logger.info('time: {:3f}s'.format(time.time() - start))
         np.save(os.path.join(out_dir, 'method.npy'), knn_res)
@@ -272,7 +296,8 @@ def main(args):
     # make logger
     dataset = args.dataset
 
-    out_dir = os.path.join(args.out_dir, dataset, args.tree_type, args.tree_kernel)
+    out_dir = os.path.join(args.out_dir, dataset, args.tree_type,
+                           args.tree_kernel, 'rs{}'.format(args.rs))
 
     if args.trex:
         out_dir = os.path.join(out_dir, args.kernel_model)
@@ -287,6 +312,7 @@ def main(args):
     logger = print_util.get_logger(os.path.join(out_dir, 'log.txt'))
     logger.info(args)
 
+    logger.info('\nSeed: {}'.format(args.rs))
     experiment(args, logger, out_dir, seed=args.rs)
     print_util.remove_logger(logger)
 

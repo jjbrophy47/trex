@@ -58,7 +58,7 @@ class SVM(BaseEstimator, ClassifierMixin):
 
     def similarity(self, X, train_indices=None):
         X_train = self.X_train_[train_indices] if train_indices is not None else self.X_train_
-        return self.kernel_func_(X, X_train)
+        return linear_kernel(X, X_train)
 
     def get_weight(self):
         """
