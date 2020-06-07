@@ -3,7 +3,7 @@
 #SBATCH --job-name=runtime
 #SBATCH --output=jobs/logs/runtime/adult4
 #SBATCH --error=jobs/errors/runtime/adult4
-#SBATCH --time=5-00:00:00
+#SBATCH --time=7-00:00:00
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=7
@@ -22,5 +22,6 @@ for i in ${!rs_list[@]}; do
       --n_estimators $n_estimators \
       --max_depth $max_depth \
       --rs ${rs_list[$i]} \
-      --inf_k 0
+      --maple \
+      --dstump
 done

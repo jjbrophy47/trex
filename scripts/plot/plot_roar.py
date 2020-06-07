@@ -20,9 +20,14 @@ def set_size(width, fraction=1, subplots=(1, 1)):
 def get_results(args, dataset, method, score_ndx=0):
 
     # get results
-    in_dir = os.path.join(args.in_dir, dataset, args.tree_type, args.tree_kernel)
+    method_dir = 'klr' if method == 'random' else method
+    method_name = method if method == 'random' else 'method'
+
+    in_dir = os.path.join(args.in_dir, dataset, args.tree_type,
+                          args.tree_kernel, method_dir)
+
     pct_path = os.path.join(in_dir, 'percentages.npy')
-    method_path = os.path.join(in_dir, '{}.npy'.format(method))
+    method_path = os.path.join(in_dir, '{}.npy'.format(method_name))
 
     if not os.path.exists(method_path):
         return None
@@ -36,10 +41,10 @@ def get_results(args, dataset, method, score_ndx=0):
 
 def main(args):
 
-    method_list = ['trex_lr', 'random', 'maple', 'leafinfluence', 'teknn']
-    colors = ['blue', 'red', 'orange', 'black', 'purple']
-    labels = ['TREX', 'Random', 'MAPLE', 'LeafInfluence', 'TE-KNN']
-    markers = ['1', '*', 'd', 'h', 'o']
+    method_list = ['random', 'maple', 'leafinfluence', 'teknn', 'klr']
+    colors = ['red', 'orange', 'black', 'purple', 'blue']
+    labels = ['Random', 'MAPLE', 'LeafInfluence', 'TEKNN', 'TREX']
+    markers = ['*', 'd', 'h', 'o', '1']
     metric_mapping = {'auc': 'AUROC', 'acc': 'Accuracy'}
 
     # matplotlib settings
@@ -60,6 +65,8 @@ def main(args):
                             figsize=(width, height), sharex=True)
     axs = axs.flatten()
 
+    n_pts = 10
+
     lines = []
     lines_ndx = []
     for i, dataset in enumerate(args.dataset):
@@ -70,7 +77,7 @@ def main(args):
 
             if res is not None:
                 res, pcts = res
-                line = ax.errorbar(pcts[:len(res)], res,
+                line = ax.errorbar(pcts[:len(res)][:n_pts], res[:n_pts],
                                    marker=markers[j], color=colors[j], label=labels[j])
 
                 if i == 0:
@@ -95,19 +102,19 @@ def main(args):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Feature representation extractions for tree ensembles',
                                      formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+
     parser.add_argument('--dataset', type=str, nargs='+', default=['churn', 'amazon', 'adult', 'census'],
                         help='dataset to explain.')
     parser.add_argument('--in_dir', type=str, default='output/roar/', help='input directory.')
     parser.add_argument('--out_dir', type=str, default='output/plots/roar/', help='output directory.')
 
     parser.add_argument('--tree_type', type=str, default='cb', help='tree type.')
-    parser.add_argument('--tree_kernel', type=str, default='leaf_output', help='tree kernel.')
-    parser.add_argument('--kernel_model', type=str, default='lr', help='kernel model.')
+    parser.add_argument('--tree_kernel', type=str, default='tree_output', help='tree kernel.')
 
     parser.add_argument('--metric', type=str, default='acc', help='predictive metric.')
-
     parser.add_argument('--rs', type=int, nargs='+', default=[1], help='dataset to explain.')
     parser.add_argument('--ext', type=str, default='png', help='output image format.')
+
     args = parser.parse_args()
     main(args)
 
@@ -119,8 +126,7 @@ class Args:
     out_dir = 'output/plots/roar/'
 
     tree_type = 'cb'
-    tree_kernel = 'leaf_output'
-    kernel_model = 'lr'
+    tree_kernel = 'tree_output'
 
     rs = [1]
     ext = 'png'

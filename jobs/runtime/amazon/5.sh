@@ -1,16 +1,16 @@
 #!/bin/bash
 #SBATCH --partition=long
 #SBATCH --job-name=runtime
-#SBATCH --output=jobs/logs/runtime/census4
-#SBATCH --error=jobs/errors/runtime/census4
-#SBATCH --time=7-00:00:00
+#SBATCH --output=jobs/logs/runtime/amazon4
+#SBATCH --error=jobs/errors/runtime/amazon4
+#SBATCH --time=5-00:00:00
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=5
 #SBATCH --account=uoml
 module load python3/3.6.1
 
-dataset='census'
+dataset='amazon'
 n_estimators=250
 max_depth=5
 
@@ -22,6 +22,5 @@ for i in ${!rs_list[@]}; do
       --n_estimators $n_estimators \
       --max_depth $max_depth \
       --rs ${rs_list[$i]} \
-      --maple \
-      --dstump
+      --inf_k 0
 done

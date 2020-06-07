@@ -49,7 +49,7 @@ def get_results(dataset, method, args):
     for i in args.rs:
         res_path = os.path.join(args.in_dir, dataset, args.tree_type,
                                 args.tree_kernel, 'rs{}'.format(i),
-                                '{}.npy'.format(method))
+                                method, 'method.npy')
 
         if not os.path.exists(res_path):
             print(res_path)
@@ -88,8 +88,8 @@ def main(args):
     logger.info(args)
 
     # settings
-    method_list = ['trex_lr', 'trex_svm', 'maple', 'influence', 'teknn']
-    s = '[{:10}] fine_tune: {:>11.5f} +/- {:>11.5f}, test_time: {:>11.5f} +/- {:>11.5f}'
+    method_list = ['klr', 'svm', 'maple', 'leaf_influence', 'teknn']
+    s = '[{:15}] fine_tune: {:>11.5f} +/- {:>11.5f}, test_time: {:>11.5f} +/- {:>11.5f}'
 
     for i, dataset in enumerate(args.dataset):
         logger.info('\n{}'.format(dataset.capitalize()))
@@ -115,8 +115,8 @@ if __name__ == '__main__':
     parser.add_argument('--out_dir', type=str, default='output/prints/runtime/', help='output directory.')
 
     parser.add_argument('--tree_type', type=str, default='cb', help='tree type.')
-    parser.add_argument('--tree_kernel', type=str, default='leaf_output', help='tree kernel.')
-    parser.add_argument('--kernel_model', type=str, default='lr', help='kernel model.')
+    parser.add_argument('--tree_kernel', type=str, default='tree_output', help='tree kernel.')
+    parser.add_argument('--kernel_model', type=str, default='klr', help='kernel model.')
 
     parser.add_argument('--rs', type=int, nargs='+', default=[1, 2, 3, 4, 5], help='random state.')
     args = parser.parse_args()
@@ -130,7 +130,7 @@ class Args:
     out_dir = 'output/plots/cleaning/'
 
     tree_type = 'cb'
-    tree_kernel = 'leaf_output'
-    kernel_model = 'lr'
+    tree_kernel = 'tree_output'
+    kernel_model = 'klr'
 
     rs = [1, 2, 3, 4, 5]

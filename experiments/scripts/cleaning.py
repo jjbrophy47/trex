@@ -212,9 +212,13 @@ def experiment(args, logger, out_dir, seed):
     """
 
     # get model and data
-    clf = model_util.get_classifier(args.tree_type, n_estimators=args.n_estimators, max_depth=args.max_depth,
+    clf = model_util.get_classifier(args.tree_type,
+                                    n_estimators=args.n_estimators,
+                                    max_depth=args.max_depth,
                                     random_state=seed)
-    X_train, X_test, y_train, y_test, label = data_util.get_data(args.dataset, random_state=seed,
+
+    X_train, X_test, y_train, y_test, label = data_util.get_data(args.dataset,
+                                                                 random_state=seed,
                                                                  data_dir=args.data_dir)
 
     # reduce train size

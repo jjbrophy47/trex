@@ -366,12 +366,7 @@ class TreeExplainer:
         Return C implementation of the kernel model.
         """
         if self.kernel_model == 'svm':
-            kernel_model = SVM(kernel=self.kernel_model_kernel,
-                               C=C,
-                               gamma=self.gamma,
-                               coef0=self.coef0,
-                               degree=self.degree,
-                               random_state=self.random_state)
+            kernel_model = SVM(C=C, random_state=self.random_state)
         else:
             kernel_model = KernelLogisticRegression(C=C, temp_dir=self.temp_dir)
 
