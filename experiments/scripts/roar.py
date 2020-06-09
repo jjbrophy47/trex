@@ -28,6 +28,11 @@ from utility import exp_util
 from influence_boosting.influence.leaf_influence import CBLeafInfluenceEnsemble
 from maple.MAPLE import MAPLE
 
+trex_explainer = None
+maple_explainer = None
+teknn_explainer = None
+teknn_extractor = None
+
 
 def _measure_performance(sort_indices, percentages, X_test, y_test, X_train, y_train, clf):
     """
@@ -64,59 +69,46 @@ def _measure_performance(sort_indices, percentages, X_test, y_test, X_train, y_t
 
 def _trex_method(args, tree, X_test, X_train, y_train, seed, logger):
 
-    # train TREX
-    explainer = trex.TreeExplainer(tree, X_train, y_train,
-                                   tree_kernel=args.tree_kernel,
-                                   random_state=seed,
-                                   true_label=args.true_label,
-                                   kernel_model=args.kernel_model,
-                                   kernel_model_kernel=args.kernel_model_kernel,
-                                   verbose=args.verbose,
-                                   val_frac=args.val_frac,
-                                   logger=logger)
+    global trex_explainer
 
-    # train_weight = explainer.get_weight()[0]
-    # train_order = np.argsort(np.abs(train_weight))[::-1]
-    # return train_order
+    # train TREX
+    if trex_explainer is None:
+        trex_explainer = trex.TreeExplainer(tree, X_train, y_train,
+                                            tree_kernel=args.tree_kernel,
+                                            random_state=seed,
+                                            true_label=args.true_label,
+                                            kernel_model=args.kernel_model,
+                                            verbose=args.verbose,
+                                            val_frac=args.val_frac,
+                                            logger=logger)
 
     # sort instances with highest positive influence first
     contributions_sum = np.zeros(X_train.shape[0])
 
-    train_weight = explainer.get_weight()[0]
+    train_weight = trex_explainer.get_weight()[0]
     for i in tqdm.tqdm(range(X_test.shape[0])):
-        # contributions = explainer.explain(X_test[i].reshape(1, -1))[0]
-
-        # pred_label = explainer.predict(X_test[i])
-        train_sim = explainer.similarity(X_test[[i]])[0]
+        train_sim = trex_explainer.similarity(X_test[[i]])[0]
         contributions = train_weight * train_sim
-
-        # if args.kernel_model == 'svm':
-        #     n_sv = len(np.where(contributions != 0)[0])
-        #     sv_pct = (n_sv / X_train.shape[0]) * 100
-        #     logger.info('support vectors: {} ({:.2f}%)'.format(n_sv, sv_pct))
-
-        # contributions_sum += np.abs(contributions)
         contributions_sum += contributions
 
-    print(len(np.where(contributions_sum > 0)[0]))
-    print(len(np.where(contributions_sum < 0)[0]))
-    print(len(np.where(contributions_sum == 0)[0]))
-
     train_order = np.argsort(contributions_sum)[::-1]
-
     return train_order
 
 
 def _maple_method(X_test, args, model, X_train, y_train, logger):
 
+    global maple_explainer
+
     train_label = y_train if args.true_label else model.predict(X_train)
-    explainer = MAPLE(X_train, train_label, X_train, train_label,
-                      verbose=args.verbose, dstump=False)
+
+    if maple_explainer is None:
+        maple_explainer = MAPLE(X_train, train_label, X_train, train_label,
+                                verbose=args.verbose, dstump=False)
 
     # order the training instances
     contributions_sum = np.zeros(X_train.shape[0])
     for i in tqdm.tqdm(range(X_test.shape[0])):
-        contributions = explainer.get_weights(X_test[i])
+        contributions = maple_explainer.get_weights(X_test[i])
         contributions_sum += contributions
     train_order = np.argsort(contributions_sum)[::-1]
     return train_order
@@ -135,7 +127,8 @@ def _influence_method(X_test, args, model, X_train, y_train, y_test, logger):
         update_set = 'TopKLeaves'
 
     explainer = CBLeafInfluenceEnsemble(model_path, X_train, y_train, k=args.inf_k,
-                                        learning_rate=model.learning_rate_, update_set=update_set)
+                                        learning_rate=model.learning_rate_,
+                                        update_set=update_set)
 
     contributions_sum = np.zeros(X_train.shape[0])
     for i in tqdm.tqdm(range(X_test.shape[0])):
@@ -157,52 +150,34 @@ def _influence_method(X_test, args, model, X_train, y_train, y_test, logger):
 
 def _teknn_method(args, model, X_test, X_train, y_train, y_test, seed, logger):
 
-    # transform the data
-    extractor = trex.TreeExtractor(model, tree_kernel=args.tree_kernel)
-    X_train_alt = extractor.fit_transform(X_train)
-    train_label = y_train if args.true_label else model.predict(X_train)
+    global teknn_explainer
+    global teknn_extractor
 
-    # tune and train teknn
-    knn_clf = exp_util.tune_knn(model, X_train, X_train_alt, train_label, args.val_frac,
-                                seed=seed, logger=logger)
+    if teknn_explainer is None:
+
+        # transform the data
+        teknn_extractor = trex.TreeExtractor(model, tree_kernel=args.tree_kernel)
+        X_train_alt = teknn_extractor.fit_transform(X_train)
+        train_label = y_train if args.true_label else model.predict(X_train)
+
+        # tune and train teknn
+        teknn_explainer = exp_util.tune_knn(model, X_train, X_train_alt, train_label, args.val_frac,
+                                            seed=1, logger=logger)
 
     # results container
     contributions_sum = np.zeros(X_train.shape[0])
 
     # compute the contribution of all training samples on each test instance
     for i in tqdm.tqdm(range(X_test.shape[0])):
-        x_test_alt = extractor.transform(X_test[[i]])
-        pred_label = int(knn_clf.predict(x_test_alt)[0])
-        distances, neighbor_ids = knn_clf.kneighbors(x_test_alt)
+        x_test_alt = teknn_extractor.transform(X_test[[i]])
+        pred_label = int(teknn_explainer.predict(x_test_alt)[0])
+        distances, neighbor_ids = teknn_explainer.kneighbors(x_test_alt)
 
         for neighbor_id in neighbor_ids[0]:
             contribution = 1 if y_train[neighbor_id] == pred_label else -1
             contributions_sum[neighbor_id] += contribution
 
-    # # transform the data
-    # extractor = trex.TreeExtractor(model, tree_kernel=args.tree_kernel)
-    # X_train_alt = extractor.fit_transform(X_train)
-    # X_test_alt = extractor.transform(X_test)
-
-    # # setup aggregate data container
-    # contributions_sum = np.zeros(X_train.shape[0])
-    # train_label = y_train if args.true_label else model.predict(X_train)
-
-    # # compute the contribution of all training samples for each test instance
-    # for i in tqdm.tqdm(range(X_test.shape[0])):
-    #     distances = np.linalg.norm(X_test_alt[i] - X_train_alt, axis=1)
-    #     contributions = np.divide(1, distances, out=np.zeros_like(distances), where=distances != 0)
-
-    #     neg_ndx = np.where(train_label != y_test[i])[0]
-    #     contributions[neg_ndx] *= -1
-    #     contributions_sum += contributions
-
-    print(len(np.where(contributions_sum > 0)[0]))
-    print(len(np.where(contributions_sum < 0)[0]))
-    print(len(np.where(contributions_sum == 0)[0]))
-
     train_order = np.argsort(contributions_sum)[::-1]
-
     return train_order
 
 
@@ -216,23 +191,31 @@ def experiment(args, logger, out_dir, seed):
     clf = model_util.get_classifier(args.tree_type,
                                     n_estimators=args.n_estimators,
                                     max_depth=args.max_depth,
-                                    random_state=seed)
+                                    random_state=1)
 
     data = data_util.get_data(args.dataset,
-                              random_state=seed,
+                              random_state=1,
                               data_dir=args.data_dir)
 
     X_train, X_test, y_train, y_test, label = data
 
     # use part of the train data
     if args.train_frac < 1.0 and args.train_frac > 0.0:
-        n_samples = int(X_train.shape[0] * args.train_frac)
-        X_train, y_train = X_train[:n_samples], y_train[:n_samples]
+        n_train_samples = int(X_train.shape[0] * args.train_frac)
+        train_indices = np.random.choice(X_train.shape[0], size=n_train_samples, replace=False)
+        X_train, y_train = X_train[train_indices], y_train[train_indices]
 
     # use part of the test data for evaluation
     if args.test_frac < 1.0 and args.test_frac > 0.0:
         n_test_samples = int(X_test.shape[0] * args.test_frac)
-        X_test, y_test = X_test[:n_test_samples], y_test[:n_test_samples]
+        np.random.seed(seed)
+        test_indices = np.random.choice(X_test.shape[0], size=n_test_samples, replace=False)
+        X_test, y_test = X_test[test_indices], y_test[test_indices]
+
+    elif args.n_test is not None:
+        np.random.seed(seed)
+        test_indices = np.random.choice(X_test.shape[0], size=args.n_test, replace=False)
+        X_test, y_test = X_test[test_indices], y_test[test_indices]
 
     logger.info('no. train instances: {:,}'.format(len(X_train)))
     logger.info('no. test instances: {:,}'.format(len(X_test)))
@@ -296,25 +279,26 @@ def main(args):
     # make logger
     dataset = args.dataset
 
-    out_dir = os.path.join(args.out_dir, dataset, args.tree_type,
-                           args.tree_kernel, 'rs{}'.format(args.rs))
+    for rs in args.rs:
+        out_dir = os.path.join(args.out_dir, dataset, args.tree_type,
+                               args.tree_kernel, 'rs{}'.format(rs))
 
-    if args.trex:
-        out_dir = os.path.join(out_dir, args.kernel_model)
-    elif args.teknn:
-        out_dir = os.path.join(out_dir, 'teknn')
-    elif args.maple:
-        out_dir = os.path.join(out_dir, 'maple')
-    elif args.inf_k is not None:
-        out_dir = os.path.join(out_dir, 'leaf_influence')
+        if args.trex:
+            out_dir = os.path.join(out_dir, args.kernel_model)
+        elif args.teknn:
+            out_dir = os.path.join(out_dir, 'teknn')
+        elif args.maple:
+            out_dir = os.path.join(out_dir, 'maple')
+        elif args.inf_k is not None:
+            out_dir = os.path.join(out_dir, 'leaf_influence')
 
-    os.makedirs(out_dir, exist_ok=True)
-    logger = print_util.get_logger(os.path.join(out_dir, 'log.txt'))
-    logger.info(args)
+        os.makedirs(out_dir, exist_ok=True)
+        logger = print_util.get_logger(os.path.join(out_dir, 'log.txt'))
+        logger.info(args)
 
-    logger.info('\nSeed: {}'.format(args.rs))
-    experiment(args, logger, out_dir, seed=args.rs)
-    print_util.remove_logger(logger)
+        logger.info('\nSeed: {}'.format(rs))
+        experiment(args, logger, out_dir, seed=rs)
+        print_util.remove_logger(logger)
 
 
 if __name__ == '__main__':
@@ -329,6 +313,7 @@ if __name__ == '__main__':
     parser.add_argument('--train_frac', type=float, default=1.0, help='dataset to explain.')
     parser.add_argument('--val_frac', type=float, default=0.1, help='Amount of data for validation.')
     parser.add_argument('--test_frac', type=float, default=1.0, help='dataset to evaluate on.')
+    parser.add_argument('--n_test', type=int, default=None, help='number of test instances.')
 
     # tree settings
     parser.add_argument('--tree_type', type=str, default='cb', help='model to use.')
@@ -339,7 +324,6 @@ if __name__ == '__main__':
     parser.add_argument('--trex', action='store_true', default=False, help='Use TREX.')
     parser.add_argument('--tree_kernel', type=str, default='tree_output', help='type of encoding.')
     parser.add_argument('--kernel_model', type=str, default='klr', help='kernel model to use.')
-    parser.add_argument('--kernel_model_kernel', type=str, default='linear', help='similarity kernel')
     parser.add_argument('--true_label', action='store_true', default=False, help='train TREX on the true labels.')
 
     # method settings
@@ -348,7 +332,7 @@ if __name__ == '__main__':
     parser.add_argument('--maple', action='store_true', default=False, help='Whether to use MAPLE as a baseline.')
 
     # experiment settings
-    parser.add_argument('--rs', type=int, default=1, help='Random State.')
+    parser.add_argument('--rs', type=int, nargs='+', default=[1], help='Random State.')
     parser.add_argument('--verbose', type=int, default=0, help='Verbosity level.')
 
     args = parser.parse_args()
@@ -363,6 +347,7 @@ class Args:
     train_frac = 1.0
     val_frac = 0.1
     test_frac = 1.0
+    n_test = 50
 
     tree_type = 'cb'
     n_estimators = 100
@@ -371,7 +356,6 @@ class Args:
     trex = True
     tree_kernel = 'tree_output'
     kernel_model = 'klr'
-    kernel_model_kernel = 'linear'
     true_label = False
 
     teknn = False

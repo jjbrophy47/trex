@@ -15,8 +15,9 @@ n_estimators=100
 max_depth=5
 
 tree_kernels=('tree_output' 'leaf_path' 'leaf_output')
-rs_list=(1 2 3 4 5 6 7 8 9 10)
-test_frac=0.05
+rs_list=(1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20)
+test_frac=1.0
+n_test=50
 
 for tree_kernel in ${tree_kernels[@]}; do
     for rs in ${!rs_list[@]}; do
@@ -28,6 +29,7 @@ for tree_kernel in ${tree_kernels[@]}; do
           --max_depth $max_depth \
           --rs $rs \
           --test_frac $test_frac \
+          --n_test $n_test \
           --trex \
           --kernel_model 'klr'
 
@@ -38,6 +40,7 @@ for tree_kernel in ${tree_kernels[@]}; do
           --max_depth $max_depth \
           --rs $rs \
           --test_frac $test_frac \
+          --n_test $n_test \
           --teknn
 
         python3 experiments/scripts/roar.py \
@@ -47,6 +50,7 @@ for tree_kernel in ${tree_kernels[@]}; do
           --max_depth $max_depth \
           --rs $rs \
           --test_frac $test_frac \
+          --n_test $n_test \
           --maple
     done
 done

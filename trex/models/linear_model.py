@@ -4,22 +4,22 @@ SVM and kernel kernel logistic regression models.
 import os
 
 import numpy as np
-from scipy import sparse as sps
 from sklearn.base import BaseEstimator, ClassifierMixin
 from sklearn.multiclass import OneVsRestClassifier
 from sklearn.metrics.pairwise import linear_kernel
-from sklearn.svm import SVC
 
 from . import liblinear_util
 
 
 class SVM(BaseEstimator, ClassifierMixin):
     """
-    Multiclass wrapper around sklearn's SVC. This is to unify the API for the SVM and Kernel LR models.
-    If multiclass, uses a one-vs-rest strategy and fits a BinaryKernelLogisticRegression classifier for each class.
+    Multiclass wrapper around sklearn's SVC. This is to unify the API
+    for the SVM and Kernel LR models.
+    If multiclass, uses a one-vs-rest strategy and fits a
+    BinaryKernelLogisticRegression classifier for each class.
     """
 
-    def __init__(self, C=1.0, pred_size=500, random_state=None):
+    def __init__(self, C=1.0, pred_size=1000, temp_dir='.temp_svm'):
         """
         Parameters
         ----------
@@ -28,30 +28,27 @@ class SVM(BaseEstimator, ClassifierMixin):
         pred_size: int (default=1000)
             Max number of instancs to predict at one time. A higher number can
             be faster, but requires more memory to create the similarity matrix.
-        random_state: int (default=None)
-            Number for reproducibility.
+        temp_dir: str (default='.temp_svm')
+            Temporary directory.
         """
         self.C = C
         self.pred_size = pred_size
-        self.random_state = random_state
+        self.temp_dir = temp_dir
 
     def fit(self, X, y):
         self.X_train_ = X
         self.n_features_ = X.shape[1]
-        estimator = BinarySVM(C=self.C, pred_size=self.pred_size,
-                              random_state=self.random_state)
+        estimator = BinarySVM(C=self.C,
+                              pred_size=self.pred_size,
+                              temp_dir=self.temp_dir)
         self.ovr_ = OneVsRestClassifier(estimator).fit(X, y)
         return self
 
     def decision_function(self, X):
         return self.ovr_.decision_function(X)
 
-    def decision_proba(self, X):
-        return self._sigmoid(self.decision_function(X))
-
     def predict_proba(self, X):
-        a = self.decision_proba(X).reshape(-1, 1)
-        return np.hstack([1 - a, a])
+        return self.ovr_.predict_proba(X)
 
     def predict(self, X):
         return self.ovr_.predict(X)
@@ -62,11 +59,11 @@ class SVM(BaseEstimator, ClassifierMixin):
 
     def get_weight(self):
         """
-        Return a sparse matrix of train instance weights.
+        Return a matrix of train instance weights.
             If binary, the array has shape (1, n_train_samples).
             If multiclass, the array has shape (n_classes, n_train_samples).
         """
-        return sps.vstack([estimator.get_weight() for estimator in self.ovr_.estimators_])
+        return np.vstack([estimator.get_weight() for estimator in self.ovr_.estimators_])
 
     def explain(self, X, y=None):
         """
@@ -89,9 +86,9 @@ class SVM(BaseEstimator, ClassifierMixin):
 
         # handle multiclass and binary slightly differently
         if len(self.ovr_.estimators_) > 1:
-            result = sps.vstack([self.ovr_.estimators_[y[i]].explain(X[[i]]) for i in range(len(X))])
+            result = np.vstack([self.ovr_.estimators_[y[i]].explain(X[[i]]) for i in range(len(X))])
         else:
-            result = sps.vstack([self.ovr_.estimators_[0].explain(X[[i]]) for i in range(len(X))])
+            result = np.vstack([self.ovr_.estimators_[0].explain(X[[i]]) for i in range(len(X))])
             result[np.where(y == 0)] *= -1
 
         return result
@@ -103,10 +100,14 @@ class SVM(BaseEstimator, ClassifierMixin):
 
 class BinarySVM(BaseEstimator, ClassifierMixin):
     """
-    Wrapper around sklearn's SVC. This is to unify the API for the SVM and Kernel LR models.
+    Wrapper around liblinear. Solves the l2 regularized l2 loss (squared hinge)
+    support vector classifier dual problem using a linear kernel.
+    Solver number 1: https://github.com/cjlin1/liblinear
+    This is equivalent to sklearn's LinearSVC.
+    Reference: https://www.csie.ntu.edu.tw/~cjlin/papers/liblinear.pdf
     """
 
-    def __init__(self, C=1.0, pred_size=1000, random_state=None):
+    def __init__(self, C=1.0, pred_size=1000, temp_dir='.temp_svm'):
         """
         Parameters
         ----------
@@ -115,29 +116,42 @@ class BinarySVM(BaseEstimator, ClassifierMixin):
         pred_size: int (default=1000)
             Max number of instancs to predict at one time. A higher number can
             be faster, but requires more memory to create the similarity matrix.
-        random_state: int (default=None)
-            Number for reproducibility.
+        temp_dir: str (default='.temp_svm')
+            Temporary directory.
         """
         self.C = C
         self.pred_size = pred_size
-        self.random_state = random_state
+        self.temp_dir = temp_dir
 
     def fit(self, X, y, n_check=10):
 
         # store training instances for later use
         self.X_train_ = X
-        self.n_features_ = X.shape[1]
+        self.classes_ = np.unique(y)
+        assert len(self.classes_) == 2
 
-        # train the SVM
-        estimator = SVC(C=self.C, kernel='linear', random_state=self.random_state)
-        self.model_ = estimator.fit(X, y)
-        self.coef_ = self.model_.dual_coef_[0]
-        self.coef_indices_ = self.model_.support_
-        self.intercept_ = self.model_.intercept_[0]
+        # remove any previously stored models
+        os.makedirs(self.temp_dir, exist_ok=True)
 
-        # # sanity check to make sure our decomposition is making the predictions as the svm
-        assert np.allclose(self.model_.predict(X[:n_check]), self.predict(X[:n_check]))
-        assert np.allclose(self.model_.decision_function(X[:n_check]), self.decision_function(X[:n_check]))
+        # setup path names
+        train_data_path = os.path.join(self.temp_dir, 'train_data')
+        model_path = os.path.join(self.temp_dir, 'model')
+        prediction_path = os.path.join(self.temp_dir, 'prediction')
+
+        # train the model using liblinear
+        y_liblinear = np.where(y == 0, -1, 1)  # liblinear works better with -1 instead of 0
+        liblinear_util.create_data_file(X, y_liblinear, train_data_path)
+        liblinear_util.train_linear_svc(train_data_path, model_path, C=self.C)
+        self.coef_ = liblinear_util.parse_model_file(model_path)
+
+        # make sure our decomposition is making the same predictions as liblinear
+        liblinear_util.predict_linear_svc(train_data_path, model_path, prediction_path)
+        pred_label = liblinear_util.parse_linear_svc_predictions(prediction_path, minus_to_zeros=True)
+
+        if not np.all(pred_label[:n_check] == self.predict(X[:n_check])):
+            print('SVM PREDICTIONS NOT ALL CLOSE!')
+            print(pred_label[:n_check])
+            print(self.predict(X[:n_check]))
 
         return self
 
@@ -149,10 +163,19 @@ class BinarySVM(BaseEstimator, ClassifierMixin):
 
         decisions = []
         for i in range(0, len(X), self.pred_size):
-            X_sim = linear_kernel(X[i: i + self.pred_size], self.X_train_[self.coef_indices_])
-            decisions.append(np.sum(X_sim * self.coef_, axis=1) + self.intercept_)
+            X_sim = linear_kernel(X[i: i + self.pred_size], self.X_train_)
+            decisions.append(np.sum(X_sim * self.coef_, axis=1))
+
         decision = np.concatenate(decisions)
         return decision
+
+    def predict_proba(self, X):
+        """
+        Returns a 2d array of probabilities of shape (len(X), n_classes).
+        """
+        assert X.ndim == 2
+        a = self._sigmoid(self.decision_function(X)).reshape(-1, 1)
+        return np.hstack([1 - a, a])
 
     def predict(self, X):
         """
@@ -165,10 +188,7 @@ class BinarySVM(BaseEstimator, ClassifierMixin):
         """
         Return a sparse array of train instance weights with shape (1, n_train_samples).
         """
-        data = self.coef_
-        indices = self.coef_indices_
-        indptr = np.array([0, len(data)])
-        return sps.csr_matrix((data, indices, indptr), shape=(1, len(self.X_train_)))
+        return self.coef_.copy()
 
     def explain(self, x):
         """
@@ -176,17 +196,22 @@ class BinarySVM(BaseEstimator, ClassifierMixin):
         The resulting array is of shape (1, n_train_samples).
         """
         assert x.shape == (1, self.X_train_.shape[1])
-        x_sim = linear_kernel(x, self.X_train_[self.coef_indices_])
-        impact = (x_sim * self.coef_)[0]
-        indptr = np.array([0, len(impact)])
-        return sps.csr_matrix((impact, self.coef_indices_, indptr), shape=(1, len(self.X_train_)))
+        x_sim = linear_kernel(x, self.X_train_)
+        impact = x_sim * self.coef_
+        return impact
+
+    def _sigmoid(self, z):
+        return 1 / (1 + np.exp(-z))
 
 
 class KernelLogisticRegression(BaseEstimator, ClassifierMixin):
     """
-    Wrapper around liblinear. Solves the l2 logistic regression dual problem using a linear kernel.
+    Wrapper around liblinear. Solves the l2 logistic regression dual problem
+    using a linear kernel.
+    Solver number 7: https://github.com/cjlin1/liblinear
     Reference: https://www.csie.ntu.edu.tw/~cjlin/papers/liblinear.pdf
-    If multiclass, uses a one-vs-rest strategy and fits a BinaryKernelLogisticRegression classifier for each class.
+    If multiclass, uses a one-vs-rest strategy and fits a
+    BinaryKernelLogisticRegression classifier for each class.
     """
 
     def __init__(self, C=1.0, pred_size=1000, temp_dir='.temp_klr'):
@@ -209,7 +234,8 @@ class KernelLogisticRegression(BaseEstimator, ClassifierMixin):
         self.X_train_ = X
         self.n_features_ = X.shape[1]
         self.n_classes_ = len(np.unique(y))
-        estimator = BinaryKernelLogisticRegression(C=self.C, pred_size=self.pred_size,
+        estimator = BinaryKernelLogisticRegression(C=self.C,
+                                                   pred_size=self.pred_size,
                                                    temp_dir=self.temp_dir)
         self.ovr_ = OneVsRestClassifier(estimator).fit(X, y)
         self.coef_ = np.vstack([estimator.coef_ for estimator in self.ovr_.estimators_])
@@ -297,14 +323,17 @@ class BinaryKernelLogisticRegression(BaseEstimator, ClassifierMixin):
         # train the model using liblinear
         y_liblinear = np.where(y == 0, -1, 1)  # liblinear works better with -1 instead of 0
         liblinear_util.create_data_file(X, y_liblinear, train_data_path)
-        liblinear_util.train_model(train_data_path, model_path, C=self.C)
+        liblinear_util.train_lr(train_data_path, model_path, C=self.C)
         self.coef_ = liblinear_util.parse_model_file(model_path)
 
         # make sure our decomposition is making the same predictions as liblinear
-        liblinear_util.predict(train_data_path, model_path, prediction_path)
-        pred_label, pred_proba = liblinear_util.parse_prediction_file(prediction_path, minus_to_zeros=True)
-        assert np.allclose(pred_label[:n_check], self.predict(X[:n_check]))
-        assert np.allclose(pred_proba[:n_check][:, 1], self.predict_proba(X[:n_check])[:, 1], atol=atol)
+        liblinear_util.predict_lr(train_data_path, model_path, prediction_path)
+        pred_label, pred_proba = liblinear_util.parse_lr_predictions(prediction_path, minus_to_zeros=True)
+
+        if not np.allclose(pred_proba[:n_check][:, 1], self.predict_proba(X[:n_check])[:, 1], atol=atol):
+            print('KLR PREDICTIONS NOT ALL CLOSE!, ATOL={}'.format(atol))
+            print(pred_proba[:n_check][:, 1])
+            print(self.predict_proba(X[:n_check][:, 1]))
 
         return self
 

@@ -38,7 +38,7 @@ for tree_kernel in ${tree_kernels[@]}; do
       --verbose $verbose \
       --trex \
       --tree_kernel $tree_kernel \
-      --kernel_model 'svm'
+      --kernel_model 'klr'
 
     python3 experiments/scripts/cleaning.py \
       --dataset $dataset \
@@ -49,7 +49,7 @@ for tree_kernel in ${tree_kernels[@]}; do
       --verbose $verbose \
       --trex \
       --tree_kernel $tree_kernel \
-      --kernel_model 'klr'
+      --kernel_model 'svm'
 
     python3 experiments/scripts/cleaning.py \
       --dataset $dataset \

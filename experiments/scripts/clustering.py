@@ -91,8 +91,7 @@ def experiment(args, logger, out_dir, seed):
         explainer = trex.TreeExplainer(tree, X_train, y_train,
                                        tree_kernel=args.tree_kernel,
                                        random_state=seed,
-                                       kernel_model=args.kernel_model,
-                                       kernel_model_kernel=args.kernel_model_kernel)
+                                       kernel_model=args.kernel_model)
         X_feature = explainer.transform(X_feature)
 
     if X_feature.shape[1] > args.n_pca:
@@ -142,9 +141,8 @@ if __name__ == '__main__':
     parser.add_argument('--n_estimators', type=int, default=100, help='number of trees.')
     parser.add_argument('--max_depth', type=int, default=None, help='maximum depth.')
 
-    parser.add_argument('--tree_kernel', type=str, default='leaf_output', help='type of encoding.')
-    parser.add_argument('--kernel_model', type=str, default='lr', help='kernel model to use.')
-    parser.add_argument('--kernel_model_kernel', type=str, default='linear', help='similarity kernel')
+    parser.add_argument('--tree_kernel', type=str, default='tree_output', help='type of encoding.')
+    parser.add_argument('--kernel_model', type=str, default='klr', help='kernel model to use.')
     parser.add_argument('--true_label', action='store_true', help='train TREX on the true labels.')
 
     parser.add_argument('--n_pca', type=int, default=50, help='pca components.')
@@ -165,9 +163,8 @@ class Args:
     n_estimators = 100
     max_depth = None
 
-    tree_kernel = 'leaf_output'
-    kernel_model = 'lr'
-    kernel_model_kernel = 'linear'
+    tree_kernel = 'tree_output'
+    kernel_model = 'klr'
     true_label = False
 
     n_pca = 50

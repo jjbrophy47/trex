@@ -3,7 +3,6 @@ This script parses the model and predictions files generated from the
 'train' and 'predict' executables from liblinear.
 """
 import os
-import argparse
 
 import numpy as np
 from sklearn.datasets import dump_svmlight_file
@@ -17,10 +16,27 @@ def create_data_file(X, y, data_file):
     dump_svmlight_file(X, y, data_file, zero_based=False)
 
 
-def train_model(data_file, model_file, C=1.0):
+def train_linear_svc(data_file, model_file, C=1.0):
     """
-    Trains an l2 logistic regression binary classifier using the
+    Trains an l2-regularized l2-loss (squared hinge) support vector classifier
+    by solving the dual formulation using a linear kernel.
+
+    Solver '1' in liblinear: https://github.com/cjlin1/liblinear
+    Sklearn LinearSVC: https://github.com/scikit-learn/scikit-learn/blob/\
+    fd237278e895b42abe8d8d09105cbb82dc2cbba7/sklearn/svm/_base.py#L782
+    """
+    dir_path = os.path.dirname(os.path.realpath(__file__))
+    cmd = '{}/liblinear/train -s 1 -B 0 -c {} {} {} > /dev/null'.format(dir_path, C, data_file, model_file)
+    result = os.system(cmd)
+    assert result == 0
+
+
+def train_lr(data_file, model_file, C=1.0):
+    """
+    Trains an l2-regularized logistic regression classifier using the
     dual formulation with a linear kernel.
+
+    Solver '7' in liblinear: https://github.com/cjlin1/liblinear
     """
     dir_path = os.path.dirname(os.path.realpath(__file__))
     cmd = '{}/liblinear/train -s 7 -B 0 -c {} {} {} > /dev/null'.format(dir_path, C, data_file, model_file)
@@ -28,7 +44,17 @@ def train_model(data_file, model_file, C=1.0):
     assert result == 0
 
 
-def predict(data_file, model_file, prediction_file):
+def predict_linear_svc(data_file, model_file, prediction_file):
+    """
+    Generates labels from the linear SVC model.
+    """
+    dir_path = os.path.dirname(os.path.realpath(__file__))
+    cmd = '{}/liblinear/predict -b 0 {} {} {} > /dev/null'
+    result = os.system(cmd.format(dir_path, data_file, model_file, prediction_file))
+    assert result == 0
+
+
+def predict_lr(data_file, model_file, prediction_file):
     """
     Generates labels and probability estimates using an l2 lr dual liblinear model.
     """
@@ -54,7 +80,7 @@ def parse_model_file(model_file):
     for i, line in enumerate(lines):
         line = line.strip()
         if line.startswith('solver_type'):
-            assert line.split(' ')[1] == 'L2R_LR_DUAL'
+            assert line.split(' ')[1] in ['L2R_LR_DUAL', 'L2R_L2LOSS_SVC_DUAL']
         elif line.startswith('nr_class'):
             assert line.split(' ')[1] == '2'
         elif line.startswith('label'):
@@ -75,7 +101,24 @@ def parse_model_file(model_file):
     return np.array(alpha)
 
 
-def parse_prediction_file(prediction_path, minus_to_zeros=True):
+def parse_linear_svc_predictions(prediction_path, minus_to_zeros=True):
+    """
+    Parses a liblinear output file as a result of running 'predict -b 1 <data_file> <model_file> <filepath>'.
+    """
+    assert os.path.exists(prediction_path)
+
+    with open(prediction_path, 'r') as f:
+        lines = f.readlines()
+
+    pred_label = np.array([int(p_str.strip()) for p_str in lines])
+
+    if minus_to_zeros:
+        pred_label = np.where(pred_label == -1, 0, 1)
+
+    return pred_label
+
+
+def parse_lr_predictions(prediction_path, minus_to_zeros=True):
     """
     Parses a liblinear output file as a result of running 'predict -b 1 <data_file> <model_file> <filepath>'.
     """
@@ -103,19 +146,3 @@ def parse_prediction_file(prediction_path, minus_to_zeros=True):
         pred_label = np.where(pred_label == -1, 0, 1)
 
     return pred_label, proba
-
-
-if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='Feature representation extractions for tree ensembles',
-                                     formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    parser.add_argument('--filepath', type=str, help='name of the file to parse.')
-    parser.add_argument('--filetype', type=str, default='model', help="'model' or 'output'")
-    args = parser.parse_args()
-    print(args)
-
-    if args.filetype == 'model':
-        parse_model_file(args.filepath)
-    elif args.filetype == 'predictions':
-        parse_prediction_file(args.filepath)
-    else:
-        exit('{} filetype not supported'.format(args.filetype))

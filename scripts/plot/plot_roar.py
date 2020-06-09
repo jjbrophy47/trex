@@ -57,10 +57,10 @@ def get_results(args, dataset, method, score_ndx=0):
 
 def main(args):
 
-    method_list = ['random', 'maple', 'leafinfluence', 'teknn', 'klr']
-    colors = ['red', 'orange', 'black', 'purple', 'blue', 'green']
-    labels = ['Random', 'MAPLE', 'LeafInfluence', 'TEKNN', 'TREX-KLR', 'TREX-SVM']
-    markers = ['*', 'd', 'h', 'o', '1', '2']
+    method_list = ['random', 'maple', 'teknn', 'klr']
+    colors = ['red', 'orange', 'purple', 'blue', 'green']
+    labels = ['Random', 'MAPLE', 'TEKNN', 'TREX-KLR', 'TREX-SVM']
+    markers = ['*', 'd', 'o', '1', '2']
     metric_mapping = {'auc': 'AUROC', 'acc': 'Accuracy'}
 
     # matplotlib settings
@@ -102,17 +102,19 @@ def main(args):
 
         if i == 0:
             ax.set_ylabel('Test {}'.format(metric_mapping[args.metric]))
-        if i == 1:
+        if i == 0:
             ax.legend()
+
         ax.set_title(dataset.capitalize())
         ax.set_xlabel('% train data removed')
         ax.tick_params(axis='both', which='major')
 
-    os.makedirs(args.out_dir, exist_ok=True)
+    out_dir = os.path.join(args.out_dir, args.tree_kernel)
+    os.makedirs(out_dir, exist_ok=True)
 
     plt.tight_layout()
     fig.subplots_adjust(wspace=0.25, hspace=0.05)
-    plt.savefig(os.path.join(args.out_dir, 'plot.{}'.format(args.ext)))
+    plt.savefig(os.path.join(out_dir, 'plot.{}'.format(args.ext)))
 
 
 if __name__ == '__main__':
@@ -128,7 +130,7 @@ if __name__ == '__main__':
     parser.add_argument('--tree_kernel', type=str, default='tree_output', help='tree kernel.')
 
     parser.add_argument('--metric', type=str, default='acc', help='predictive metric.')
-    parser.add_argument('--rs', type=int, nargs='+', default=[1, 2, 3, 4, 5], help='dataset to explain.')
+    parser.add_argument('--rs', type=int, nargs='+', default=[1, 2, 3, 4, 5], help='random states.')
     parser.add_argument('--ext', type=str, default='png', help='output image format.')
 
     args = parser.parse_args()

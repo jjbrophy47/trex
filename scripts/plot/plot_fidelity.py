@@ -64,20 +64,36 @@ def main(args):
 
     # matplotlib settings
     plt.rc('font', family='serif')
-    plt.rc('xtick', labelsize=17)
-    plt.rc('ytick', labelsize=17)
-    plt.rc('axes', labelsize=22)
-    plt.rc('axes', titlesize=22)
-    plt.rc('legend', fontsize=20)
-    plt.rc('legend', title_fontsize=11)
-    plt.rc('lines', linewidth=1)
-    plt.rc('lines', markersize=6)
 
-    # inches
-    width = 5.5  # Neurips 2020
-    width, height = set_size(width=width * 3, fraction=1, subplots=(1, 3))
-    fig, axs = plt.subplots(1, max(2, len(args.dataset)), figsize=(width, height),
-                            sharey='row')
+    if args.two_col:
+        plt.rc('xtick', labelsize=11)
+        plt.rc('ytick', labelsize=11)
+        plt.rc('axes', labelsize=11)
+        plt.rc('axes', titlesize=11)
+        plt.rc('legend', fontsize=11)
+        plt.rc('legend', title_fontsize=11)
+        plt.rc('lines', linewidth=1)
+        plt.rc('lines', markersize=3)
+
+        width = 3.25  # Two column style
+        width, height = set_size(width=width * 2, fraction=1, subplots=(2, 2))
+        fig, axs = plt.subplots(2, 2, figsize=(width, height),
+                                sharey='row', sharex='col')
+
+    else:
+        plt.rc('xtick', labelsize=17)
+        plt.rc('ytick', labelsize=17)
+        plt.rc('axes', labelsize=22)
+        plt.rc('axes', titlesize=22)
+        plt.rc('legend', fontsize=20)
+        plt.rc('legend', title_fontsize=11)
+        plt.rc('lines', linewidth=1)
+        plt.rc('lines', markersize=6)
+
+        width = 5.5  # One column style
+        width, height = set_size(width=width * 3, fraction=1, subplots=(1, 3))
+        fig, axs = plt.subplots(1, max(2, len(args.dataset)), figsize=(width, height),
+                                sharey='row')
     axs = axs.flatten()
 
     # plot top row
@@ -85,14 +101,22 @@ def main(args):
         _plot_graph(args, axs[i], dataset, method_list, args.tree_kernel,
                     labels, colors, markers, corr=args.corr)
         axs[i].set_title(dataset.capitalize())
-        axs[i].set_xlabel(xlabel)
+
+        if args.two_col:
+            if i % 2 == 0:
+                axs[i].set_ylabel(ylabel)
+            if i > 1:
+                axs[i].set_xlabel(xlabel)
+        else:
+            axs[i].set_xlabel(xlabel)
     axs[0].set_ylabel(ylabel)
 
-    os.makedirs(args.out_dir, exist_ok=True)
+    out_dir = os.path.join(args.out_dir, args.tree_kernel)
+    os.makedirs(out_dir, exist_ok=True)
 
     fig.subplots_adjust(wspace=0.005, hspace=0.005)
     plt.tight_layout()
-    plt.savefig(os.path.join(args.out_dir, 'plot.{}'.format(args.ext)))
+    plt.savefig(os.path.join(out_dir, 'plot.{}'.format(args.ext)))
 
 
 if __name__ == '__main__':
@@ -104,8 +128,9 @@ if __name__ == '__main__':
     parser.add_argument('--out_dir', type=str, default='output/plots/fidelity/', help='output directory.')
 
     parser.add_argument('--tree_type', type=str, default='cb', help='tree ensemble.')
-    parser.add_argument('--tree_kernel', type=str, default='leaf_output', help='tree kernel.')
+    parser.add_argument('--tree_kernel', type=str, default='tree_output', help='tree kernel.')
 
+    parser.add_argument('--two_col', action='store_true', default=False, help='format into two columns.')
     parser.add_argument('--corr', type=str, default='pearson', help='statistical correlation.')
     parser.add_argument('--ext', type=str, default='png', help='output image format.')
     args = parser.parse_args()
@@ -119,7 +144,7 @@ class Args:
     out_dir = 'output/plots/fidelity/'
 
     tree_type = 'cb'
-    tree_kernel = 'leaf_output'
+    tree_kernel = 'tree_output'
 
     corr = 'pearson'
     ext = 'png'

@@ -56,7 +56,6 @@ def _trex_method(args, model, test_ndx, X_test, X_train, y_train,
                                    random_state=seed,
                                    true_label=args.true_label,
                                    kernel_model=args.kernel_model,
-                                   kernel_model_kernel=args.kernel_model_kernel,
                                    verbose=args.verbose,
                                    val_frac=args.val_frac,
                                    logger=logger)
@@ -281,7 +280,6 @@ if __name__ == '__main__':
     parser.add_argument('--trex', action='store_true', default=False, help='TREX method.')
     parser.add_argument('--tree_kernel', type=str, default='tree_output', help='Type of encoding.')
     parser.add_argument('--kernel_model', type=str, default='klr', help='Kernel model to use.')
-    parser.add_argument('--kernel_model_kernel', type=str, default='linear', help='Similarity kernel')
     parser.add_argument('--true_label', action='store_true', default=False, help='Train TREX on the true labels.')
 
     # method settings
@@ -313,7 +311,6 @@ class Args:
     trex = True
     tree_kernel = 'tree_output'
     kernel_model = 'klr'
-    kernel_model_kernel = 'linear'
     true_label = False
 
     teknn = False

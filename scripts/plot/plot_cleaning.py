@@ -64,7 +64,7 @@ def main(args):
     # settings
     method_list = ['klr', 'svm', 'random',
                    'tree', 'klr_loss', 'svm_loss',
-                   'maple', 'leafinfluence', 'teknn',
+                   'maple', 'leaf_influence', 'teknn',
                    'teknn_loss']
     labels = ['TREX-KLR', 'TREX-SVM', 'Random',
               'Tree Loss', 'KLR Loss', 'SVM Loss',
@@ -131,7 +131,8 @@ def main(args):
         ax.tick_params(axis='both', which='major')
         ax.axhline(test_clean, color='k', linestyle='--')
 
-    os.makedirs(args.out_dir, exist_ok=True)
+    out_dir = os.path.join(args.out_dir, args.tree_kernel)
+    os.makedirs(out_dir, exist_ok=True)
 
     n_legend_cols = int(len(lines) / 2) if len(lines) > 3 else len(lines)
     fig.legend(tuple(lines), tuple(new_labels), loc='center', ncol=n_legend_cols,
@@ -139,7 +140,7 @@ def main(args):
 
     plt.tight_layout()
     fig.subplots_adjust(bottom=0.445, wspace=0.275)
-    plt.savefig(os.path.join(args.out_dir, 'plot.{}'.format(args.ext)))
+    plt.savefig(os.path.join(out_dir, 'plot.{}'.format(args.ext)))
 
 
 if __name__ == '__main__':

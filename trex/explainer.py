@@ -1,6 +1,7 @@
 """
 Instance-based explainer for a tree ensemble using an SVM or KLR.
-Currently supports: sklearn's RandomForestClassifier and GBMClassifier, lightgbm, xgboost, and catboost.
+Currently supports: sklearn's RandomForestClassifier and GBMClassifier,
+    lightgbm, xgboost, and catboost.
     Is also only compatible with dense dataset inputs.
 """
 import os
@@ -25,11 +26,6 @@ class TreeExplainer:
                  kernel_model='svm',
                  tree_kernel='leaf_output',
                  C=1.0,
-                 kernel_model_kernel='linear',
-                 gamma='scale',
-                 coef0=0.0,
-                 degree=3,
-                 dense_output=True,
                  true_label=False,
                  random_state=None,
                  val_frac=0.1,
@@ -55,24 +51,6 @@ class TreeExplainer:
         C : float (default=0.1)
             Regularization parameter for the kernel model. Lower C values result
             in stronger regularization.
-        kernel_model_kernel : str (default='linear', {'linear', 'poly', 'rbf', 'sigmoid'})
-            Kernel to use in the dual optimization of the kernel model.
-            If kernel_model='klr', only 'linear' is currently supported.
-        gamma : float (default='scale')
-            Kernel coefficient for 'rbf', 'poly', and 'sigmoid'.
-            If 'scale', gamma defaults to 1 / (n_features * X.var()).
-            If None, defaults to 1 / n_features.
-            Only applies if kernel_model='svm'.
-        coef0 : float (default=0.0)
-            Independent term in 'poly' and 'sigmoid'.
-            Only applies if kernel_model='svm'.
-        degree : int (default=3)
-            Degree of the 'poly' kernel.
-            Only applies if kernel_model='svm'.
-        dense_output : bool (default=False)
-            If True, returns impact of all training instances; otherwise, returns
-            only support vector impacts and their corresponding training indices.
-            Only applies if kernel_model='svm'.
         true_label : bool (default=False)
             If False, predicted labels from the tree ensemble are used to train the kernel model.
         random_state : int (default=None)
@@ -89,11 +67,6 @@ class TreeExplainer:
         self.kernel_model = kernel_model
         self.tree_kernel = tree_kernel
         self.C = C
-        self.kernel_model_kernel = kernel_model_kernel
-        self.gamma = gamma
-        self.coef0 = coef0
-        self.degree = degree
-        self.dense_output = dense_output
         self.true_label = true_label
         self.random_state = random_state
         self.verbose = verbose
@@ -272,15 +245,11 @@ class TreeExplainer:
 
     def get_weight(self):
         """
-        Return an array of training instance weights. A sparse output is returned if an
-            svm is being used and dense_output=False.
+        Return an array of training instance weights.
             If binary, returns an array of shape (1, n_train_samples).
             If multiclass, returns an array of shape (n_classes, n_train_samples).
         """
         weight = self.kernel_model_.get_weight()
-
-        if self.dense_output and self.kernel_model == 'svm':
-            weight = weight.toarray()
 
         if self.n_classes_ == 2:
             assert weight.shape == (1, self.n_samples_)
@@ -304,15 +273,10 @@ class TreeExplainer:
             the contribution towards the ground-truth label, instead of the predicted label.
             Must have the same length as X.
 
-        Returns a 2d array of contributions of shape (len(X), n_train_samples). A sparse
-            matrix is returned if kernel_model=svm and dense_output=False.
+        Returns a 2d array of contributions of shape (len(X), n_train_samples).
         """
         contributions = self.kernel_model_.explain(self.transform(X), y=y)
         assert contributions.shape == (len(X), self.n_samples_)
-
-        if self.dense_output and self.kernel_model == 'svm':
-            contributions = contributions.toarray()
-
         return contributions
 
     def transform(self, X):
@@ -342,12 +306,7 @@ class TreeExplainer:
         d['tree_kernel'] = self.tree_kernel
         d['tree_type'] = str(self.tree)
         d['kernel_model'] = self.kernel_model
-        d['kernel_model_kernel'] = self.kernel_model_kernel
         d['C'] = self.C
-        d['gamma'] = self.gamma
-        d['coef0'] = self.coef0
-        d['degree'] = self.degree
-        d['dense_output'] = self.dense_output
         d['true_label'] = self.true_label
         d['random_state'] = self.random_state
         d['train_shape'] = self.X_train.shape
@@ -366,7 +325,7 @@ class TreeExplainer:
         Return C implementation of the kernel model.
         """
         if self.kernel_model == 'svm':
-            kernel_model = SVM(C=C, random_state=self.random_state)
+            kernel_model = SVM(C=C, temp_dir=self.temp_dir)
         else:
             kernel_model = KernelLogisticRegression(C=C, temp_dir=self.temp_dir)
 
@@ -407,11 +366,3 @@ class TreeExplainer:
 
         # check kernel model
         assert self.kernel_model in ['svm', 'klr'], '{} unsupported'.format(self.kernel_model)
-
-        # check kernel model kernel
-        kernel_types = ['linear', 'rbf', 'poly', 'sigmoid']
-        assert self.kernel_model_kernel in kernel_types, '{} unsupported'.format(self.kernel_model_kernel)
-
-        # check kernel for LR
-        if self.kernel_model == 'klr':
-            assert self.kernel_model_kernel == 'linear', "klr only supports 'linear' kernel"

@@ -20,10 +20,6 @@ from utility import model_util
 from utility import exp_util
 
 
-def _sigmoid(x):
-    return 1 / (1 + np.exp(-x))
-
-
 def _get_knn_predictions(tree, knn_clf, X_test, X_test_alt, y_train):
     """
     Generate predictions for TEKNN.
@@ -64,16 +60,12 @@ def _get_trex_predictions(tree, explainer, data):
     else:
         yhat_tree_test = yhat_tree_test.flatten()
 
-    # linear model predictions
-    if explainer.kernel_model == 'svm':
-        yhat_trex_test = explainer.decision_function(X_test).flatten()
-    else:
-        yhat_trex_test = explainer.predict_proba(X_test)
+    # kernel model predictions
+    yhat_trex_test = explainer.predict_proba(X_test)
 
-        if not multiclass:
-            yhat_trex_test = yhat_trex_test[:, 1].flatten()
-        else:
-            yhat_trex_test = yhat_trex_test.flatten()
+    if not multiclass:
+        yhat_trex_test = yhat_trex_test[:, 1]
+    yhat_trex_test = yhat_trex_test.flatten()
 
     res = {}
     res['tree'] = yhat_tree_test
@@ -141,7 +133,6 @@ def experiment(args, logger, out_dir, seed):
         explainer = trex.TreeExplainer(tree, X_train, y_train,
                                        tree_kernel=args.tree_kernel,
                                        kernel_model=args.kernel_model,
-                                       kernel_model_kernel=args.kernel_model_kernel,
                                        random_state=args.rs,
                                        logger=logger,
                                        true_label=not args.true_label,
@@ -199,7 +190,6 @@ if __name__ == '__main__':
     parser.add_argument('--tree_kernel', type=str, default='tree_output', help='type of encoding.')
     parser.add_argument('--true_label', action='store_true', default=False, help='Use true labels for explainer.')
     parser.add_argument('--kernel_model', type=str, default='klr', help='linear model to use.')
-    parser.add_argument('--kernel_model_kernel', type=str, default='linear', help='Similarity kernel.')
 
     parser.add_argument('--trex', action='store_true', default=False, help='use TREX as surrogate model.')
     parser.add_argument('--teknn', action='store_true', default=False, help='Use KNN on top of TREX features.')
@@ -226,7 +216,6 @@ class Args:
     tree_kernel = 'tree_output'
     true_label = False
     kernel_model = 'klr'
-    kernel_model_kernel = 'linear'
 
     trex = True
     teknn = False

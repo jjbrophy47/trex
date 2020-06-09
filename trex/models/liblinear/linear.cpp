@@ -816,7 +816,7 @@ void Solver_MCSVM_CS::Solve(double *w)
 
 static void solve_l2r_l1l2_svc(
 	const problem *prob, double *w, double eps,
-	double Cp, double Cn, int solver_type)
+	double Cp, double Cn, int solver_type, double *alpha_coef)
 {
 	int l = prob->l;
 	int w_size = prob->n;
@@ -981,6 +981,13 @@ static void solve_l2r_l1l2_svc(
 	}
 	info("Objective value = %lf\n",v/2);
 	info("nSV = %d\n",nSV);
+
+    // fill up alpha coefficients
+    int j = 0;
+    for (int i = 0; i < l; i++) {
+        alpha_coef[j] = alpha[i] * prob->y[j];
+        j++;
+    }
 
 	delete [] QD;
 	delete [] alpha;
@@ -2214,10 +2221,10 @@ static void train_one(const problem *prob, const parameter *param, double *w, do
 			break;
 		}
 		case L2R_L2LOSS_SVC_DUAL:
-			solve_l2r_l1l2_svc(prob, w, eps, Cp, Cn, L2R_L2LOSS_SVC_DUAL);
+			solve_l2r_l1l2_svc(prob, w, eps, Cp, Cn, L2R_L2LOSS_SVC_DUAL, alpha);
 			break;
 		case L2R_L1LOSS_SVC_DUAL:
-			solve_l2r_l1l2_svc(prob, w, eps, Cp, Cn, L2R_L1LOSS_SVC_DUAL);
+			solve_l2r_l1l2_svc(prob, w, eps, Cp, Cn, L2R_L1LOSS_SVC_DUAL, alpha);
 			break;
 		case L1R_L2LOSS_SVC:
 		{

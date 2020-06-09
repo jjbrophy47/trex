@@ -29,16 +29,6 @@ python3 experiments/scripts/cleaning.py \
   --maple
 
 for tree_kernel in ${tree_kernels[@]}; do
-    python3 experiments/scripts/cleaning.py \
-      --dataset $dataset \
-      --n_estimators $n_estimators \
-      --max_depth $max_depth \
-      --check_pct $check_pct \
-      --rs $rs \
-      --verbose $verbose \
-      --trex \
-      --tree_kernel $tree_kernel \
-      --kernel_model 'svm'
 
     python3 experiments/scripts/cleaning.py \
       --dataset $dataset \
@@ -50,6 +40,17 @@ for tree_kernel in ${tree_kernels[@]}; do
       --trex \
       --tree_kernel $tree_kernel \
       --kernel_model 'klr'
+
+    python3 experiments/scripts/cleaning.py \
+      --dataset $dataset \
+      --n_estimators $n_estimators \
+      --max_depth $max_depth \
+      --check_pct $check_pct \
+      --rs $rs \
+      --verbose $verbose \
+      --trex \
+      --tree_kernel $tree_kernel \
+      --kernel_model 'svm'
 
     python3 experiments/scripts/cleaning.py \
       --dataset $dataset \

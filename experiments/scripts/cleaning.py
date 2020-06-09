@@ -297,7 +297,6 @@ def experiment(args, logger, out_dir, seed):
                                        random_state=seed,
                                        true_label=args.true_label,
                                        kernel_model=args.kernel_model,
-                                       kernel_model_kernel=args.kernel_model_kernel,
                                        verbose=args.verbose,
                                        val_frac=args.val_frac,
                                        logger=logger)
@@ -443,7 +442,6 @@ if __name__ == '__main__':
     parser.add_argument('--tree_kernel', type=str, default='tree_output', help='type of encoding.')
     parser.add_argument('--true_label', action='store_true', default=False, help='Train model on true labels.')
     parser.add_argument('--kernel_model', type=str, default='klr', help='kernel model to use.')
-    parser.add_argument('--kernel_model_kernel', default='linear', help='Similarity kernel for the linear model.')
 
     # method settings
     parser.add_argument('--inf_k', type=int, default=None, help='Number of leaves to use for leafinfluence.')
@@ -479,7 +477,6 @@ class Args:
     tree_kernel = 'tree_output'
     true_label = False
     kernel_model = 'klr'
-    kernel_model_kernel = 'linear'
     kernel_model_loss = False
 
     check_pct = 0.3

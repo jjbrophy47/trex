@@ -286,7 +286,6 @@ def experiment(args, logger, out_dir, seed):
                                        tree_kernel=args.tree_kernel,
                                        random_state=seed,
                                        kernel_model=args.kernel_model,
-                                       kernel_model_kernel=args.kernel_model_kernel,
                                        true_label=args.true_label,
                                        X_val=X_val,
                                        logger=logger)
@@ -502,7 +501,6 @@ if __name__ == '__main__':
     # TREX settings
     parser.add_argument('--tree_kernel', type=str, default='leaf_output', help='type of encoding.')
     parser.add_argument('--kernel_model', type=str, default='lr', help='kernel model to use.')
-    parser.add_argument('--kernel_model_kernel', type=str, default='linear', help='similarity kernel')
     parser.add_argument('--val_frac', type=float, default=0.1, help='amount of validation data.')
     parser.add_argument('--true_label', action='store_true', default=False, help='train TREX on the true labels.')
 
@@ -538,9 +536,8 @@ class Args:
     max_depth = None
     val_frac = 0.1
 
-    tree_kernel = 'leaf_output'
-    kernel_model = 'lr'
-    kernel_model_kernel = 'linear'
+    tree_kernel = 'tree_output'
+    kernel_model = 'klr'
     true_label = False
 
     ext = 'pdf'

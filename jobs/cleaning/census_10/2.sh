@@ -31,17 +31,6 @@ python3 experiments/scripts/cleaning.py \
   --train_frac $train_frac
 
 for tree_kernel in ${tree_kernels[@]}; do
-    python3 experiments/scripts/cleaning.py \
-      --dataset $dataset \
-      --n_estimators $n_estimators \
-      --max_depth $max_depth \
-      --check_pct $check_pct \
-      --rs $rs \
-      --verbose $verbose \
-      --trex \
-      --tree_kernel $tree_kernel \
-      --kernel_model 'svm' \
-      --train_frac $train_frac
 
     python3 experiments/scripts/cleaning.py \
       --dataset $dataset \
@@ -53,6 +42,18 @@ for tree_kernel in ${tree_kernels[@]}; do
       --trex \
       --tree_kernel $tree_kernel \
       --kernel_model 'klr' \
+      --train_frac $train_frac
+
+    python3 experiments/scripts/cleaning.py \
+      --dataset $dataset \
+      --n_estimators $n_estimators \
+      --max_depth $max_depth \
+      --check_pct $check_pct \
+      --rs $rs \
+      --verbose $verbose \
+      --trex \
+      --tree_kernel $tree_kernel \
+      --kernel_model 'svm' \
       --train_frac $train_frac
 
     python3 experiments/scripts/cleaning.py \
