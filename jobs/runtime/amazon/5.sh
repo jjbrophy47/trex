@@ -1,8 +1,8 @@
 #!/bin/bash
 #SBATCH --partition=long
 #SBATCH --job-name=runtime
-#SBATCH --output=jobs/logs/runtime/amazon4
-#SBATCH --error=jobs/errors/runtime/amazon4
+#SBATCH --output=jobs/logs/runtime/amazon5
+#SBATCH --error=jobs/errors/runtime/amazon5
 #SBATCH --time=5-00:00:00
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1

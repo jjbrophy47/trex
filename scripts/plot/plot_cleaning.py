@@ -41,7 +41,8 @@ def get_results(dataset, method, args):
                                 '{}.npy'.format(method_name))
 
         if not os.path.exists(res_path):
-            print(res_path)
+            if args.verbose > 0:
+                print(res_path)
             continue
 
         res = np.load(res_path)
@@ -146,6 +147,7 @@ def main(args):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Feature representation extractions for tree ensembles',
                                      formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+
     parser.add_argument('--dataset', type=str, nargs='+', default=['churn', 'amazon', 'adult',
                         'census_0p1', 'census'], help='dataset to explain.')
     parser.add_argument('--in_dir', type=str, default='output/cleaning/', help='input directory.')
@@ -156,6 +158,8 @@ if __name__ == '__main__':
 
     parser.add_argument('--rs', type=int, nargs='+', default=[1, 2, 3, 4, 5], help='random state.')
     parser.add_argument('--ext', type=str, default='png', help='output image format.')
+    parser.add_argument('--verbose', type=int, default=1, help='verbosity level.')
+
     args = parser.parse_args()
     main(args)
 
@@ -171,3 +175,4 @@ class Args:
 
     rs = [1]
     ext = 'png'
+    verbose = 0

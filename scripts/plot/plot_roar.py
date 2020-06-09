@@ -35,7 +35,8 @@ def get_results(args, dataset, method, score_ndx=0):
         method_path = os.path.join(in_dir, '{}.npy'.format(method_name))
 
         if not os.path.exists(method_path):
-            print(method_path)
+            if args.verbose > 0:
+                print(method_path)
             continue
 
         pcts = np.load(pct_path)
@@ -47,10 +48,13 @@ def get_results(args, dataset, method, score_ndx=0):
 
     # process results
     else:
-        res = np.vstack(res_list)
-        res_mean = np.mean(res, axis=0)
-        res_sem = sem(res, axis=0)
-        result = res_mean, res_sem, pcts
+        if len(res_list) > 1:
+            res = np.vstack(res_list)
+            res_mean = np.mean(res, axis=0)
+            res_sem = sem(res, axis=0)
+            result = res_mean, res_sem, pcts
+        else:
+            result = res_list[0], [0] * len(res_list[0]), pcts
 
     return result
 
@@ -132,6 +136,7 @@ if __name__ == '__main__':
     parser.add_argument('--metric', type=str, default='acc', help='predictive metric.')
     parser.add_argument('--rs', type=int, nargs='+', default=[1, 2, 3, 4, 5], help='random states.')
     parser.add_argument('--ext', type=str, default='png', help='output image format.')
+    parser.add_argument('--verbose', type=int, default=1, help='verbosity level.')
 
     args = parser.parse_args()
     main(args)
@@ -146,5 +151,7 @@ class Args:
     tree_type = 'cb'
     tree_kernel = 'tree_output'
 
+    metric = 'acc'
     rs = [1]
     ext = 'png'
+    verbose = 0

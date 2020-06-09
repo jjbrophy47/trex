@@ -33,7 +33,8 @@ def _plot_graph(args, ax, dataset, method_list, tree_kernel,
         method_path = os.path.join(in_dir, method, 'surrogate.npy')
 
         if not os.path.exists(method_path):
-            print(method_path)
+            if args.verbose > 0:
+                print(method_path)
             continue
 
         tree_res = np.load(tree_path)
@@ -132,7 +133,10 @@ if __name__ == '__main__':
 
     parser.add_argument('--two_col', action='store_true', default=False, help='format into two columns.')
     parser.add_argument('--corr', type=str, default='pearson', help='statistical correlation.')
+
     parser.add_argument('--ext', type=str, default='png', help='output image format.')
+    parser.add_argument('--verbose', type=int, default=1, help='verbosity level.')
+
     args = parser.parse_args()
     main(args)
 
@@ -146,5 +150,8 @@ class Args:
     tree_type = 'cb'
     tree_kernel = 'tree_output'
 
+    two_col = False
     corr = 'pearson'
+
     ext = 'png'
+    verbose = 0

@@ -347,7 +347,7 @@ class Args:
     train_frac = 1.0
     val_frac = 0.1
     test_frac = 1.0
-    n_test = 50
+    n_test = None
 
     tree_type = 'cb'
     n_estimators = 100
@@ -362,5 +362,5 @@ class Args:
     inf_k = None
     maple = False
 
-    rs = 1
+    rs = [1]
     verbose = 0

@@ -17,7 +17,7 @@ check_pct=0.15
 
 rs=1
 verbose=1
-tree_kernels=('tree_output' 'leaf_path' 'leaf_output')
+tree_kernels=('tree_output' 'leaf_output' 'leaf_path')
 
 python3 experiments/scripts/cleaning.py \
   --dataset $dataset \
