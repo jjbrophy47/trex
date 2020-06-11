@@ -3,10 +3,10 @@
 #SBATCH --job-name=runtime
 #SBATCH --output=jobs/logs/runtime/adult4
 #SBATCH --error=jobs/errors/runtime/adult4
-#SBATCH --time=7-00:00:00
+#SBATCH --time=5-00:00:00
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1
-#SBATCH --cpus-per-task=7
+#SBATCH --cpus-per-task=5
 #SBATCH --account=uoml
 module load python3/3.6.1
 

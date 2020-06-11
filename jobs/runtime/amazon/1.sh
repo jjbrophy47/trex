@@ -3,7 +3,7 @@
 #SBATCH --job-name=runtime
 #SBATCH --output=jobs/logs/runtime/amazon1
 #SBATCH --error=jobs/errors/runtime/amazon1
-#SBATCH --time=7-00:00:00
+#SBATCH --time=1-00:00:00
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=5

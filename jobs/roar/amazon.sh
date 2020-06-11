@@ -3,7 +3,7 @@
 #SBATCH --job-name=roar
 #SBATCH --output=jobs/logs/roar/amazon
 #SBATCH --error=jobs/errors/roar/amazon
-#SBATCH --time=7-00:00:00
+#SBATCH --time=1-00:00:00
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=5

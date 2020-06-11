@@ -1,10 +1,5 @@
 """
-Explanation of missclassified test instances for the NC17_EvalPart1 (train) and
-MFC18_EvalPart1 (test) dataset using TREX. Visualizes the most important feature
-from the raw data perspective (positive vs negative), then weighting it using the weights
-for a global explanation then weighting it using similarity x abs(weight) for a local explanation.
-This also plots the weight distribution, as well as thr similarity vs weight distribution
-for a single test instance.
+Explanation of missclassified test instances.
 """
 import os
 import sys
@@ -281,13 +276,12 @@ def experiment(args, logger, out_dir, seed):
     # train TREX
     else:
         logger.info('building TREX...')
-        X_val = exp_util.get_val_data(X_train, args.val_frac, seed)
         explainer = trex.TreeExplainer(tree, X_train, y_train,
                                        tree_kernel=args.tree_kernel,
                                        random_state=seed,
                                        kernel_model=args.kernel_model,
                                        true_label=args.true_label,
-                                       X_val=X_val,
+                                       val_frac=args.val_frac,
                                        logger=logger)
         logger.info('saving TREX model to {}...'.format(model_path))
         explainer.save(model_path)
@@ -474,7 +468,7 @@ if __name__ == '__main__':
                                      formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
     # I/O settings
-    parser.add_argument('--dataset', type=str, default='nc17_mfc18', help='dataset to explain.')
+    parser.add_argument('--dataset', type=str, default='adult', help='dataset to explain.')
     parser.add_argument('--data_dir', type=str, default='data', help='dataset to explain.')
     parser.add_argument('--out_dir', type=str, default='output/misclassification/', help='output directory.')
 
@@ -494,13 +488,13 @@ if __name__ == '__main__':
     parser.add_argument('--normalize_shap', action='store_true', default=False, help='normalize SHAP values.')
 
     # tree ensemble settings
-    parser.add_argument('--tree_type', type=str, default='lgb', help='model to use.')
+    parser.add_argument('--tree_type', type=str, default='cb', help='model to use.')
     parser.add_argument('--n_estimators', type=int, default=100, help='number of trees.')
     parser.add_argument('--max_depth', type=int, default=None, help='maximum depth.')
 
     # TREX settings
-    parser.add_argument('--tree_kernel', type=str, default='leaf_output', help='type of encoding.')
-    parser.add_argument('--kernel_model', type=str, default='lr', help='kernel model to use.')
+    parser.add_argument('--tree_kernel', type=str, default='tree_output', help='type of encoding.')
+    parser.add_argument('--kernel_model', type=str, default='klr', help='kernel model to use.')
     parser.add_argument('--val_frac', type=float, default=0.1, help='amount of validation data.')
     parser.add_argument('--true_label', action='store_true', default=False, help='train TREX on the true labels.')
 
@@ -514,7 +508,7 @@ if __name__ == '__main__':
 
 
 class Args:
-    dataset = 'nc17_mfc18'
+    dataset = 'adult'
     data_dir = 'data'
     out_dir = 'output/misclassification/'
 
@@ -526,14 +520,14 @@ class Args:
     rasterize = False
 
     topk = 1
-    test_type = 'correct'
+    test_type = 'pos_incorrect'
     load_trex = False
     load_shap = False
     normalize_shap = False
 
-    tree_type = 'lgb'
+    tree_type = 'cb'
     n_estimators = 100
-    max_depth = None
+    max_depth = 5
     val_frac = 0.1
 
     tree_kernel = 'tree_output'
