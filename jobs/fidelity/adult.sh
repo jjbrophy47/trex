@@ -3,10 +3,10 @@
 #SBATCH --job-name=fidelity
 #SBATCH --output=jobs/logs/fidelity/adult
 #SBATCH --error=jobs/errors/fidelity/adult
-#SBATCH --time=7-00:00:00
+#SBATCH --time=2-00:00:00
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1
-#SBATCH --cpus-per-task=11
+#SBATCH --cpus-per-task=5
 #SBATCH --account=uoml
 module load python3/3.6.1
 
