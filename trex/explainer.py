@@ -70,6 +70,7 @@ class TreeExplainer:
         self.kernel_model = kernel_model
         self.tree_kernel = tree_kernel
         self.C = C
+        self.pred_size = pred_size
         self.true_label = true_label
         self.random_state = random_state
         self.verbose = verbose
