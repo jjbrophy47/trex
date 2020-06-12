@@ -26,9 +26,10 @@ class TreeExplainer:
                  kernel_model='svm',
                  tree_kernel='leaf_output',
                  C=1.0,
+                 val_frac=0.1,
+                 pred_size=1000,
                  true_label=False,
                  random_state=None,
-                 val_frac=0.1,
                  verbose=0,
                  C_grid=[1e-2, 1e-1, 1e0, 1e1, 1e2],
                  logger=None,
@@ -51,12 +52,14 @@ class TreeExplainer:
         C : float (default=0.1)
             Regularization parameter for the kernel model. Lower C values result
             in stronger regularization.
+        val_frac : float (default=0.1)
+            Fraction of training data used to tune the hyperparameters of KLR or SVM.
+        pred_size : int (default=1000)
+            Break predictions up into chunks of pred_size.
         true_label : bool (default=False)
             If False, predicted labels from the tree ensemble are used to train the kernel model.
         random_state : int (default=None)
             Random state to promote reproducibility.
-        val_frac : float (default=0.1)
-            Fraction of training data used to tune the hyperparameters of KLR or SVM.
         temp_dir : str (default='.trex')
         """
 
@@ -197,7 +200,13 @@ class TreeExplainer:
         Returns a 1d array of decision vaues.
         """
         assert self.kernel_model == 'svm', 'decision_function only supports svm!'
-        return self.kernel_model_.decision_function(self.transform(X))
+        assert X.ndim == 2
+
+        decisions = []
+        for i in range(0, len(X), self.pred_size):
+            X_sub = self.transform(X[i: i + self.pred_size])
+            decisions.append(self.kernel_model_.decision_function(X_sub))
+        return np.concatenate(decisions)
 
     def predict_proba(self, X):
         """
@@ -210,7 +219,11 @@ class TreeExplainer:
 
         Returns a 2d array of probabilities of shape (len(X), n_classes).
         """
-        return self.kernel_model_.predict_proba(self.transform(X))
+        probas = []
+        for i in range(0, len(X), self.pred_size):
+            X_sub = self.transform(X[i: i + self.pred_size])
+            probas.append(self.kernel_model_.predict_proba(X_sub))
+        return np.vstack(probas)
 
     def predict(self, X):
         """
@@ -223,7 +236,11 @@ class TreeExplainer:
 
         Return 1 1d array of predicted labels.
         """
-        return self.le_.inverse_transform(self.kernel_model_.predict(self.transform(X)))
+        predictions = []
+        for i in range(0, len(X), self.pred_size):
+            X_sub = self.transform(X[i: i + self.pred_size])
+            predictions.append(self.kernel_model_.predict(X_sub))
+        return np.concatenate(predictions)
 
     # Note: If len(X) is large and the number of training instances is large,
     #       the resulting matrix may be huge.
@@ -240,8 +257,11 @@ class TreeExplainer:
 
         Returns an array of shape (len(X), n_train_samples).
         """
-        X_sim = self.kernel_model_.similarity(self.transform(X), train_indices=train_indices)
-        return X_sim
+        similarities = []
+        for i in range(0, len(X), self.pred_size):
+            X_sub = self.transform(X[i: i + self.pred_size])
+            similarities.append(self.kernel_model_.similarity(X_sub))
+        return np.vstack(similarities)
 
     def get_weight(self):
         """
@@ -275,8 +295,15 @@ class TreeExplainer:
 
         Returns a 2d array of contributions of shape (len(X), n_train_samples).
         """
-        contributions = self.kernel_model_.explain(self.transform(X), y=y)
+        contributions_list = []
+        for i in range(0, len(X), self.pred_size):
+            X_sub = self.transform(X[i: i + self.pred_size])
+            y_sub = y[i: i + self.pred_size]
+            contributions_list.append(self.kernel_model_.explain(X_sub, y=y_sub))
+
+        contributions = np.vstack(contributions_list)
         assert contributions.shape == (len(X), self.n_samples_)
+
         return contributions
 
     def transform(self, X):
