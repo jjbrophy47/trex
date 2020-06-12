@@ -83,9 +83,13 @@ def get_mean(args, r, name='fine_tune'):
 def main(args):
 
     # make logger
-    os.makedirs(args.out_dir, exist_ok=True)
-    logger = get_logger(os.path.join(args.out_dir, 'log.txt'))
+    out_dir = os.path.join(args.out_dir, args.tree_kernel)
+    os.makedirs(out_dir, exist_ok=True)
+
+    logger = get_logger(os.path.join(out_dir, 'log.txt'))
     logger.info(args)
+
+    os.makedirs(args.out_dir, exist_ok=True)
 
     # settings
     method_list = ['klr', 'svm', 'maple', 'leaf_influence', 'teknn']

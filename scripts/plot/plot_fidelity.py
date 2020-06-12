@@ -39,8 +39,6 @@ def _plot_graph(args, ax, dataset, method_list, tree_kernel,
 
         tree_res = np.load(tree_path)
         method_res = np.load(method_path)
-        if 'svm' in method:
-            method_res = _sigmoid(method_res)
 
         corr_func = pearsonr if args.corr == 'pearson' else spearmanr
         corr = corr_func(tree_res, method_res)[0]
