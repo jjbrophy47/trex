@@ -17,7 +17,7 @@ check_pct=0.15
 
 rs=4
 verbose=1
-tree_kernels=('tree_output' 'leaf_output' 'leaf_path')
+tree_kernels=('leaf_output')
 
 # python3 experiments/scripts/cleaning.py \
 #   --dataset $dataset \
@@ -30,27 +30,16 @@ tree_kernels=('tree_output' 'leaf_output' 'leaf_path')
 
 for tree_kernel in ${tree_kernels[@]}; do
 
-    python3 experiments/scripts/cleaning.py \
-      --dataset $dataset \
-      --n_estimators $n_estimators \
-      --max_depth $max_depth \
-      --check_pct $check_pct \
-      --rs $rs \
-      --verbose $verbose \
-      --trex \
-      --tree_kernel $tree_kernel \
-      --kernel_model 'klr'
-
-    python3 experiments/scripts/cleaning.py \
-      --dataset $dataset \
-      --n_estimators $n_estimators \
-      --max_depth $max_depth \
-      --check_pct $check_pct \
-      --rs $rs \
-      --verbose $verbose \
-      --trex \
-      --tree_kernel $tree_kernel \
-      --kernel_model 'svm'
+    # python3 experiments/scripts/cleaning.py \
+    #   --dataset $dataset \
+    #   --n_estimators $n_estimators \
+    #   --max_depth $max_depth \
+    #   --check_pct $check_pct \
+    #   --rs $rs \
+    #   --verbose $verbose \
+    #   --trex \
+    #   --tree_kernel $tree_kernel \
+    #   --kernel_model 'klr'
 
     # python3 experiments/scripts/cleaning.py \
     #   --dataset $dataset \
@@ -59,6 +48,17 @@ for tree_kernel in ${tree_kernels[@]}; do
     #   --check_pct $check_pct \
     #   --rs $rs \
     #   --verbose $verbose \
-    #   --teknn \
-    #   --tree_kernel $tree_kernel
+    #   --trex \
+    #   --tree_kernel $tree_kernel \
+    #   --kernel_model 'svm'
+
+    python3 experiments/scripts/cleaning.py \
+      --dataset $dataset \
+      --n_estimators $n_estimators \
+      --max_depth $max_depth \
+      --check_pct $check_pct \
+      --rs $rs \
+      --verbose $verbose \
+      --teknn \
+      --tree_kernel $tree_kernel
 done

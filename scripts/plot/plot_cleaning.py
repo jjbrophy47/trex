@@ -118,8 +118,8 @@ def main(args):
                 line = ax.errorbar(check_pct, res_mean, yerr=res_std,
                                    marker=markers[j], color=colors[j])
 
-                if dataset == 'census':
-                    ax.set_ylim(bottom=0.935, top=0.96)
+                # if dataset == 'census':
+                #     ax.set_ylim(bottom=0.935, top=0.96)
 
                 if i == 0:
                     lines.append(line[0])

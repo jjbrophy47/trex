@@ -22,7 +22,6 @@ import trex
 from utility import model_util
 from utility import data_util
 from utility import print_util
-from utility import exp_util
 
 
 def set_size(width, fraction=1, subplots=(1, 1)):
@@ -263,28 +262,15 @@ def experiment(args, logger, out_dir, seed):
     tree = clone(clf).fit(X_train, y_train)
     model_util.performance(tree, X_train, y_train, X_test, y_test, logger=logger)
 
-    # load a TREX model
-    model_dir = os.path.join(out_dir, '/models/')
-    os.makedirs(model_dir, exist_ok=True)
-    model_path = os.path.join(model_dir, 'explainer.pkl')
-
-    if args.load_trex and os.path.exists(model_path):
-        assert os.path.exists(model_path)
-        logger.info('loading TREX model from {}...'.format(model_path))
-        explainer = exp_util.load_model(model_path)
-
     # train TREX
-    else:
-        logger.info('building TREX...')
-        explainer = trex.TreeExplainer(tree, X_train, y_train,
-                                       tree_kernel=args.tree_kernel,
-                                       random_state=seed,
-                                       kernel_model=args.kernel_model,
-                                       true_label=args.true_label,
-                                       val_frac=args.val_frac,
-                                       logger=logger)
-        logger.info('saving TREX model to {}...'.format(model_path))
-        explainer.save(model_path)
+    logger.info('training TREX...')
+    explainer = trex.TreeExplainer(tree, X_train, y_train,
+                                   tree_kernel=args.tree_kernel,
+                                   random_state=seed,
+                                   kernel_model=args.kernel_model,
+                                   true_label=args.true_label,
+                                   val_frac=args.val_frac,
+                                   logger=logger)
 
     # extract predictions
     start = time.time()
@@ -365,6 +351,15 @@ def experiment(args, logger, out_dir, seed):
     train_sim = explainer.similarity(X_test[[test_ndx]])[0]
     contributions = train_weight * train_sim
 
+    # how many age 17 instances have high similarity?
+    sim_thresh = 2.25
+    high_sim_indices = np.where(train_sim >= sim_thresh)[0]
+    age17_indices = np.where(X_train[:, 0] == 17)[0]
+    high_sim_age17_indices = np.intersect1d(age17_indices, high_sim_indices)
+
+    logger.info('no. samples with sim >= {}: {}'.format(sim_thresh, len(high_sim_indices)))
+    logger.info('no. age=17 samples w/ sim >= {}: {}'.format(sim_thresh, len(high_sim_age17_indices)))
+
     logger.info('\ncollecting results...')
     results = explainer.get_params()
     results['test_ndx'] = test_ndx
@@ -374,32 +369,24 @@ def experiment(args, logger, out_dir, seed):
     results['train_sim'] = train_sim
     results['trex_x_test_pred'] = explainer.predict(x_test)[0]
 
-    # shap values for train and test
-    X_train_shap_fp = os.path.join(model_dir, 'X_train_shap.npy')
-    X_test_shap_fp = os.path.join(model_dir, 'X_test_shap.npy')
+    if args.summary_plot:
 
-    if args.load_shap and os.path.exists(X_train_shap_fp):
-        X_train_shap = np.load(X_train_shap_fp)
-    else:
+        # shap values for train and test
         logger.info('\ncomputing SHAP values for X_train...')
         X_train_shap = shap_explainer.shap_values(X_train)
-        np.save(X_train_shap_fp, X_train_shap)
 
-    if args.load_shap and os.path.exists(X_test_shap_fp):
-        X_test_shap = np.load(X_test_shap_fp)
-    else:
         logger.info('computing SHAP values for X_test...')
         X_test_shap = shap_explainer.shap_values(X_test)
-        np.save(X_test_shap_fp, X_test_shap)
 
-    if args.summary_plot:
         shap.summary_plot(X_train_shap, X_train, feature_names=feature)
         shap.summary_plot(X_test_shap, X_test, feature_names=feature)
 
     # feature-based explanation for test instance
     logger.info('test {}'.format(test_ndx))
     logger.info('{}'.format(dict(zip(feature, X_test[test_ndx]))))
-    shap.summary_plot(test_shap, x_test, feature_names=feature)
+
+    if args.summary_plot:
+        shap.summary_plot(test_shap, x_test, feature_names=feature)
 
     contributions_sum = np.sum(np.abs(contributions))
     indices = np.argsort(contributions)[::-1]
@@ -435,11 +422,14 @@ def experiment(args, logger, out_dir, seed):
 
         train_feature_bins = np.histogram(X_train[:, feat_ndx], bins=args.max_bins)[1]
 
-        results['target_feature'] = target_feature
-        results['train_feature_vals'] = X_train[:, feat_ndx]
-        results['train_feature_bins'] = train_feature_bins
+        plot_instances = False
+        if target_feature == 'age':
+            plot_instances = True
+            results['test_val'] = test_val
+            results['target_feature'] = target_feature
+            results['train_feature_vals'] = X_train[:, feat_ndx]
+            results['train_feature_bins'] = train_feature_bins
 
-        plot_instances = True if target_feature == 'age' else False
         _plot_feature_histograms(args, results, test_val, out_dir,
                                  plot_instances=plot_instances)
 
@@ -475,14 +465,14 @@ if __name__ == '__main__':
     # plot settings
     parser.add_argument('--max_bins', type=int, default=40, help='number of bins for feature values.')
     parser.add_argument('--alpha', type=float, default=0.5, help='transparency value.')
-    parser.add_argument('--kde', action='store_true', default=None, help='plot kde on weight distribution.')
-    parser.add_argument('--overlay', action='store_true', default=None, help='overlay weight distributions.')
-    parser.add_argument('--summary_plot', action='store_true', default=None, help='show summary plot for SHAP.')
-    parser.add_argument('--rasterize', action='store_true', default=None, help='rasterize dense instance plots.')
+    parser.add_argument('--kde', action='store_true', default=False, help='plot kde on weight distribution.')
+    parser.add_argument('--overlay', action='store_true', default=False, help='overlay weight distributions.')
+    parser.add_argument('--summary_plot', action='store_true', default=False, help='show summary plot for SHAP.')
+    parser.add_argument('--rasterize', action='store_true', default=False, help='rasterize dense instance plots.')
 
     # explanation settings
     parser.add_argument('--topk', type=int, default=1, help='number of features to show.')
-    parser.add_argument('--test_type', type=str, default='correct', help='instance to try and explain.')
+    parser.add_argument('--test_type', type=str, default='pos_incorrect', help='instance to try and explain.')
     parser.add_argument('--load_trex', action='store_true', default=False, help='load TREX.')
     parser.add_argument('--load_shap', action='store_true', default=False, help='load SHAP values.')
     parser.add_argument('--normalize_shap', action='store_true', default=False, help='normalize SHAP values.')

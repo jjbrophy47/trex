@@ -69,23 +69,41 @@ def main(args):
 
     # matplotlib settings
     plt.rc('font', family='serif')
-    plt.rc('xtick', labelsize=17)
-    plt.rc('ytick', labelsize=17)
-    plt.rc('axes', labelsize=22)
-    plt.rc('axes', titlesize=22)
-    plt.rc('legend', fontsize=20)
-    plt.rc('legend', title_fontsize=11)
-    plt.rc('lines', linewidth=2)
-    plt.rc('lines', markersize=8)
 
-    # inches
-    width = 5.5  # Neurips 2020
-    width, height = set_size(width=width * 3, fraction=1, subplots=(1, 3))
-    fig, axs = plt.subplots(1, max(2, len(args.dataset)),
-                            figsize=(width, height), sharex=True)
+    if args.two_col:
+        plt.rc('xtick', labelsize=11)
+        plt.rc('ytick', labelsize=11)
+        plt.rc('axes', labelsize=11)
+        plt.rc('axes', titlesize=11)
+        plt.rc('legend', fontsize=11)
+        plt.rc('legend', title_fontsize=11)
+        plt.rc('lines', linewidth=1)
+        plt.rc('lines', markersize=3)
+
+        width = 3.25  # Two column style
+        width, height = set_size(width=width * 2, fraction=1, subplots=(2, 2))
+        fig, axs = plt.subplots(2, 2, figsize=(width, height), sharex='col')
+
+    else:
+        plt.rc('xtick', labelsize=17)
+        plt.rc('ytick', labelsize=17)
+        plt.rc('axes', labelsize=22)
+        plt.rc('axes', titlesize=22)
+        plt.rc('legend', fontsize=20)
+        plt.rc('legend', title_fontsize=11)
+        plt.rc('lines', linewidth=2)
+        plt.rc('lines', markersize=8)
+
+        width = 5.5  # Neurips 2020
+        width, height = set_size(width=width * 3, fraction=1, subplots=(1, 3))
+        fig, axs = plt.subplots(1, max(2, len(args.dataset)),
+                                figsize=(width, height), sharex=True)
     axs = axs.flatten()
 
     n_pts = 10
+
+    ylabel = 'Test {}'.format(metric_mapping[args.metric])
+    xlabel = '% train data removed'
 
     lines = []
     lines_ndx = []
@@ -104,20 +122,32 @@ def main(args):
                     lines.append(line[0])
                     lines_ndx.append(j)
 
-        if i == 0:
-            ax.set_ylabel('Test {}'.format(metric_mapping[args.metric]))
-        if i == 0:
+        if args.two_col:
+            if i % 2 == 0:
+                axs[i].set_ylabel(ylabel)
+            if i > 1:
+                axs[i].set_xlabel(xlabel)
+
+        else:
+
+            if i == 0:
+                ax.set_ylabel(ylabel)
+                ax.set_xlabel(xlabel)
+
+        if i == 2:
             ax.legend()
 
         ax.set_title(dataset.capitalize())
-        ax.set_xlabel('% train data removed')
         ax.tick_params(axis='both', which='major')
 
     out_dir = os.path.join(args.out_dir, args.tree_kernel)
     os.makedirs(out_dir, exist_ok=True)
 
     plt.tight_layout()
-    fig.subplots_adjust(wspace=0.25, hspace=0.05)
+
+    if not args.two_col:
+        fig.subplots_adjust(wspace=0.25, hspace=0.05)
+
     plt.savefig(os.path.join(out_dir, 'plot.{}'.format(args.ext)))
 
 
@@ -134,6 +164,7 @@ if __name__ == '__main__':
     parser.add_argument('--tree_kernel', type=str, default='tree_output', help='tree kernel.')
 
     parser.add_argument('--metric', type=str, default='acc', help='predictive metric.')
+    parser.add_argument('--two_col', action='store_true', default=False, help='format into two columns.')
     parser.add_argument('--rs', type=int, nargs='+', default=[1, 2, 3, 4, 5], help='random states.')
     parser.add_argument('--ext', type=str, default='png', help='output image format.')
     parser.add_argument('--verbose', type=int, default=1, help='verbosity level.')

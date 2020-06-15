@@ -14,18 +14,16 @@ dataset='census'
 n_estimators=250
 max_depth=5
 
-tree_kernels=('tree_output' 'leaf_output')
-rs_list=(1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20)
+tree_kernels=('leaf_output')
+rs_list=(0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19)
 test_frac=1.0
 n_test=50
 
-for rs in ${rs_list[@]}; do
-    python3 experiments/scripts/roar.py \
-      --dataset $dataset \
-      --n_estimators $n_estimators \
-      --max_depth $max_depth \
-      --rs $rs \
-      --test_frac $test_frac \
-      --n_test $n_test \
-      --maple
-done
+python3 experiments/scripts/roar.py \
+  --dataset $dataset \
+  --n_estimators $n_estimators \
+  --max_depth $max_depth \
+  --rs 0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 \
+  --test_frac $test_frac \
+  --n_test $n_test \
+  --maple

@@ -120,7 +120,6 @@ if __name__ == '__main__':
 
     parser.add_argument('--tree_type', type=str, default='cb', help='tree type.')
     parser.add_argument('--tree_kernel', type=str, default='tree_output', help='tree kernel.')
-    parser.add_argument('--kernel_model', type=str, default='klr', help='kernel model.')
 
     parser.add_argument('--rs', type=int, nargs='+', default=[1, 2, 3, 4, 5], help='random state.')
     args = parser.parse_args()
@@ -135,6 +134,5 @@ class Args:
 
     tree_type = 'cb'
     tree_kernel = 'tree_output'
-    kernel_model = 'klr'
 
     rs = [1, 2, 3, 4, 5]
