@@ -18,7 +18,7 @@ tree_kernels=('leaf_output')
 rs_list=(3 4 5)
 
 for tree_kernel in ${tree_kernels[@]}; do
-    for i in ${rs_list[@]}; do
+    for rs in ${rs_list[@]}; do
         python3 experiments/scripts/runtime.py \
           --dataset $dataset \
           --n_estimators $n_estimators \
