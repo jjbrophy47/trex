@@ -22,5 +22,7 @@ for tree_kernel in ${tree_kernels[@]}; do
       --tree_kernel $tree_kernel \
       --n_estimators $n_estimators \
       --max_depth $max_depth \
-      --teknn
+      --teknn \
+      --k 15 \
+      --pred_size 20
 done

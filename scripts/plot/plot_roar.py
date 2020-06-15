@@ -64,7 +64,7 @@ def main(args):
     method_list = ['random', 'maple', 'teknn', 'klr']
     colors = ['red', 'orange', 'purple', 'blue', 'green']
     labels = ['Random', 'MAPLE', 'TEKNN', 'TREX-KLR', 'TREX-SVM']
-    markers = ['*', 'd', 'o', '1', '2']
+    markers = ['o', 'd', '^', 'x', '2']
     metric_mapping = {'auc': 'AUROC', 'acc': 'Accuracy'}
 
     # matplotlib settings
@@ -134,7 +134,7 @@ def main(args):
                 ax.set_ylabel(ylabel)
                 ax.set_xlabel(xlabel)
 
-        if i == 2:
+        if i == 1:
             ax.legend()
 
         ax.set_title(dataset.capitalize())

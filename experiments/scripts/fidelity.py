@@ -12,6 +12,7 @@ sys.path.insert(0, here + '/../')  # for utility
 sys.path.insert(0, here + '/../../')  # for libliner
 
 import numpy as np
+from sklearn.neighbors import KNeighborsClassifier
 
 import trex
 from utility import print_util
@@ -20,28 +21,72 @@ from utility import model_util
 from utility import exp_util
 
 
-def _get_knn_predictions(tree, knn_clf, X_test, X_test_alt, y_train):
+def _get_knn_predictions(tree, knn_clf, X_test, X_test_alt,
+                         y_train, pred_size=None, out_dir=None,
+                         logger=None):
     """
     Generate predictions for TEKNN.
     """
 
     multiclass = True if len(np.unique(y_train)) > 2 else False
 
-    # tree ensemble predictions
-    yhat_tree_test = tree.predict_proba(X_test)
-    yhat_knn_test = knn_clf.predict_proba(X_test_alt)
+    if pred_size is not None:
+        pred_indices = np.random.choice(X_test.shape[0],
+                                        size=X_test.shape[0],
+                                        replace=False)
 
-    if not multiclass:
-        yhat_tree_test = yhat_tree_test[:, 1].flatten()
-        yhat_knn_test = yhat_knn_test[:, 1].flatten()
+        tree_preds = []
+        knn_preds = []
+
+        start = time.time()
+        for i in range(0, X_test.shape[0], pred_size):
+
+            sub_indices = pred_indices[i: i + pred_size]
+            X_test_sub = X_test[sub_indices]
+            X_test_sub_alt = X_test_alt[sub_indices]
+
+            tree_pred = tree.predict_proba(X_test_sub)
+            knn_pred = knn_clf.predict_proba(X_test_sub_alt)
+
+            if not multiclass:
+                tree_preds.append(tree_pred[:, 1])
+                knn_preds.append(knn_pred[:, 1])
+
+            else:
+                tree_preds.append(tree_pred.flatten())
+                knn_preds.append(knn_pred.flatten())
+
+            tree_result = np.concatenate(tree_preds)
+            knn_result = np.concatenate(knn_preds)
+
+            # save results
+            log_time = time.time() - start
+            s = 'saving {} predictions, cumulative time {:.3f}s'
+            logger.info(s.format(len(tree_result), log_time))
+
+            # save results
+            np.save(os.path.join(out_dir, 'tree.npy'), tree_result)
+            np.save(os.path.join(out_dir, 'surrogate.npy'), knn_result)
+
+        return None
+
     else:
-        yhat_tree_test = yhat_tree_test.flatten()
-        yhat_knn_test = yhat_knn_test.flatten()
 
-    res = {}
-    res['tree'] = yhat_tree_test
-    res['teknn'] = yhat_knn_test
-    return res
+        # tree ensemble predictions
+        yhat_tree_test = tree.predict_proba(X_test)
+        yhat_knn_test = knn_clf.predict_proba(X_test_alt)
+
+        if not multiclass:
+            yhat_tree_test = yhat_tree_test[:, 1].flatten()
+            yhat_knn_test = yhat_knn_test[:, 1].flatten()
+        else:
+            yhat_tree_test = yhat_tree_test.flatten()
+            yhat_knn_test = yhat_knn_test.flatten()
+
+        res = {}
+        res['tree'] = yhat_tree_test
+        res['teknn'] = yhat_knn_test
+        return res
 
 
 def _get_trex_predictions(tree, explainer, data):
@@ -100,32 +145,44 @@ def experiment(args, logger, out_dir, seed):
     logger.info('max depth: {}'.format(args.max_depth))
 
     # train a tree ensemble
+    logger.info('fitting tree ensemble...')
     tree = clf.fit(X_train, y_train)
 
     if args.teknn:
 
         # transform data
         extractor = trex.TreeExtractor(tree, tree_kernel=args.tree_kernel)
+
+        logger.info('transforming training data...')
         X_train_alt = extractor.fit_transform(X_train)
+
+        logger.info('transforming test data...')
         X_test_alt = extractor.transform(X_test)
+
         train_label = y_train if args.true_label else tree.predict(X_train)
 
         # tune and train teknn
         start = time.time()
         logger.info('TE-KNN...')
-        knn_clf = exp_util.tune_knn(tree, X_train, X_train_alt, train_label, args.val_frac,
-                                    seed=seed, logger=logger)
+        if args.k:
+            knn_clf = KNeighborsClassifier(n_neighbors=args.k, weights='uniform')
+            knn_clf = knn_clf.fit(X_train_alt, y_train)
+        else:
+            knn_clf = exp_util.tune_knn(tree, X_train, X_train_alt, train_label, args.val_frac,
+                                        seed=seed, logger=logger)
 
         start = time.time()
         logger.info('generating predictions...')
-        results = _get_knn_predictions(tree, knn_clf, X_test, X_test_alt, y_train)
+        results = _get_knn_predictions(tree, knn_clf, X_test, X_test_alt, y_train,
+                                       pred_size=args.pred_size, out_dir=out_dir,
+                                       logger=logger)
         logger.info('time: {:.3f}s'.format(time.time() - start))
 
-        results['n_neighbors'] = knn_clf.get_params()['n_neighbors']
-
         # save results
-        np.save(os.path.join(out_dir, 'tree.npy'), results['tree'])
-        np.save(os.path.join(out_dir, 'surrogate.npy'), results['teknn'])
+        if results:
+            results['n_neighbors'] = knn_clf.get_params()['n_neighbors']
+            np.save(os.path.join(out_dir, 'tree.npy'), results['tree'])
+            np.save(os.path.join(out_dir, 'surrogate.npy'), results['teknn'])
 
     if args.trex:
 
@@ -176,26 +233,35 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Feature representation extractions for tree ensembles',
                                      formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
+    # I/O settings
     parser.add_argument('--dataset', type=str, default='churn', help='dataset to explain.')
     parser.add_argument('--data_dir', type=str, default='data', help='data directory.')
     parser.add_argument('--out_dir', type=str, default='output/fidelity/', help='output directory.')
 
+    # data settings
     parser.add_argument('--train_frac', type=float, default=1.0, help='amount of training data to use.')
     parser.add_argument('--val_frac', type=float, default=0.1, help='amount of training data to use for validation.')
 
+    # tree settings
     parser.add_argument('--tree_type', type=str, default='cb', help='model to use.')
     parser.add_argument('--n_estimators', type=int, default=100, help='number of trees in tree ensemble.')
     parser.add_argument('--max_depth', type=int, default=None, help='maximum depth in tree ensemble.')
 
+    # TREX settings
     parser.add_argument('--tree_kernel', type=str, default='tree_output', help='type of encoding.')
     parser.add_argument('--true_label', action='store_true', default=False, help='Use true labels for explainer.')
     parser.add_argument('--kernel_model', type=str, default='klr', help='linear model to use.')
 
+    # method settings
     parser.add_argument('--trex', action='store_true', default=False, help='use TREX as surrogate model.')
     parser.add_argument('--teknn', action='store_true', default=False, help='Use KNN on top of TREX features.')
+    parser.add_argument('--k', type=int, default=None, help='no. neighbors.')
 
+    # experiment settings
+    parser.add_argument('--pred_size', type=int, default=None, help='chunk size.')
     parser.add_argument('--rs', type=int, default=1, help='random state.')
     parser.add_argument('--verbose', type=int, default=0, help='Verbosity level.')
+
     args = parser.parse_args()
     main(args)
 
@@ -219,6 +285,8 @@ class Args:
 
     trex = True
     teknn = False
+    k = None
 
+    pred_size = None
     rs = 1
     verbose = 0
