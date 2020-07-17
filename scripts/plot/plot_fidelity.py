@@ -55,7 +55,7 @@ def main(args):
 
     method_list = ['klr', 'svm', 'teknn']
     labels = ['KLR', 'SVM', 'KNN']
-    colors = ['cyan', 'blue', 'purple']
+    colors = ['blue', 'cyan', 'purple']
     markers = ['1', '2', '*']
 
     ylabel = 'GBDT probability'

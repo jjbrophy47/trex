@@ -61,6 +61,7 @@ def get_results(dataset, method, args):
 
 
 def main(args):
+    print(args)
 
     # settings
     method_list = ['klr', 'svm', 'random',
@@ -71,9 +72,10 @@ def main(args):
               'Tree Loss', 'KLR Loss', 'SVM Loss',
               'MAPLE', 'LeafInfluence', 'TE-KNN',
               'TE-KNN Loss']
-    colors = ['cyan', 'blue', 'red', 'green', 'purple', 'magenta', 'orange',
+    colors = ['blue', 'cyan', 'red', 'green', 'purple', 'magenta', 'orange',
               'black', 'yellow', '#EEC64F', 'g', 'r']
     markers = ['1', '2', 'o', 'v', '^', '<', '>', '.', '*', 'h', '3', '4']
+    zorders = [10, 9, 8, 1, 2, 3, 4, 5, 6, 7]
 
     # matplotlib settings
     plt.rc('font', family='serif')
@@ -116,7 +118,8 @@ def main(args):
             if res is not None:
                 res_mean, res_std = res
                 line = ax.errorbar(check_pct, res_mean, yerr=res_std,
-                                   marker=markers[j], color=colors[j])
+                                   marker=markers[j], color=colors[j],
+                                   zorder=zorders[j])
 
                 # if dataset == 'census':
                 #     ax.set_ylim(bottom=0.935, top=0.96)
