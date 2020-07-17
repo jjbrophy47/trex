@@ -1,5 +1,5 @@
 <p align="center">
-  <img src=notes/images/logo.png?raw=true" alt="logo"/>
+  <img src=logo.png?raw=true" alt="logo"/>
 </p>
 
 ---
