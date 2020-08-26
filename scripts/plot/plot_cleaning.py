@@ -160,7 +160,7 @@ if __name__ == '__main__':
     parser.add_argument('--out_dir', type=str, default='output/plots/cleaning/', help='output directory.')
 
     parser.add_argument('--tree_type', type=str, default='cb', help='tree type.')
-    parser.add_argument('--tree_kernel', type=str, default='tree_output', help='tree kernel.')
+    parser.add_argument('--tree_kernel', type=str, default='leaf_output', help='tree kernel.')
 
     parser.add_argument('--rs', type=int, nargs='+', default=[1, 2, 3, 4, 5], help='random state.')
     parser.add_argument('--ext', type=str, default='png', help='output image format.')

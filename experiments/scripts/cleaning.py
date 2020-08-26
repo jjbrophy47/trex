@@ -5,6 +5,7 @@ Experiment: dataset cleaning from noisy labels,
 """
 import time
 import argparse
+from datetime import datetime
 from copy import deepcopy
 import os
 import sys
@@ -398,12 +399,12 @@ def main(args):
         dataset += '_{}'.format(str(args.train_frac).replace('.', 'p'))
 
     out_dir = os.path.join(args.out_dir, dataset, args.tree_type,
-                           args.tree_kernel, 'rs{}'.format(args.rs))
+                           'rs{}'.format(args.rs))
 
     if args.trex:
-        out_dir = os.path.join(out_dir, args.kernel_model)
+        out_dir = os.path.join(out_dir, args.kernel_model, args.tree_kernel)
     elif args.teknn:
-        out_dir = os.path.join(out_dir, 'teknn')
+        out_dir = os.path.join(out_dir, 'teknn', args.tree_kernel)
     elif args.maple:
         out_dir = os.path.join(out_dir, 'maple')
     elif args.inf_k is not None:
@@ -412,6 +413,7 @@ def main(args):
     os.makedirs(out_dir, exist_ok=True)
     logger = print_util.get_logger(os.path.join(out_dir, 'log.txt'))
     logger.info(args)
+    logger.info(datetime.now())
 
     seed = args.rs
     logger.info('\nSeed: {}'.format(seed))
