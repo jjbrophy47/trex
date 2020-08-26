@@ -1,5 +1,6 @@
 """
-Experiment: Compare runtimes for explaining a single test instance for different methods.
+Experiment: Compare runtimes for explaining a
+            single test instance for different methods.
 """
 import time
 import argparse
@@ -237,12 +238,12 @@ def main(args):
 
     # make logger
     out_dir = os.path.join(args.out_dir, args.dataset, args.tree_type,
-                           args.tree_kernel, 'rs{}'.format(args.rs))
+                           'rs{}'.format(args.rs))
 
     if args.trex:
-        out_dir = os.path.join(out_dir, args.kernel_model)
+        out_dir = os.path.join(out_dir, args.kernel_model, args.tree_kernel)
     elif args.teknn:
-        out_dir = os.path.join(out_dir, 'teknn')
+        out_dir = os.path.join(out_dir, 'teknn', args.tree_kernel)
     elif args.maple:
         out_dir = os.path.join(out_dir, 'maple')
     elif args.inf_k is not None:

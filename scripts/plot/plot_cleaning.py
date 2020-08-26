@@ -30,6 +30,10 @@ def get_results(dataset, method, args):
     if 'loss' in method:
         method_dir = method.split('_')[0]
 
+    # add tree kernel to specific methods
+    if method_dir in ['klr', 'svm', 'teknn']:
+        method_dir = os.path.join(method_dir, args.tree_kernel)
+
     # get method name
     method_name = 'method_loss' if 'loss' in method else 'method'
     if method in ['tree', 'random']:
@@ -37,7 +41,7 @@ def get_results(dataset, method, args):
 
     for i in args.rs:
         res_path = os.path.join(args.in_dir, dataset, args.tree_type,
-                                args.tree_kernel, 'rs{}'.format(i), method_dir,
+                                'rs{}'.format(i), method_dir,
                                 '{}.npy'.format(method_name))
 
         if not os.path.exists(res_path):
@@ -62,6 +66,9 @@ def get_results(dataset, method, args):
 
 def main(args):
     print(args)
+
+    # add specific cleaning output directory
+    args.in_dir = os.path.join(args.in_dir, 'cleaning')
 
     # settings
     method_list = ['klr', 'svm', 'random',
@@ -102,7 +109,7 @@ def main(args):
         ax = axs[i]
 
         rs_dir = os.path.join(args.in_dir, dataset, args.tree_type,
-                              args.tree_kernel, 'rs1', 'klr')
+                              'rs1', 'klr', args.tree_kernel)
         if not os.path.exists(rs_dir):
             print(rs_dir)
             continue
@@ -156,7 +163,7 @@ if __name__ == '__main__':
 
     parser.add_argument('--dataset', type=str, nargs='+', default=['churn', 'amazon', 'adult',
                         'census_0p1', 'census'], help='dataset to explain.')
-    parser.add_argument('--in_dir', type=str, default='output/cleaning/', help='input directory.')
+    parser.add_argument('--in_dir', type=str, default='output/', help='input directory.')
     parser.add_argument('--out_dir', type=str, default='output/plots/cleaning/', help='output directory.')
 
     parser.add_argument('--tree_type', type=str, default='cb', help='tree type.')

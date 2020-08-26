@@ -281,12 +281,12 @@ def main(args):
 
     for rs in args.rs:
         out_dir = os.path.join(args.out_dir, dataset, args.tree_type,
-                               args.tree_kernel, 'rs{}'.format(rs))
+                               'rs{}'.format(rs))
 
         if args.trex:
-            out_dir = os.path.join(out_dir, args.kernel_model)
+            out_dir = os.path.join(out_dir, args.kernel_model, args.tree_kernel)
         elif args.teknn:
-            out_dir = os.path.join(out_dir, 'teknn')
+            out_dir = os.path.join(out_dir, 'teknn', args.tree_kernel)
         elif args.maple:
             out_dir = os.path.join(out_dir, 'maple')
         elif args.inf_k is not None:

@@ -44,12 +44,16 @@ def remove_logger(logger):
 
 def get_results(dataset, method, args):
 
+    # add tree kernel to specific methods
+    method_dir = method
+    if method in ['klr', 'svm', 'teknn']:
+        method_dir = os.path.join(method_dir, args.tree_kernel)
+
     # get results from each run
     r = {}
     for i in args.rs:
         res_path = os.path.join(args.in_dir, dataset, args.tree_type,
-                                args.tree_kernel, 'rs{}'.format(i),
-                                method, 'method.npy')
+                                'rs{}'.format(i), method_dir, 'method.npy')
 
         if not os.path.exists(res_path):
             print(res_path)
@@ -81,6 +85,8 @@ def get_mean(args, r, name='fine_tune'):
 
 
 def main(args):
+    print(Args)
+    args.in_dir = os.path.join(args.in_dir, 'runtime')
 
     # make logger
     out_dir = os.path.join(args.out_dir, args.tree_kernel)
@@ -115,7 +121,7 @@ if __name__ == '__main__':
 
     parser.add_argument('--dataset', type=str, nargs='+', default=['churn', 'amazon', 'adult', 'census'],
                         help='dataset to explain.')
-    parser.add_argument('--in_dir', type=str, default='output/runtime/', help='input directory.')
+    parser.add_argument('--in_dir', type=str, default='output/', help='input directory.')
     parser.add_argument('--out_dir', type=str, default='output/prints/runtime/', help='output directory.')
 
     parser.add_argument('--tree_type', type=str, default='cb', help='tree type.')

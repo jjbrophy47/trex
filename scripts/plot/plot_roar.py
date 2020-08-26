@@ -27,9 +27,13 @@ def get_results(args, dataset, method, score_ndx=0):
     method_dir = 'klr' if method == 'random' else method
     method_name = method if method == 'random' else 'method'
 
+    # add tree kernel to specific methods
+    if method_dir in ['klr', 'svm', 'teknn']:
+        method_dir = os.path.join(method_dir, args.tree_kernel)
+
     for i in args.rs:
         in_dir = os.path.join(args.in_dir, dataset, args.tree_type,
-                              args.tree_kernel, 'rs{}'.format(i), method_dir)
+                              'rs{}'.format(i), method_dir)
 
         pct_path = os.path.join(in_dir, 'percentages.npy')
         method_path = os.path.join(in_dir, '{}.npy'.format(method_name))
@@ -60,10 +64,13 @@ def get_results(args, dataset, method, score_ndx=0):
 
 
 def main(args):
+    print(args)
+
+    args.in_dir = os.path.join(args.in_dir, 'roar')
 
     method_list = ['random', 'maple', 'teknn', 'klr']
     colors = ['red', 'orange', 'purple', 'blue', 'green']
-    labels = ['Random', 'MAPLE', 'TEKNN', 'TREX-KLR', 'TREX-SVM']
+    labels = ['Random', 'MAPLE', 'TEKNN', 'TREX', 'TREX-SVM']
     markers = ['o', 'd', '^', 'x', '2']
     metric_mapping = {'auc': 'AUROC', 'acc': 'Accuracy'}
 
@@ -157,7 +164,7 @@ if __name__ == '__main__':
 
     parser.add_argument('--dataset', type=str, nargs='+', default=['churn', 'amazon', 'adult', 'census'],
                         help='dataset to explain.')
-    parser.add_argument('--in_dir', type=str, default='output/roar/', help='input directory.')
+    parser.add_argument('--in_dir', type=str, default='output/', help='input directory.')
     parser.add_argument('--out_dir', type=str, default='output/plots/roar/', help='output directory.')
 
     parser.add_argument('--tree_type', type=str, default='cb', help='tree type.')

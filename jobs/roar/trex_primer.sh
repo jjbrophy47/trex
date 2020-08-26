@@ -5,7 +5,7 @@ mem=$4
 time=$5
 partition=$6
 
-rs_list=(1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20)
+rs_list=(0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19)
 kernel_model_list=('klr')
 tree_kernel_list=('leaf_output' 'tree_output' 'leaf_path')
 
