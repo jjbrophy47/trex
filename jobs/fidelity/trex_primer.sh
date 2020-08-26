@@ -10,7 +10,6 @@ tree_kernel_list=('leaf_output' 'tree_output' 'leaf_path')
 
 for kernel_model in ${kernel_model_list[@]}; do
     for tree_kernel in ${tree_kernel_list[@]}; do
-
         sbatch --mem=${mem}G \
                --time=$time \
                --partition=$partition \
@@ -19,3 +18,5 @@ for kernel_model in ${kernel_model_list[@]}; do
                --error=jobs/errors/fidelity/$dataset \
                jobs/fidelity/trex_runner.sh $dataset $n_estimators \
                $max_depth $kernel_model $tree_kernel
+    done
+done

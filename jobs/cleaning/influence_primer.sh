@@ -18,3 +18,4 @@ for rs in ${rs_list[@]}; do
            --error=jobs/errors/cleaning/$dataset \
            jobs/cleaning/influence_runner.sh $dataset $n_estimators \
            $max_depth $check_pct $train_frac $rs
+done

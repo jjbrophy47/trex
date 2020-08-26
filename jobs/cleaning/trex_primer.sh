@@ -23,3 +23,6 @@ for rs in ${rs_list[@]}; do
                    --error=jobs/errors/cleaning/$dataset \
                    jobs/cleaning/trex_runner.sh $dataset $n_estimators \
                    $max_depth $check_pct $train_frac $kernel_model $tree_kernel $rs
+        done
+    done
+done

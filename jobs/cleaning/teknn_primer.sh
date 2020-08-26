@@ -12,7 +12,6 @@ tree_kernel_list=('leaf_output' 'tree_output' 'leaf_path')
 
 for rs in ${rs_list[@]}; do
     for tree_kernel in ${tree_kernel_list[@]}; do
-
         sbatch --mem=${mem}G \
                --time=$time \
                --partition=$partition \
@@ -21,3 +20,5 @@ for rs in ${rs_list[@]}; do
                --error=jobs/errors/cleaning/$dataset \
                jobs/cleaning/teknn_runner.sh $dataset $n_estimators \
                $max_depth $check_pct $train_frac $tree_kernel $rs
+    done
+done

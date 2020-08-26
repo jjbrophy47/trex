@@ -16,3 +16,4 @@ for tree_kernel in ${tree_kernel_list[@]}; do
            --error=jobs/errors/fidelity/$dataset \
            jobs/fidelity/teknn_runner.sh $dataset $n_estimators \
            $max_depth $tree_kernel
+done

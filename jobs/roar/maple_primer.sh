@@ -16,3 +16,4 @@ for rs in ${rs_list[@]}; do
            --error=jobs/errors/roar/$dataset \
            jobs/roar/maple_runner.sh $dataset $n_estimators \
            $max_depth $rs
+done
