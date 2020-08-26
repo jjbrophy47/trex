@@ -1,6 +1,11 @@
-# sbatch jobs/fidelity/churn.sh
-# sbatch jobs/fidelity/amazon.sh
-# sbatch jobs/fidelity/adult.sh
-# sbatch jobs/fidelity/census/1.sh
-# sbatch jobs/fidelity/census/2.sh
-sbatch jobs/fidelity/census/3.sh
+# TREX
+./jobs/fidelity/trex_primer.sh churn 100 3 3 1440 short
+./jobs/fidelity/trex_primer.sh amazon 250 5 5 1440 short
+./jobs/fidelity/trex_primer.sh adult 100 5 6 1440 short
+./jobs/fidelity/trex_primer.sh census 250 5 15 1440 short
+
+# TEKNN
+./jobs/fidelity/teknn_primer.sh churn 100 3 3 1440 short
+./jobs/fidelity/teknn_primer.sh amazon 250 5 5 1440 short
+./jobs/fidelity/teknn_primer.sh adult 100 5 6 1440 short
+./jobs/fidelity/teknn_primer.sh census 250 5 15 1440 short

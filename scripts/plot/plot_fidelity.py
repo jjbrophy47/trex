@@ -8,6 +8,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from scipy.stats import pearsonr
 from scipy.stats import spearmanr
+from sklearn.metrics import r2_score
 
 
 def set_size(width, fraction=1, subplots=(1, 1)):
@@ -40,8 +41,14 @@ def _plot_graph(args, ax, dataset, method_list, tree_kernel,
         tree_res = np.load(tree_path)
         method_res = np.load(method_path)
 
-        corr_func = pearsonr if args.corr == 'pearson' else spearmanr
-        corr = corr_func(tree_res, method_res)[0]
+        if args.corr == 'pearson':
+            corr = pearsonr(tree_res, method_res)[0]
+        elif args.corr == 'spearman':
+            corr = spearmanr(tree_res, method_res)[0]
+        elif args.corr == 'r2':
+            corr = r2_score(tree_res, method_res)
+        else:
+            raise ValueError('Correlation function {} unknown!'.format(args.corr))
 
         label = '{}={:.3f}'.format(labels[i], corr)
         ax.scatter(method_res, tree_res, color=colors[i],
@@ -127,7 +134,7 @@ if __name__ == '__main__':
     parser.add_argument('--out_dir', type=str, default='output/plots/fidelity/', help='output directory.')
 
     parser.add_argument('--tree_type', type=str, default='cb', help='tree ensemble.')
-    parser.add_argument('--tree_kernel', type=str, default='tree_output', help='tree kernel.')
+    parser.add_argument('--tree_kernel', type=str, default='leaf_output', help='tree kernel.')
 
     parser.add_argument('--two_col', action='store_true', default=False, help='format into two columns.')
     parser.add_argument('--corr', type=str, default='pearson', help='statistical correlation.')

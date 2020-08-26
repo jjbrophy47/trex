@@ -1,23 +1,23 @@
-sbatch jobs/runtime/churn/1.sh
-# sbatch jobs/runtime/churn/2.sh
-# sbatch jobs/runtime/churn/3.sh
-# sbatch jobs/runtime/churn/4.sh
-# sbatch jobs/runtime/churn/5.sh
+# TREX
+./jobs/runtime/trex_primer.sh churn 100 3 3 1440 short
+./jobs/runtime/trex_primer.sh amazon 250 5 5 1440 short
+./jobs/runtime/trex_primer.sh adult 100 5 6 1440 short
+./jobs/runtime/trex_primer.sh census 250 5 15 1440 short
 
-sbatch jobs/runtime/amazon/1.sh
-# sbatch jobs/runtime/amazon/2.sh
-# sbatch jobs/runtime/amazon/3.sh
-# sbatch jobs/runtime/amazon/4.sh
-# sbatch jobs/runtime/amazon/5.sh
+# TEKNN
+./jobs/runtime/teknn_primer.sh churn 100 3 3 1440 short
+./jobs/runtime/teknn_primer.sh amazon 250 5 5 1440 short
+./jobs/runtime/teknn_primer.sh adult 100 5 6 1440 short
+./jobs/runtime/teknn_primer.sh census 250 5 15 1440 short
 
-sbatch jobs/runtime/adult/1.sh
-# sbatch jobs/runtime/adult/2.sh
-# sbatch jobs/runtime/adult/3.sh
-# sbatch jobs/runtime/adult/4.sh
-# sbatch jobs/runtime/adult/5.sh
+# MAPLE
+# ./jobs/runtime/maple_primer.sh churn 100 3 3 1440 short
+# ./jobs/runtime/maple_primer.sh amazon 250 5 5 1440 short
+# ./jobs/runtime/maple_primer.sh adult 100 5 6 1440 short
+# ./jobs/runtime/maple_primer.sh census 250 5 15 1440 short
 
-sbatch jobs/runtime/census/1.sh
-# sbatch jobs/runtime/census/2.sh
-# sbatch jobs/runtime/census/3.sh
-# sbatch jobs/runtime/census/4.sh
-# sbatch jobs/runtime/census/5.sh
+# Leaf Influence
+# ./jobs/runtime/maple_primer.sh churn 100 3 3 1440 short
+# ./jobs/runtime/maple_primer.sh amazon 250 5 5 1440 short
+# ./jobs/runtime/maple_primer.sh adult 100 5 6 1440 short
+# ./jobs/runtime/maple_primer.sh census 250 5 15 1440 short

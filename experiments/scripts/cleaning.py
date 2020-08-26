@@ -1,6 +1,7 @@
 """
-Experiment: dataset cleaning from noisy labels, specifically a percentage of flipped labels
-in the train data. Only for binary classification datasets.
+Experiment: dataset cleaning from noisy labels,
+            specifically a percentage of flipped labels
+            in the train data. Only for binary classification datasets.
 """
 import time
 import argparse
@@ -430,7 +431,7 @@ if __name__ == '__main__':
     # data settings
     parser.add_argument('--train_frac', type=float, default=1.0, help='amount of training data to use.')
     parser.add_argument('--val_frac', type=float, default=0.1, help='amount of training data to use for validation.')
-    parser.add_argument('--flip_frac', type=float, default=0.4, help='Fraction of train labels to flip.')
+    parser.add_argument('--flip_frac', type=float, default=0.4, help='fraction of train labels to flip.')
 
     # tree settings
     parser.add_argument('--tree_type', type=str, default='cb', help='tree model to use.')
@@ -438,23 +439,23 @@ if __name__ == '__main__':
     parser.add_argument('--max_depth', type=int, default=None, help='maximum depth in tree ensemble.')
 
     # TREX settings
-    parser.add_argument('--trex', action='store_true', default=False, help='Use TREX.')
+    parser.add_argument('--trex', action='store_true', default=False, help='use TREX.')
     parser.add_argument('--tree_kernel', type=str, default='tree_output', help='type of encoding.')
-    parser.add_argument('--true_label', action='store_true', default=False, help='Train model on true labels.')
+    parser.add_argument('--true_label', action='store_true', default=False, help='train model on true labels.')
     parser.add_argument('--kernel_model', type=str, default='klr', help='kernel model to use.')
 
     # method settings
-    parser.add_argument('--inf_k', type=int, default=None, help='Number of leaves to use for leafinfluence.')
-    parser.add_argument('--maple', action='store_true', default=False, help='Whether to use MAPLE as a baseline.')
-    parser.add_argument('--teknn', action='store_true', default=False, help='Use KNN on top of TREX features.')
+    parser.add_argument('--inf_k', type=int, default=None, help='number of leaves to use for leafinfluence.')
+    parser.add_argument('--maple', action='store_true', default=False, help='whether to use MAPLE as a baseline.')
+    parser.add_argument('--teknn', action='store_true', default=False, help='use KNN on top of TREX features.')
 
     # plot settings
-    parser.add_argument('--check_pct', type=float, default=0.3, help='Max percentage of train instances to check.')
-    parser.add_argument('--n_plot_points', type=int, default=10, help='Number of points to plot.')
+    parser.add_argument('--check_pct', type=float, default=0.3, help='max percentage of train instances to check.')
+    parser.add_argument('--n_plot_points', type=int, default=10, help='number of points to plot.')
 
     # experiment settings
     parser.add_argument('--rs', type=int, default=1, help='random state.')
-    parser.add_argument('--verbose', type=int, default=0, help='Verbosity level.')
+    parser.add_argument('--verbose', type=int, default=0, help='verbosity level.')
 
     args = parser.parse_args()
     main(args)

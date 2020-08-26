@@ -7,6 +7,7 @@ Currently supports: sklearn's RandomForestClassifier and GBMClassifier,
 import os
 import time
 import uuid
+import shutil
 
 import pickle
 import numpy as np
@@ -24,7 +25,7 @@ class TreeExplainer:
 
     def __init__(self, tree, X_train, y_train,
                  kernel_model='klr',
-                 tree_kernel='tree_output',
+                 tree_kernel='leaf_output',
                  C=1.0,
                  val_frac=0.1,
                  pred_size=1000,
@@ -33,6 +34,7 @@ class TreeExplainer:
                  verbose=0,
                  C_grid=[1e-2, 1e-1, 1e0, 1e1, 1e2],
                  logger=None,
+                 cv=5,
                  temp_dir='.trex'):
         """
         Trains an svm on feature representations from a learned tree ensemble.
@@ -60,6 +62,8 @@ class TreeExplainer:
             If False, predicted labels from the tree ensemble are used to train the kernel model.
         random_state : int (default=None)
             Random state to promote reproducibility.
+        random_state : int (default=5)
+            Number of cross-validation folds to use for tuning.
         temp_dir : str (default='.trex')
         """
 
@@ -76,6 +80,7 @@ class TreeExplainer:
         self.verbose = verbose
         self.logger = logger
         self.temp_dir = os.path.join(temp_dir, str(uuid.uuid4()))
+        self.cv = cv
         self._validate()
 
         if logger:
@@ -112,7 +117,7 @@ class TreeExplainer:
             fold = 0
 
             # tune C
-            skf = StratifiedKFold(n_splits=2, shuffle=True, random_state=self.random_state)
+            skf = StratifiedKFold(n_splits=self.cv, shuffle=True, random_state=self.random_state)
             for train_index, test_index in skf.split(X_val_feature, y_val):
                 fold += 1
 
@@ -161,6 +166,12 @@ class TreeExplainer:
 
         if self.logger:
             self.logger.info('total training time: {:.3f}s'.format(time.time() - train_start))
+
+    def __del__(self):
+        """
+        Clean up any temporary directories.
+        """
+        shutil.rmtree(self.temp_dir)
 
     def __str__(self):
         s = '\nTree Explainer:'

@@ -313,7 +313,7 @@ if __name__ == '__main__':
     parser.add_argument('--train_frac', type=float, default=1.0, help='dataset to explain.')
     parser.add_argument('--val_frac', type=float, default=0.1, help='Amount of data for validation.')
     parser.add_argument('--test_frac', type=float, default=1.0, help='dataset to evaluate on.')
-    parser.add_argument('--n_test', type=int, default=None, help='number of test instances.')
+    parser.add_argument('--n_test', type=int, default=50, help='number of test instances.')
 
     # tree settings
     parser.add_argument('--tree_type', type=str, default='cb', help='model to use.')
@@ -322,7 +322,7 @@ if __name__ == '__main__':
 
     # TREX settings
     parser.add_argument('--trex', action='store_true', default=False, help='Use TREX.')
-    parser.add_argument('--tree_kernel', type=str, default='tree_output', help='type of encoding.')
+    parser.add_argument('--tree_kernel', type=str, default='leaf_output', help='type of encoding.')
     parser.add_argument('--kernel_model', type=str, default='klr', help='kernel model to use.')
     parser.add_argument('--true_label', action='store_true', default=False, help='train TREX on the true labels.')
 

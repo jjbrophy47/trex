@@ -1,15 +1,17 @@
-# sbatch jobs/roar/churn/churn1.sh
-# sbatch jobs/roar/churn/churn2.sh
-# sbatch jobs/roar/churn/churn3.sh
+# TREX
+./jobs/roar/trex_primer.sh churn 100 3 3 1440 short
+./jobs/roar/trex_primer.sh amazon 250 5 5 1440 short
+./jobs/roar/trex_primer.sh adult 100 5 6 1440 short
+./jobs/roar/trex_primer.sh census 250 5 15 1440 short
 
-# sbatch jobs/roar/amazon/amazon1.sh
-# sbatch jobs/roar/amazon/amazon2.sh
-# sbatch jobs/roar/amazon/amazon3.sh
+# TEKNN
+./jobs/roar/teknn_primer.sh churn 100 3 3 1440 short
+./jobs/roar/teknn_primer.sh amazon 250 5 5 1440 short
+./jobs/roar/teknn_primer.sh adult 100 5 6 1440 short
+./jobs/roar/teknn_primer.sh census 250 5 15 1440 short
 
-# sbatch jobs/roar/adult/adult1.sh
-# sbatch jobs/roar/adult/adult2.sh
-# sbatch jobs/roar/adult/adult3.sh
-
-sbatch jobs/roar/census/census1.sh
-sbatch jobs/roar/census/census2.sh
-sbatch jobs/roar/census/census3.sh
+# MAPLE
+# ./jobs/roar/maple_primer.sh churn 100 3 3 1440 short
+# ./jobs/roar/maple_primer.sh amazon 250 5 5 1440 short
+# ./jobs/roar/maple_primer.sh adult 100 5 6 1440 short
+# ./jobs/roar/maple_primer.sh census 250 5 15 1440 short
