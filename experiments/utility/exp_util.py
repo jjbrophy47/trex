@@ -47,7 +47,7 @@ def load_model(model_path):
         return pickle.loads(f.read())
 
 
-def tune_knn(tree, X_train, X_train_feature, y_train, val_frac, seed, logger=None):
+def tune_knn(tree, X_train, X_train_feature, y_train, val_frac, seed, logger=None, cv=5):
     """
     Tunes KNN by choosing hyperparameters that give the best pearson
     correlation to the tree predictions.
@@ -74,7 +74,7 @@ def tune_knn(tree, X_train, X_train_feature, y_train, val_frac, seed, logger=Non
     fold = 0
 
     # tune C
-    skf = StratifiedKFold(n_splits=2, shuffle=True, random_state=seed)
+    skf = StratifiedKFold(n_splits=cv, shuffle=True, random_state=seed)
     for train_index, test_index in skf.split(X_val_feature, y_val):
         fold += 1
 

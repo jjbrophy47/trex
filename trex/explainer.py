@@ -167,11 +167,11 @@ class TreeExplainer:
         if self.logger:
             self.logger.info('total training time: {:.3f}s'.format(time.time() - train_start))
 
-    # def __del__(self):
-    #     """
-    #     Clean up any temporary directories.
-    #     """
-    #     shutil.rmtree(self.temp_dir)
+    def __del__(self):
+        """
+        Clean up any temporary directories.
+        """
+        shutil.rmtree(self.temp_dir)
 
     def __str__(self):
         s = '\nTree Explainer:'
