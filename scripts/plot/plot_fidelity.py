@@ -54,8 +54,18 @@ def _plot_graph(args, ax, dataset, method_list, tree_kernel,
         ax.scatter(method_res, tree_res, color=colors[i],
                    label=label, rasterized=True, marker=markers[i])
 
-    ax.legend(loc='upper left')
     ax.tick_params(axis='both', which='major')
+
+    leg = ax.legend(loc='upper right', ncol=2, handletextpad=0.1, framealpha=1.0)
+
+    # Get the bounding box of the original legend
+    bb = leg.get_bbox_to_anchor().inverse_transformed(ax.transAxes)
+
+    # Change to location of the legend.
+    yOffset = 0.3
+    bb.y0 += yOffset
+    bb.y1 += yOffset
+    leg.set_bbox_to_anchor(bb, transform=ax.transAxes)
 
 
 def main(args):
@@ -76,14 +86,14 @@ def main(args):
         plt.rc('ytick', labelsize=11)
         plt.rc('axes', labelsize=11)
         plt.rc('axes', titlesize=11)
-        plt.rc('legend', fontsize=11)
-        plt.rc('legend', title_fontsize=11)
+        plt.rc('legend', fontsize=7)
+        plt.rc('legend', title_fontsize=9)
         plt.rc('lines', linewidth=1)
         plt.rc('lines', markersize=3)
 
         width = 3.25  # Two column style
         width, height = set_size(width=width * 2, fraction=1, subplots=(2, 2))
-        fig, axs = plt.subplots(2, 2, figsize=(width, height),
+        fig, axs = plt.subplots(2, 2, figsize=(width, height * 1.15),
                                 sharey='row', sharex='col')
 
     else:
@@ -106,7 +116,7 @@ def main(args):
     for i, dataset in enumerate(args.dataset):
         _plot_graph(args, axs[i], dataset, method_list, args.tree_kernel,
                     labels, colors, markers, corr=args.corr)
-        axs[i].set_title(dataset.capitalize())
+        axs[i].set_title(dataset.capitalize(), loc='left')
 
         if args.two_col:
             if i % 2 == 0:
@@ -117,11 +127,12 @@ def main(args):
             axs[i].set_xlabel(xlabel)
     axs[0].set_ylabel(ylabel)
 
+    # fig.subplots_adjust(wspace=0.005, hspace=0.005)
+    plt.tight_layout()
+
     out_dir = os.path.join(args.out_dir, args.tree_kernel)
     os.makedirs(out_dir, exist_ok=True)
 
-    fig.subplots_adjust(wspace=0.005, hspace=0.005)
-    plt.tight_layout()
     plt.savefig(os.path.join(out_dir, 'plot.{}'.format(args.ext)))
 
 

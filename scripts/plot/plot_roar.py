@@ -66,8 +66,6 @@ def get_results(args, dataset, method, score_ndx=0):
 def main(args):
     print(args)
 
-    args.in_dir = os.path.join(args.in_dir, 'roar')
-
     method_list = ['random', 'maple', 'teknn', 'klr']
     colors = ['red', 'orange', 'purple', 'blue', 'green']
     labels = ['Random', 'MAPLE', 'TEKNN', 'TREX', 'TREX-SVM']
@@ -164,11 +162,11 @@ if __name__ == '__main__':
 
     parser.add_argument('--dataset', type=str, nargs='+', default=['churn', 'amazon', 'adult', 'census'],
                         help='dataset to explain.')
-    parser.add_argument('--in_dir', type=str, default='output/', help='input directory.')
+    parser.add_argument('--in_dir', type=str, default='output/roar/', help='input directory.')
     parser.add_argument('--out_dir', type=str, default='output/plots/roar/', help='output directory.')
 
     parser.add_argument('--tree_type', type=str, default='cb', help='tree type.')
-    parser.add_argument('--tree_kernel', type=str, default='tree_output', help='tree kernel.')
+    parser.add_argument('--tree_kernel', type=str, default='leaf_output', help='tree kernel.')
 
     parser.add_argument('--metric', type=str, default='acc', help='predictive metric.')
     parser.add_argument('--two_col', action='store_true', default=False, help='format into two columns.')
@@ -178,18 +176,3 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
     main(args)
-
-
-class Args:
-
-    dataset = ['churn', 'amazon', 'adult', 'census']
-    in_dir = 'output/roar/'
-    out_dir = 'output/plots/roar/'
-
-    tree_type = 'cb'
-    tree_kernel = 'tree_output'
-
-    metric = 'acc'
-    rs = [1]
-    ext = 'png'
-    verbose = 0
