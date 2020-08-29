@@ -6,6 +6,7 @@
 *cb_model.json
 
 myenv
+newenv
 testenv
 
 dist
@@ -21,3 +22,7 @@ supplemental
 temp_output2
 
 notes
+
+trex/models/liblinear/*.o
+trex/models/liblinear/train
+trex/models/liblinear/predict
