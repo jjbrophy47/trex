@@ -44,7 +44,7 @@ def main(args):
 
         width = 3.25  # Two column style
         width, height = set_size(width=width * 2, fraction=1, subplots=(2, 2))
-        fig, axs = plt.subplots(2, 2, figsize=(width, height))
+        fig, axs = plt.subplots(2, 2, figsize=(width, height * 1.15))
 
     else:
         # matplotlib settings
@@ -133,7 +133,7 @@ def main(args):
             weights=train_sim_weight[train_neg_ndx],
             label='neg samples')
     ax.axvline(test_val, color='k', linestyle='--')
-    ax.legend()
+    ax.legend(frameon=False)
     ax.set_ylabel('Density')
     ax.set_xlabel(feature_name.capitalize())
     ax.set_title(r'Weighted by $\alpha * \gamma$')
@@ -149,7 +149,7 @@ def main(args):
     if not args.two_col:
         fig.subplots_adjust(wspace=0.25, hspace=0.05)
 
-    plt.savefig(os.path.join(out_dir, 'plot.{}'.format(args.ext)))
+    plt.savefig(os.path.join(out_dir, 'misclassification.{}'.format(args.ext)))
 
 
 if __name__ == '__main__':
@@ -161,7 +161,7 @@ if __name__ == '__main__':
     parser.add_argument('--out_dir', type=str, default='output/plots/misclassification/', help='output directory.')
 
     parser.add_argument('--tree_type', type=str, default='cb', help='tree type.')
-    parser.add_argument('--tree_kernel', type=str, default='tree_output', help='tree kernel.')
+    parser.add_argument('--tree_kernel', type=str, default='leaf_output', help='tree kernel.')
 
     # plot settings
     parser.add_argument('--alpha', type=float, default=0.5, help='transparency value.')
@@ -174,21 +174,3 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
     main(args)
-
-
-class Args:
-
-    dataset = ['churn', 'amazon', 'adult', 'census']
-    in_dir = 'output/roar/'
-    out_dir = 'output/plots/roar/'
-
-    tree_type = 'cb'
-    tree_kernel = 'tree_output'
-
-    alpha = 0.5
-    rasterize = False
-
-    metric = 'acc'
-    rs = [1]
-    ext = 'png'
-    verbose = 0

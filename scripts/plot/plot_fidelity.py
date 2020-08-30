@@ -56,15 +56,18 @@ def _plot_graph(args, ax, dataset, method_list, tree_kernel,
 
     ax.tick_params(axis='both', which='major')
 
-    leg = ax.legend(loc='upper right', ncol=2, handletextpad=0.1, framealpha=1.0)
+    leg = ax.legend(loc='upper right', ncol=2, handletextpad=0.05, framealpha=1.0)
 
     # Get the bounding box of the original legend
     bb = leg.get_bbox_to_anchor().inverse_transformed(ax.transAxes)
 
     # Change to location of the legend.
-    yOffset = 0.3
+    yOffset = 0.25
+    xOffset = 0.01
     bb.y0 += yOffset
     bb.y1 += yOffset
+    bb.x0 += xOffset
+    bb.x1 += xOffset
     leg.set_bbox_to_anchor(bb, transform=ax.transAxes)
 
 
@@ -86,14 +89,14 @@ def main(args):
         plt.rc('ytick', labelsize=11)
         plt.rc('axes', labelsize=11)
         plt.rc('axes', titlesize=11)
-        plt.rc('legend', fontsize=7)
+        plt.rc('legend', fontsize=8)
         plt.rc('legend', title_fontsize=9)
         plt.rc('lines', linewidth=1)
         plt.rc('lines', markersize=3)
 
-        width = 3.25  # Two column style
+        width = 3.45  # Two column style
         width, height = set_size(width=width * 2, fraction=1, subplots=(2, 2))
-        fig, axs = plt.subplots(2, 2, figsize=(width, height * 1.15),
+        fig, axs = plt.subplots(2, 2, figsize=(width, height * 1.25),
                                 sharey='row', sharex='col')
 
     else:
@@ -127,13 +130,12 @@ def main(args):
             axs[i].set_xlabel(xlabel)
     axs[0].set_ylabel(ylabel)
 
-    # fig.subplots_adjust(wspace=0.005, hspace=0.005)
     plt.tight_layout()
 
     out_dir = os.path.join(args.out_dir, args.tree_kernel)
     os.makedirs(out_dir, exist_ok=True)
 
-    plt.savefig(os.path.join(out_dir, 'plot.{}'.format(args.ext)))
+    plt.savefig(os.path.join(out_dir, 'fidelity_{}.{}'.format(args.tree_kernel, args.ext)))
 
 
 if __name__ == '__main__':
@@ -155,19 +157,3 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
     main(args)
-
-
-class Args:
-
-    dataset = ['churn', 'amazon', 'adult', 'census']
-    in_dir = 'output/fidelity/'
-    out_dir = 'output/plots/fidelity/'
-
-    tree_type = 'cb'
-    tree_kernel = 'tree_output'
-
-    two_col = False
-    corr = 'pearson'
-
-    ext = 'png'
-    verbose = 0

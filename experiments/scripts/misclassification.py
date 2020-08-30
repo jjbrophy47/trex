@@ -480,17 +480,17 @@ if __name__ == '__main__':
     # tree ensemble settings
     parser.add_argument('--tree_type', type=str, default='cb', help='model to use.')
     parser.add_argument('--n_estimators', type=int, default=100, help='number of trees.')
-    parser.add_argument('--max_depth', type=int, default=None, help='maximum depth.')
+    parser.add_argument('--max_depth', type=int, default=5, help='maximum depth.')
 
     # TREX settings
-    parser.add_argument('--tree_kernel', type=str, default='tree_output', help='type of encoding.')
+    parser.add_argument('--tree_kernel', type=str, default='leaf_output', help='type of encoding.')
     parser.add_argument('--kernel_model', type=str, default='klr', help='kernel model to use.')
     parser.add_argument('--val_frac', type=float, default=0.1, help='amount of validation data.')
     parser.add_argument('--true_label', action='store_true', default=False, help='train TREX on the true labels.')
 
     # extra settings
     parser.add_argument('--ext', type=str, default='png', help='output image format.')
-    parser.add_argument('--rs', type=int, default=1, help='random state.')
+    parser.add_argument('--rs', type=int, default=4, help='random state.')
     parser.add_argument('--verbose', type=int, default=0, help='Verbosity level.')
 
     args = parser.parse_args()
