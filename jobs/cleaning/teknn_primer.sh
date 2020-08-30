@@ -8,7 +8,7 @@ time=$7
 partition=$8
 
 rs_list=(1 2 3 4 5)
-tree_kernel_list=('leaf_output' 'tree_output' 'leaf_path')
+tree_kernel_list=('leaf_output')
 
 for rs in ${rs_list[@]}; do
     for tree_kernel in ${tree_kernel_list[@]}; do

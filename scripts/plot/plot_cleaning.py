@@ -67,9 +67,6 @@ def get_results(dataset, method, args):
 def main(args):
     print(args)
 
-    # add specific cleaning output directory
-    args.in_dir = os.path.join(args.in_dir, 'cleaning')
-
     # settings
     method_list = ['klr', 'svm', 'random',
                    'tree', 'klr_loss', 'svm_loss',
@@ -163,7 +160,7 @@ if __name__ == '__main__':
 
     parser.add_argument('--dataset', type=str, nargs='+', default=['churn', 'amazon', 'adult',
                         'census_0p1', 'census'], help='dataset to explain.')
-    parser.add_argument('--in_dir', type=str, default='output/', help='input directory.')
+    parser.add_argument('--in_dir', type=str, default='output/cleaning/', help='input directory.')
     parser.add_argument('--out_dir', type=str, default='output/plots/cleaning/', help='output directory.')
 
     parser.add_argument('--tree_type', type=str, default='cb', help='tree type.')
@@ -175,17 +172,3 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
     main(args)
-
-
-class Args:
-
-    dataset = ['churn', 'amazon', 'adult', 'census']
-    in_dir = 'output/cleaning/'
-    out_dir = 'output/plots/cleaning/'
-
-    tree_type = 'cb'
-    tree_kernel = 'tree_output'
-
-    rs = [1]
-    ext = 'png'
-    verbose = 0
