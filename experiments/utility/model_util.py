@@ -1,6 +1,8 @@
 """
 Utility methods to make life easier.
 """
+import os
+import uuid
 import warnings
 warnings.simplefilter(action='ignore', category=UserWarning)  # lgb compiler warning
 
@@ -20,8 +22,10 @@ def get_classifier(model, n_estimators=20, max_depth=None, learning_rate=0.03, r
                                       max_depth=max_depth)
     elif model == 'cb':
         import catboost
+        train_dir = os.path.join('.catboost_info', str(uuid.uuid4()))
+        os.makedirs(train_dir, exist_ok=True)
         clf = catboost.CatBoostClassifier(random_state=random_state, n_estimators=n_estimators,
-                                          max_depth=max_depth, verbose=False)
+                                          max_depth=max_depth, verbose=False, train_dir=train_dir)
     elif model == 'rf':
         clf = RandomForestClassifier(random_state=random_state, n_estimators=n_estimators,
                                      max_depth=max_depth)
