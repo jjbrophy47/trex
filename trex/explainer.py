@@ -310,7 +310,7 @@ class TreeExplainer:
         contributions_list = []
         for i in range(0, len(X), self.pred_size):
             X_sub = self.transform(X[i: i + self.pred_size])
-            y_sub = y[i: i + self.pred_size]
+            y_sub = y[i: i + self.pred_size] if y is not None else None
             contributions_list.append(self.kernel_model_.explain(X_sub, y=y_sub))
 
         contributions = np.vstack(contributions_list)
