@@ -19,7 +19,6 @@ import tqdm
 import numpy as np
 from sklearn.base import clone
 from sklearn.metrics import roc_auc_score, accuracy_score
-from sklearn.model_selection import StratifiedShuffleSplit
 
 import trex
 from utility import model_util
@@ -33,6 +32,8 @@ trex_explainer = None
 maple_explainer = None
 teknn_explainer = None
 teknn_extractor = None
+
+MAX_SEED_INCREASE = 1000
 
 
 def _measure_performance(sort_indices, percentages, X_test, y_test, X_train, y_train, clf):
@@ -207,16 +208,22 @@ def experiment(args, logger, out_dir, seed):
         X_train, y_train = X_train[train_indices], y_train[train_indices]
 
     # use part of the test data for evaluation
-    if args.test_frac < 1.0 and args.test_frac > 0.0:
-        n_test_samples = int(X_test.shape[0] * args.test_frac)
-        np.random.seed(seed)
-        test_indices = np.random.choice(X_test.shape[0], size=n_test_samples, replace=False)
-        X_test, y_test = X_test[test_indices], y_test[test_indices]
+    n_test_samples = args.n_test if args.n_test is not None else int(X_test.shape[0] * args.test_frac)
+    np.random.seed(seed)
+    test_indices = np.random.choice(X_test.shape[0], size=n_test_samples, replace=False)
+    X_test_sub, y_test_sub = X_test[test_indices], y_test[test_indices]
 
-    elif args.n_test is not None:
-        sss = StratifiedShuffleSplit(n_splits=1, test_size=args.n_test, random_state=seed)
-        _, test_indices = list(sss.split(X_test, y_test))[0]
-        X_test, y_test = X_test[test_indices], y_test[test_indices]
+    # choose new subset if test subset all contain the same label
+    new_seed = seed
+    while y_test_sub.sum() == len(y_test_sub) or y_test_sub.sum() == 0:
+        np.random.seed(new_seed)
+        new_seed += np.random.randint(MAX_SEED_INCREASE)
+        np.random.seed(new_seed)
+        test_indices = np.random.choice(X_test.shape[0], size=n_test_samples, replace=False)
+        X_test_sub, y_test_sub = X_test[test_indices], y_test[test_indices]
+
+    X_test = X_test_sub
+    y_test = y_test_sub
 
     logger.info('no. train instances: {:,}'.format(len(X_train)))
     logger.info('no. test instances: {:,}'.format(len(X_test)))
@@ -338,30 +345,3 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
     main(args)
-
-
-class Args:
-    dataset = 'adult'
-    data_dir = 'data'
-    out_dir = 'output/roar/'
-
-    train_frac = 1.0
-    val_frac = 0.1
-    test_frac = 1.0
-    n_test = None
-
-    tree_type = 'cb'
-    n_estimators = 100
-    max_depth = None
-
-    trex = True
-    tree_kernel = 'tree_output'
-    kernel_model = 'klr'
-    true_label = False
-
-    teknn = False
-    inf_k = None
-    maple = False
-
-    rs = [1]
-    verbose = 0
