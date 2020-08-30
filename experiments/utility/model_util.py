@@ -5,9 +5,6 @@ import warnings
 warnings.simplefilter(action='ignore', category=UserWarning)  # lgb compiler warning
 
 import numpy as np
-import catboost
-import lightgbm
-import xgboost
 from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
 from sklearn.metrics import accuracy_score, log_loss, roc_auc_score
 
@@ -17,10 +14,12 @@ def get_classifier(model, n_estimators=20, max_depth=None, learning_rate=0.03, r
 
     # create model
     if model == 'lgb':
+        import lightgbm
         max_depth = -1 if max_depth is None else max_depth
         clf = lightgbm.LGBMClassifier(random_state=random_state, n_estimators=n_estimators,
                                       max_depth=max_depth)
     elif model == 'cb':
+        import catboost
         clf = catboost.CatBoostClassifier(random_state=random_state, n_estimators=n_estimators,
                                           max_depth=max_depth, verbose=False)
     elif model == 'rf':
@@ -31,6 +30,7 @@ def get_classifier(model, n_estimators=20, max_depth=None, learning_rate=0.03, r
         clf = GradientBoostingClassifier(random_state=random_state, n_estimators=n_estimators,
                                          max_depth=max_depth)
     elif model == 'xgb':
+        import xgboost
         max_depth = 3 if max_depth is None else max_depth  # xgb default
         clf = xgboost.XGBClassifier(random_state=random_state, n_estimators=n_estimators,
                                     max_depth=max_depth)

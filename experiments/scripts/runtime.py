@@ -279,7 +279,7 @@ if __name__ == '__main__':
 
     # TREX settings
     parser.add_argument('--trex', action='store_true', default=False, help='TREX method.')
-    parser.add_argument('--tree_kernel', type=str, default='tree_output', help='Type of encoding.')
+    parser.add_argument('--tree_kernel', type=str, default='leaf_output', help='Type of encoding.')
     parser.add_argument('--kernel_model', type=str, default='klr', help='Kernel model to use.')
     parser.add_argument('--true_label', action='store_true', default=False, help='Train TREX on the true labels.')
 
@@ -295,29 +295,3 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
     main(args)
-
-
-class Args:
-    dataset = 'mfc19_mfc20'
-    data_dir = 'data'
-    out_dir = 'output/runtime/'
-
-    train_frac = 1.0
-    val_frac = 0.1
-
-    tree_type = 'cb'
-    n_estimators = 100
-    max_depth = None
-
-    trex = True
-    tree_kernel = 'tree_output'
-    kernel_model = 'klr'
-    true_label = False
-
-    teknn = False
-    inf_k = None
-    maple = False
-    dstump = True
-
-    rs = 1
-    verbose = 0
