@@ -333,7 +333,7 @@ class BinaryKernelLogisticRegression(BaseEstimator, ClassifierMixin):
         if not np.allclose(pred_proba[:n_check][:, 1], self.predict_proba(X[:n_check])[:, 1], atol=atol):
             print('KLR PREDICTIONS NOT ALL CLOSE!, ATOL={}'.format(atol))
             print(pred_proba[:n_check][:, 1])
-            print(self.predict_proba(X[:n_check][:, 1]))
+            print(self.predict_proba(X[:n_check])[:, 1])
 
         return self
 

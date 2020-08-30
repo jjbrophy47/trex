@@ -19,6 +19,7 @@ import tqdm
 import numpy as np
 from sklearn.base import clone
 from sklearn.metrics import roc_auc_score, accuracy_score
+from sklearn.model_selection import StratifiedShuffleSplit
 
 import trex
 from utility import model_util
@@ -213,8 +214,8 @@ def experiment(args, logger, out_dir, seed):
         X_test, y_test = X_test[test_indices], y_test[test_indices]
 
     elif args.n_test is not None:
-        np.random.seed(seed)
-        test_indices = np.random.choice(X_test.shape[0], size=args.n_test, replace=False)
+        sss = StratifiedShuffleSplit(n_splits=1, test_size=args.n_test, random_state=seed)
+        _, test_indices = list(sss.split(X_test, y_test))[0]
         X_test, y_test = X_test[test_indices], y_test[test_indices]
 
     logger.info('no. train instances: {:,}'.format(len(X_train)))
