@@ -19,11 +19,15 @@ import tqdm
 import numpy as np
 from sklearn.base import clone
 from sklearn.metrics import accuracy_score
+from sklearn.metrics.pairwise import rbf_kernel
 
 import trex
 from utility import model_util, data_util, exp_util, print_util
 from influence_boosting.influence.leaf_influence import CBLeafInfluenceEnsemble
 from maple.MAPLE import MAPLE
+from mmd_critic import mmd
+
+N_PROTOTYPES = 10
 
 
 def _interval_performance(ckpt_ndx, fix_ndx, noisy_ndx, clf, data, acc_test_noisy):
@@ -79,6 +83,9 @@ def _record_fixes(train_order, noisy_ndx, train_len, interval):
 
 
 def _our_method(explainer, noisy_ndx, y_train, n_check, interval):
+    """
+    Order instnces by largest absolute values of TREX weights.
+    """
 
     train_weight = explainer.get_weight()[0]
     train_order = np.argsort(np.abs(train_weight))[::-1][:n_check]
@@ -88,7 +95,9 @@ def _our_method(explainer, noisy_ndx, y_train, n_check, interval):
 
 
 def _random_method(noisy_ndx, y_train, interval, to_check=1, random_state=1):
-    """Randomly picks train instances from the train data."""
+    """
+    Randomly picks train instances from the train data.
+    """
 
     n_train = len(y_train)
 
@@ -105,7 +114,9 @@ def _random_method(noisy_ndx, y_train, interval, to_check=1, random_state=1):
 
 
 def _loss_method(noisy_ndx, y_train_proba, y_train, interval, to_check=1, logloss=False):
-    """Sorts train instances by largest train loss."""
+    """
+    Sorts train instances by largest train loss.
+    """
 
     n_train = len(y_train)
 
@@ -164,6 +175,9 @@ def _influence_method(explainer, noisy_ndx, X_train, y_train, y_train_noisy, int
 
 
 def _maple_method(explainer, X_train, noisy_ndx, interval, to_check=1):
+    """
+    Orders instances by tree kernel similarity density.
+    """
 
     n_train = X_train.shape[0]
 
@@ -205,6 +219,26 @@ def _knn_method(knn_clf, X_train, noisy_ndx, interval, to_check=1):
     train_order = np.argsort(train_impact)[::-1][:n_check]
     ckpt_ndx, fix_ndx = _record_fixes(train_order, noisy_ndx, n_train, interval)
     return ckpt_ndx, fix_ndx, train_order
+
+
+def _mmd_method(X_train, y_train, noisy_ndx, interval, n_check):
+    """
+    Orders instances by prototypes and/or criticisms.
+    """
+    n_prototypes = N_PROTOTYPES
+    n_criticisms = n_check
+
+    X = np.hstack([X_train, y_train.reshape(-1, 1)])
+    K = rbf_kernel(X)
+    candidates = np.arange(len(K))
+
+    prototypes = mmd.greedy_select_protos(K, candidates, n_prototypes)
+    criticisms = mmd.select_criticism_regularized(K, prototypes, n_criticisms, is_K_sparse=False)
+
+    train_order = criticisms[:n_check]
+    ckpt_ndx, fix_ndx = _record_fixes(train_order, noisy_ndx, len(y_train), interval)
+
+    return ckpt_ndx, fix_ndx
 
 
 def experiment(args, logger, out_dir, seed):
@@ -280,7 +314,7 @@ def experiment(args, logger, out_dir, seed):
     np.save(os.path.join(out_dir, 'check_pct.npy'), check_pct)
 
     # tree loss method
-    logger.info('ordering by tree loss...')
+    logger.info('\nordering by tree loss...')
     start = time.time()
 
     y_train_proba = model_noisy.predict_proba(X_train)
@@ -389,6 +423,16 @@ def experiment(args, logger, out_dir, seed):
         logger.info('time: {:3f}s'.format(time.time() - start))
         np.save(os.path.join(out_dir, 'method_loss.npy'), teknn_loss_res)
 
+    # MMD-Critic method
+    if args.mmd:
+        logger.info('\nordering by mmd-critic...')
+        start = time.time()
+        ckpt_ndx, fix_ndx = _mmd_method(X_train, y_train_noisy, noisy_ndx, interval, n_check)
+        _, mmd_res = _interval_performance(ckpt_ndx, fix_ndx, noisy_ndx, clf, data, acc_test_noisy)
+
+        logger.info('time: {:3f}s'.format(time.time() - start))
+        np.save(os.path.join(out_dir, 'method.npy'), mmd_res)
+
 
 def main(args):
 
@@ -409,6 +453,8 @@ def main(args):
         out_dir = os.path.join(out_dir, 'maple')
     elif args.inf_k is not None:
         out_dir = os.path.join(out_dir, 'leaf_influence')
+    elif args.mmd is not None:
+        out_dir = os.path.join(out_dir, 'mmd')
 
     os.makedirs(out_dir, exist_ok=True)
     logger = print_util.get_logger(os.path.join(out_dir, 'log.txt'))
@@ -450,6 +496,7 @@ if __name__ == '__main__':
     parser.add_argument('--inf_k', type=int, default=None, help='number of leaves to use for leafinfluence.')
     parser.add_argument('--maple', action='store_true', default=False, help='whether to use MAPLE as a baseline.')
     parser.add_argument('--teknn', action='store_true', default=False, help='use KNN on top of TREX features.')
+    parser.add_argument('--mmd', action='store_true', default=False, help='MMD-Critic prototypes.')
 
     # plot settings
     parser.add_argument('--check_pct', type=float, default=0.3, help='max percentage of train instances to check.')

@@ -140,7 +140,7 @@ def main(args):
                 ax.set_xlabel(xlabel)
 
         if i == 1:
-            ax.legend()
+            ax.legend(frameon=False)
 
         ax.set_title(dataset.capitalize())
         ax.tick_params(axis='both', which='major')
@@ -170,7 +170,7 @@ if __name__ == '__main__':
 
     parser.add_argument('--metric', type=str, default='acc', help='predictive metric.')
     parser.add_argument('--two_col', action='store_true', default=False, help='format into two columns.')
-    parser.add_argument('--rs', type=int, nargs='+', default=[1, 2, 3, 4, 5], help='random states.')
+    parser.add_argument('--rs', type=int, nargs='+', default=list(range(20)), help='random states.')
     parser.add_argument('--ext', type=str, default='png', help='output image format.')
     parser.add_argument('--verbose', type=int, default=1, help='verbosity level.')
 

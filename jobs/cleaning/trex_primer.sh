@@ -18,7 +18,7 @@ for rs in ${rs_list[@]}; do
             sbatch --mem=${mem}G \
                    --time=$time \
                    --partition=$partition \
-                   --job-name=C_TREX_$dataset \
+                   --job-name=C_TX_$dataset \
                    --output=jobs/logs/cleaning/$dataset \
                    --error=jobs/errors/cleaning/$dataset \
                    jobs/cleaning/trex_runner.sh $dataset $n_estimators \

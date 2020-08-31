@@ -14,7 +14,7 @@ for rs in {0..19}; do
             sbatch --mem=${mem}G \
                    --time=$time \
                    --partition=$partition \
-                   --job-name=R_TREX_$dataset \
+                   --job-name=R_TX_$dataset \
                    --output=jobs/logs/roar/$dataset \
                    --error=jobs/errors/roar/$dataset \
                    jobs/roar/trex_runner.sh $dataset $n_estimators \
