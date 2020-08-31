@@ -442,7 +442,7 @@ if __name__ == '__main__':
 
     # TREX settings
     parser.add_argument('--trex', action='store_true', default=False, help='use TREX.')
-    parser.add_argument('--tree_kernel', type=str, default='tree_output', help='type of encoding.')
+    parser.add_argument('--tree_kernel', type=str, default='leaf_output', help='type of encoding.')
     parser.add_argument('--true_label', action='store_true', default=False, help='train model on true labels.')
     parser.add_argument('--kernel_model', type=str, default='klr', help='kernel model to use.')
 
@@ -461,34 +461,3 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
     main(args)
-
-
-class Args:
-    dataset = 'adult'
-    data_dir = 'data'
-    out_dir = 'output/cleaning/'
-
-    train_frac = 1.0
-    val_frac = 0.1
-    flip_frac = 0.4
-
-    tree_type = 'cb'
-    n_estimators = 100
-    max_depth = None
-
-    trex = True
-    tree_kernel = 'tree_output'
-    true_label = False
-    kernel_model = 'klr'
-    kernel_model_loss = False
-
-    check_pct = 0.3
-    n_plot_points = 10
-
-    inf_k = None
-    maple = False
-    teknn = False
-    teknn_loss = False
-
-    rs = 1
-    verbose = 0

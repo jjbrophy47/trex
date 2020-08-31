@@ -86,7 +86,6 @@ def get_mean(args, r, name='fine_tune'):
 
 def main(args):
     print(args)
-    args.in_dir = os.path.join(args.in_dir, 'runtime')
 
     # make logger
     out_dir = os.path.join(args.out_dir, args.tree_kernel)
@@ -121,7 +120,7 @@ if __name__ == '__main__':
 
     parser.add_argument('--dataset', type=str, nargs='+', default=['churn', 'amazon', 'adult', 'census'],
                         help='dataset to explain.')
-    parser.add_argument('--in_dir', type=str, default='output/', help='input directory.')
+    parser.add_argument('--in_dir', type=str, default='output/runtime/', help='input directory.')
     parser.add_argument('--out_dir', type=str, default='output/prints/runtime/', help='output directory.')
 
     parser.add_argument('--tree_type', type=str, default='cb', help='tree type.')
