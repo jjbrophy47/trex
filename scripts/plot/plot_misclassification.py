@@ -44,7 +44,7 @@ def main(args):
 
         width = 3.25  # Two column style
         width, height = set_size(width=width * 2, fraction=1, subplots=(2, 2))
-        fig, axs = plt.subplots(2, 2, figsize=(width, height * 1.15))
+        fig, axs = plt.subplots(2, 2, figsize=(width, height * 1.25))
 
     else:
         # matplotlib settings
@@ -168,7 +168,7 @@ if __name__ == '__main__':
     parser.add_argument('--rasterize', action='store_true', default=False, help='rasterize dense instance plots.')
 
     parser.add_argument('--two_col', action='store_true', default=False, help='format into two columns.')
-    parser.add_argument('--rs', type=int, default=1, help='random state.')
+    parser.add_argument('--rs', type=int, default=4, help='random state.')
     parser.add_argument('--ext', type=str, default='png', help='output image format.')
     parser.add_argument('--verbose', type=int, default=1, help='verbosity level.')
 

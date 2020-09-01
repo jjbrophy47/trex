@@ -9,9 +9,7 @@ n_estimators=$2
 max_depth=$3
 check_pct=$4
 train_frac=$5
-kernel_model=$6
-tree_kernel=$7
-rs=$8
+rs=$6
 
 python3 experiments/scripts/cleaning.py \
   --mmd \

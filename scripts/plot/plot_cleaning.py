@@ -74,8 +74,8 @@ def main(args):
                    'teknn_loss']
     labels = ['TREX-KLR', 'TREX-SVM', 'Random',
               'Tree Loss', 'KLR Loss', 'SVM Loss',
-              'MAPLE', 'LeafInfluence', 'TE-KNN',
-              'TE-KNN Loss']
+              'MAPLE', 'LeafInfluence', 'TEKNN',
+              'TEKNN Loss']
     colors = ['blue', 'cyan', 'red', 'green', 'purple', 'magenta', 'orange',
               'black', 'yellow', '#EEC64F', 'g', 'r']
     markers = ['1', '2', 'o', 'v', '^', '<', '>', '.', '*', 'h', '3', '4']
@@ -96,7 +96,7 @@ def main(args):
     width = 5.5  # Neurips 2020
     width, height = set_size(width=width * 3, fraction=1, subplots=(1, 3))
 
-    fig, axs = plt.subplots(1, max(2, len(args.dataset)), figsize=(width, height))
+    fig, axs = plt.subplots(1, max(2, len(args.dataset)), figsize=(width, height * 1.15))
     axs = axs.flatten()
 
     lines = []
@@ -124,9 +124,6 @@ def main(args):
                 line = ax.errorbar(check_pct, res_mean, yerr=res_std,
                                    marker=markers[j], color=colors[j],
                                    zorder=zorders[j])
-
-                # if dataset == 'census':
-                #     ax.set_ylim(bottom=0.935, top=0.96)
 
                 if i == 0:
                     lines.append(line[0])

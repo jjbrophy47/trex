@@ -87,7 +87,7 @@ def main(args):
 
         width = 3.25  # Two column style
         width, height = set_size(width=width * 2, fraction=1, subplots=(2, 2))
-        fig, axs = plt.subplots(2, 2, figsize=(width, height), sharex='col')
+        fig, axs = plt.subplots(2, 2, figsize=(width, height * 1.15), sharex='col')
 
     else:
         plt.rc('xtick', labelsize=17)
@@ -153,7 +153,7 @@ def main(args):
     if not args.two_col:
         fig.subplots_adjust(wspace=0.25, hspace=0.05)
 
-    plt.savefig(os.path.join(out_dir, 'plot.{}'.format(args.ext)))
+    plt.savefig(os.path.join(out_dir, 'roar.{}'.format(args.ext)))
 
 
 if __name__ == '__main__':
