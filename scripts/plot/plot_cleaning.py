@@ -71,15 +71,15 @@ def main(args):
     method_list = ['klr', 'svm', 'random',
                    'tree', 'klr_loss', 'svm_loss',
                    'maple', 'leaf_influence', 'teknn',
-                   'teknn_loss']
+                   'teknn_loss', 'proto']
     labels = ['TREX-KLR', 'TREX-SVM', 'Random',
               'Tree Loss', 'KLR Loss', 'SVM Loss',
               'MAPLE', 'LeafInfluence', 'TEKNN',
-              'TEKNN Loss']
+              'TEKNN Loss', 'TreeProto']
     colors = ['blue', 'cyan', 'red', 'green', 'purple', 'magenta', 'orange',
-              'black', 'yellow', '#EEC64F', 'g', 'r']
-    markers = ['1', '2', 'o', 'v', '^', '<', '>', '.', '*', 'h', '3', '4']
-    zorders = [10, 9, 8, 1, 2, 3, 4, 5, 6, 7]
+              'black', 'yellow', '#EEC64F', 'g', 'r', 'brown']
+    markers = ['1', '2', 'o', 'v', '^', '<', '>', '.', '*', 'h', '3', '4', '5']
+    zorders = [10, 9, 8, 1, 2, 3, 4, 5, 6, 7, 0]
 
     # matplotlib settings
     plt.rc('font', family='serif')
@@ -118,6 +118,9 @@ def main(args):
 
         for j, method in enumerate(method_list):
             res = get_results(dataset, method, args)
+
+            print(method)
+            print(res[0].shape)
 
             if res is not None:
                 res_mean, res_std = res

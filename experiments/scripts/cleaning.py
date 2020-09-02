@@ -272,7 +272,7 @@ def _proto_method(model, X_train, y_train, noisy_ndx, interval, n_check):
 
     # rank training instances by low label agreement with its neighbors
     train_order = np.argsort(train_impact)[:n_check]
-    ckpt_ndx, fix_ndx = _record_fixes(train_order, noisy_ndx, n_check, interval)
+    ckpt_ndx, fix_ndx = _record_fixes(train_order, noisy_ndx, len(y_train), interval)
 
     os.system('rm {}'.format(temp_fp))
 
