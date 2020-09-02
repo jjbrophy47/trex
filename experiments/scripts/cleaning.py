@@ -9,6 +9,7 @@ from datetime import datetime
 from copy import deepcopy
 import os
 import sys
+import json
 import warnings
 warnings.simplefilter(action='ignore', category=UserWarning)  # lgb compiler warning
 here = os.path.abspath(os.path.dirname(__file__))
@@ -20,6 +21,7 @@ import numpy as np
 from sklearn.base import clone
 from sklearn.metrics import accuracy_score
 from sklearn.metrics.pairwise import rbf_kernel
+from sklearn.neighbors import KNeighborsClassifier
 
 import trex
 from utility import model_util, data_util, exp_util, print_util
@@ -27,6 +29,7 @@ from influence_boosting.influence.leaf_influence import CBLeafInfluenceEnsemble
 from maple.MAPLE import MAPLE
 from mmd_critic import mmd
 
+TREE_PROTO_K = 10
 N_PROTOTYPES = 10
 
 
@@ -86,7 +89,6 @@ def _our_method(explainer, noisy_ndx, y_train, n_check, interval):
     """
     Order instnces by largest absolute values of TREX weights.
     """
-
     train_weight = explainer.get_weight()[0]
     train_order = np.argsort(np.abs(train_weight))[::-1][:n_check]
     ckpt_ndx, fix_ndx = _record_fixes(train_order, noisy_ndx, len(y_train), interval)
@@ -221,7 +223,60 @@ def _knn_method(knn_clf, X_train, noisy_ndx, interval, to_check=1):
     return ckpt_ndx, fix_ndx, train_order
 
 
-def _mmd_method(X_train, y_train, noisy_ndx, interval, n_check):
+def _proto_method(model, X_train, y_train, noisy_ndx, interval, n_check):
+    """
+    Orders instances by using the GBT distance similarity formula in
+    https://arxiv.org/pdf/1611.07115.pdf, then ranks training samples
+    based on the proportion of labels from the k = 10, nearest neighbors.
+    """
+    extractor = trex.TreeExtractor(model, tree_kernel='leaf_path')
+    X_train_alt = extractor.fit_transform(X_train)
+
+    # obtain weight of each tree: note, this code is specific to CatBoost
+    temp_fp = '.temp_cb.json'
+    model.save_model(temp_fp, format='json')
+    cb_dump = json.load(open(temp_fp, 'r'))
+
+    # obtain weight of each tree: learning_rate^2 * var(predictions)
+    tree_weights = []
+    for tree in cb_dump['oblivious_trees']:
+        predictions = []
+
+        for val, weight in zip(tree['leaf_values'], tree['leaf_weights']):
+            predictions += [val] * weight
+
+        tree_weights.append(np.var(predictions) * (model.learning_rate_ ** 2))
+
+    # weight leaf path feature representation by the tree weights
+    for i in range(X_train_alt.shape[0]):
+
+        weight_cnt = 0
+        for j in range(X_train_alt.shape[1]):
+
+            if X_train_alt[i][j] == 1:
+                X_train_alt[i][j] *= tree_weights[weight_cnt]
+                weight_cnt += 1
+
+        assert weight_cnt == len(tree_weights)
+
+    # build a KNN using this proximity measure using k = 10
+    knn = KNeighborsClassifier(n_neighbors=TREE_PROTO_K)
+    knn = knn.fit(X_train_alt, y_train)
+
+    # compute proportion of neighbors that share the same label
+    train_impact = np.zeros(X_train_alt.shape[0])
+    for i in tqdm.tqdm(range(X_train_alt.shape[0])):
+        _, neighbor_ids = knn.kneighbors([X_train_alt[i]])
+        train_impact[i] = len(np.where(y_train[i] == y_train[neighbor_ids[0]])[0]) / len(neighbor_ids[0])
+
+    # rank training instances by low label agreement with its neighbors
+    train_order = np.argsort(train_impact)[:n_check]
+    ckpt_ndx, fix_ndx = _record_fixes(train_order, noisy_ndx, n_check, interval)
+
+    return ckpt_ndx, fix_ndx
+
+
+def _mmd_method(model, X_train, y_train, noisy_ndx, interval, n_check):
     """
     Orders instances by prototypes and/or criticisms.
     """
@@ -427,11 +482,21 @@ def experiment(args, logger, out_dir, seed):
     if args.mmd:
         logger.info('\nordering by mmd-critic...')
         start = time.time()
-        ckpt_ndx, fix_ndx = _mmd_method(X_train, y_train_noisy, noisy_ndx, interval, n_check)
+        ckpt_ndx, fix_ndx = _mmd_method(model_noisy, X_train, y_train_noisy, noisy_ndx, interval, n_check)
         _, mmd_res = _interval_performance(ckpt_ndx, fix_ndx, noisy_ndx, clf, data, acc_test_noisy)
 
         logger.info('time: {:3f}s'.format(time.time() - start))
         np.save(os.path.join(out_dir, 'method.npy'), mmd_res)
+
+    # Prototype method
+    if args.proto:
+        logger.info('\nordering by proto...')
+        start = time.time()
+        ckpt_ndx, fix_ndx = _proto_method(model_noisy, X_train, y_train_noisy, noisy_ndx, interval, n_check)
+        _, proto_res = _interval_performance(ckpt_ndx, fix_ndx, noisy_ndx, clf, data, acc_test_noisy)
+
+        logger.info('time: {:3f}s'.format(time.time() - start))
+        np.save(os.path.join(out_dir, 'method.npy'), proto_res)
 
 
 def main(args):
@@ -453,8 +518,10 @@ def main(args):
         out_dir = os.path.join(out_dir, 'maple')
     elif args.inf_k is not None:
         out_dir = os.path.join(out_dir, 'leaf_influence')
-    elif args.mmd is not None:
+    elif args.mmd:
         out_dir = os.path.join(out_dir, 'mmd')
+    elif args.proto:
+        out_dir = os.path.join(out_dir, 'proto')
 
     os.makedirs(out_dir, exist_ok=True)
     logger = print_util.get_logger(os.path.join(out_dir, 'log.txt'))
@@ -497,6 +564,7 @@ if __name__ == '__main__':
     parser.add_argument('--maple', action='store_true', default=False, help='whether to use MAPLE as a baseline.')
     parser.add_argument('--teknn', action='store_true', default=False, help='use KNN on top of TREX features.')
     parser.add_argument('--mmd', action='store_true', default=False, help='MMD-Critic prototypes.')
+    parser.add_argument('--proto', action='store_true', default=False, help='Tree prototypes.')
 
     # plot settings
     parser.add_argument('--check_pct', type=float, default=0.3, help='max percentage of train instances to check.')

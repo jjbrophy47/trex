@@ -31,7 +31,7 @@ except ImportError as e:
 
 class TreeExtractor:
 
-    def __init__(self, model, tree_kernel='leaf_path', sparse=False):
+    def __init__(self, model, tree_kernel='leaf_output', sparse=False):
         """
         Extracts model-specific feature representations for data instances from a trained tree ensemble.
 

@@ -81,7 +81,7 @@ class XGBModel:
 
 class CBModel:
     """
-    Creates a data structure from a dictionary representation of an XGBoost model.
+    Creates a data structure from a dictionary representation of a CatBoost model.
     """
 
     def __init__(self, model_dump):
