@@ -4,6 +4,7 @@ Experiment: dataset cleaning from noisy labels,
             in the train data. Only for binary classification datasets.
 """
 import time
+import uuid
 import argparse
 from datetime import datetime
 from copy import deepcopy
@@ -233,7 +234,7 @@ def _proto_method(model, X_train, y_train, noisy_ndx, interval, n_check):
     X_train_alt = extractor.fit_transform(X_train)
 
     # obtain weight of each tree: note, this code is specific to CatBoost
-    temp_fp = '.temp_cb.json'
+    temp_fp = '.{}_cb.json'.format(str(uuid.uuid4()))
     model.save_model(temp_fp, format='json')
     cb_dump = json.load(open(temp_fp, 'r'))
 
@@ -272,6 +273,8 @@ def _proto_method(model, X_train, y_train, noisy_ndx, interval, n_check):
     # rank training instances by low label agreement with its neighbors
     train_order = np.argsort(train_impact)[:n_check]
     ckpt_ndx, fix_ndx = _record_fixes(train_order, noisy_ndx, n_check, interval)
+
+    os.system('rm {}'.format(temp_fp))
 
     return ckpt_ndx, fix_ndx
 
