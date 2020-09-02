@@ -26,9 +26,16 @@
 # ./jobs/cleaning/influence_primer.sh census 250 5 0.15 0.1 15 1440 short
 # ./jobs/cleaning/influence_primer.sh census 250 5 0.15 1.0 20 1440 short
 
-# MMD-Critic
-./jobs/cleaning/mmd_primer.sh churn 100 3 0.3 1.0 3 1440 short
-./jobs/cleaning/mmd_primer.sh amazon 250 5 0.15 1.0 5 1440 short
-./jobs/cleaning/mmd_primer.sh adult 100 5 0.25 1.0 6 1440 short
-./jobs/cleaning/mmd_primer.sh census 250 5 0.15 0.1 15 1440 short
-./jobs/cleaning/mmd_primer.sh census 250 5 0.15 1.0 30 1440 short
+# # MMD-Critic
+# ./jobs/cleaning/mmd_primer.sh churn 100 3 0.3 1.0 3 1440 short
+# ./jobs/cleaning/mmd_primer.sh amazon 250 5 0.15 1.0 5 1440 short
+# ./jobs/cleaning/mmd_primer.sh adult 100 5 0.25 1.0 6 1440 short
+# ./jobs/cleaning/mmd_primer.sh census 250 5 0.15 0.1 15 1440 short
+# ./jobs/cleaning/mmd_primer.sh census 250 5 0.15 1.0 30 1440 short
+
+# TreeProto
+./jobs/cleaning/proto_primer.sh churn 100 3 0.3 1.0 3 1440 short
+./jobs/cleaning/proto_primer.sh amazon 250 5 0.15 1.0 5 1440 short
+./jobs/cleaning/proto_primer.sh adult 100 5 0.25 1.0 6 1440 short
+./jobs/cleaning/proto_primer.sh census 250 5 0.15 0.1 15 1440 short
+./jobs/cleaning/proto_primer.sh census 250 5 0.15 1.0 30 1440 short
