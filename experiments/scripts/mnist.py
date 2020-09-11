@@ -108,20 +108,19 @@ def experiment(args, logger, out_dir, seed):
     logger.info('fitting {}...'.format(args.tree_type))
     tree = clone(clf).fit(X_train_pca, y_train)
 
-    X_val_pca = exp_util.get_val_data(X_train_pca, args.val_frac, seed)
+    # show GBDT performance
+    model_util.performance(tree, X_train_pca, y_train, X_test_pca, y_test, logger=logger)
 
     logger.info('fitting TREX...')
     explainer = trex.TreeExplainer(tree, X_train_pca, y_train,
                                    tree_kernel=args.tree_kernel,
                                    random_state=seed,
-                                   true_label=args.true_label,
                                    kernel_model=args.kernel_model,
-                                   kernel_model_kernel=args.kernel_model_kernel,
-                                   X_val=X_val_pca,
+                                   val_frac=args.val_frac,
                                    verbose=args.verbose,
+                                   true_label=args.true_label,
+                                   cv=2,
                                    logger=logger)
-
-    model_util.performance(tree, X_train_pca, y_train, X_test_pca, y_test)
 
     # pick a random test instance to explain
     if args.random_test:
@@ -130,8 +129,9 @@ def experiment(args, logger, out_dir, seed):
 
     # pick a random mispredicted test instance to explain
     else:
-        y_test_label = explainer.le_.transform(y_test)
-        test_dist = exp_util.instance_loss(tree.predict_proba(X_test_pca), y_test_label)
+        # y_test_label = explainer.le_.transform(y_test)
+        # test_dist = exp_util.instance_loss(tree.predict_proba(X_test_pca), y_test_label)
+        test_dist = exp_util.instance_loss(tree.predict_proba(X_test_pca), y_test)
         test_dist_ndx = np.argsort(test_dist)[::-1]
         np.random.seed(seed)
         test_ndx = np.random.choice(test_dist_ndx[:50])
@@ -159,18 +159,29 @@ def experiment(args, logger, out_dir, seed):
     plt.rc('lines', linewidth=1)
     plt.rc('lines', markersize=6)
 
+    # matplotlib settings
+    plt.rc('font', family='serif')
+    plt.rc('xtick', labelsize=13)
+    plt.rc('ytick', labelsize=13)
+    plt.rc('axes', labelsize=13)
+    plt.rc('axes', titlesize=13)
+    plt.rc('legend', fontsize=11)
+    plt.rc('legend', title_fontsize=11)
+    plt.rc('lines', linewidth=1)
+    plt.rc('lines', markersize=6)
+
     # inches
     width = 5.5  # Neurips 2020
     width, height = set_size(width=width * 3, fraction=1, subplots=(1, 3))
-    fig, axs = plt.subplots(1, 1 + args.topk_train * 2, figsize=(width, height))
-    axs = axs.flatten()
+    fig, axs = plt.subplots(2, 1 + args.topk_train * 2, figsize=(width, height))
+
+    print(axs.shape)
 
     # plot the test image
-    axs = axs.flatten()
     identifier = 'test_id{}'.format(test_ndx)
     _display_image(args, X_test[test_ndx], identifier=identifier,
-                   predicted=test_pred, actual=test_actual, ax=axs[0])
-    plt.setp(axs[0].spines.values(), color='blue')
+                   predicted=test_pred, actual=test_actual, ax=axs[0][0])
+    plt.setp(axs[0][0].spines.values(), color='blue')
 
     topk_train = args.topk_train if args.show_negatives else args.topk_train * 2
 
@@ -181,8 +192,8 @@ def experiment(args, logger, out_dir, seed):
         train_pred = tree.predict(X_train_pca[train_ndx].reshape(1, -1))[0]
         similarity = sim[train_ndx] if args.show_similarity else None
         weight = alpha[train_ndx] if args.show_weight else None
-        plt.setp(axs[i].spines.values(), color='red')
-        _display_image(args, X_train[train_ndx], ax=axs[i], identifier=identifier,
+        plt.setp(axs[0][i].spines.values(), color='green')
+        _display_image(args, X_train[train_ndx], ax=axs[0][i], identifier=identifier,
                        predicted=train_pred, actual=y_train[train_ndx],
                        similarity=similarity, weight=weight)
 
@@ -194,13 +205,42 @@ def experiment(args, logger, out_dir, seed):
             train_pred = tree.predict(X_train_pca[train_ndx].reshape(1, -1))[0]
             similarity = sim[train_ndx] if args.show_similarity else None
             weight = alpha[train_ndx] if args.show_weight else None
-            plt.setp(axs[i].spines.values(), color='green')
-            _display_image(args, X_train[train_ndx], ax=axs[i], identifier=identifier,
+            plt.setp(axs[0][i].spines.values(), color='red')
+            _display_image(args, X_train[train_ndx], ax=axs[0][i], identifier=identifier,
                            predicted=train_pred, actual=y_train[train_ndx],
                            similarity=similarity, weight=weight)
 
     plt.savefig(os.path.join(out_dir, 'plot.pdf'), format='pdf', bbox_inches='tight')
     plt.show()
+
+    # show highest weighted and lowest weighted samples for each class
+    alpha_indices = np.argsort(alpha)
+
+    print(alpha_indices)
+
+    # plot highest negative weighted samples
+    for i, train_ndx in enumerate(alpha_indices[:topk_train]):
+        i += 1
+        identifier = 'train_id{}'.format(train_ndx)
+        train_pred = tree.predict(X_train_pca[train_ndx].reshape(1, -1))[0]
+        similarity = sim[train_ndx] if args.show_similarity else None
+        weight = alpha[train_ndx] if args.show_weight else None
+        plt.setp(axs[1][i].spines.values(), color='red')
+        _display_image(args, X_train[train_ndx], ax=axs[1][i], identifier=identifier,
+                       predicted=train_pred, actual=y_train[train_ndx],
+                       similarity=similarity, weight=weight)
+
+    # plot highest positive weighted samples
+    for i, train_ndx in enumerate(alpha_indices[::-1][:topk_train]):
+        i += 1 + args.topk_train
+        identifier = 'train_id{}'.format(train_ndx)
+        train_pred = tree.predict(X_train_pca[train_ndx].reshape(1, -1))[0]
+        similarity = sim[train_ndx] if args.show_similarity else None
+        weight = alpha[train_ndx] if args.show_weight else None
+        plt.setp(axs[1][i].spines.values(), color='green')
+        _display_image(args, X_train[train_ndx], ax=axs[1][i], identifier=identifier,
+                       predicted=train_pred, actual=y_train[train_ndx],
+                       similarity=similarity, weight=weight)
 
 
 def main(args):
@@ -209,7 +249,7 @@ def main(args):
     dataset = args.dataset
 
     out_dir = os.path.join(args.out_dir, dataset, args.tree_type,
-                           args.tree_kernel, 'rs{}'.format(args.rs))
+                           'rs{}'.format(args.rs), args.tree_kernel)
     os.makedirs(out_dir, exist_ok=True)
 
     logger = print_util.get_logger(os.path.join(out_dir, 'log.txt'))
@@ -226,15 +266,14 @@ if __name__ == '__main__':
     parser.add_argument('--data_dir', type=str, default='data', help='dataset to explain.')
     parser.add_argument('--out_dir', type=str, default='output/mnist/', help='dataset to explain.')
 
-    parser.add_argument('--val_frac', type=float, default=0.05, help='validation dataset.')
+    parser.add_argument('--val_frac', type=float, default=0.1, help='validation dataset.')
 
     parser.add_argument('--tree_type', type=str, default='lgb', help='model to use.')
     parser.add_argument('--n_estimators', type=int, default=100, help='number of trees.')
     parser.add_argument('--max_depth', type=float, default=None, help='maximum tree depth.')
 
     parser.add_argument('--tree_kernel', type=str, default='leaf_output', help='type of encoding.')
-    parser.add_argument('--kernel_model', type=str, default='lr', help='linear model to use.')
-    parser.add_argument('--kernel_model_kernel', type=str, default='linear', help='similarity kernel.')
+    parser.add_argument('--kernel_model', type=str, default='klr', help='linear model to use.')
 
     parser.add_argument('--random_test', action='store_true', default=False, help='choose random test instance.')
     parser.add_argument('--test_size', type=float, default=0.2, help='fraction to use for testing.')
@@ -268,8 +307,7 @@ class Args:
     max_depth = None
 
     tree_kernel = 'leaf_output'
-    kernel_model = 'lr'
-    kernel_model_kernel = 'linear'
+    kernel_model = 'klr'
 
     test_size = 0.2
     pca_components = 50

@@ -72,14 +72,18 @@ def main(args):
                    'tree', 'klr_loss', 'svm_loss',
                    'maple', 'leaf_influence', 'teknn',
                    'teknn_loss', 'proto']
+    method_list = ['klr', 'svm', 'random',
+                   'tree', 'klr_loss', 'svm_loss',
+                   'maple', 'leaf_influence', 'teknn',
+                   'teknn_loss', 'proto']
     labels = ['TREX-KLR', 'TREX-SVM', 'Random',
-              'Tree Loss', 'KLR Loss', 'SVM Loss',
+              'GBDT Loss', 'KLR Loss', 'SVM Loss',
               'MAPLE', 'LeafInfluence', 'TEKNN',
               'TEKNN Loss', 'TreeProto']
     colors = ['blue', 'cyan', 'red', 'green', 'purple', 'magenta', 'orange',
-              'black', 'yellow', '#EEC64F', 'g', 'r', 'brown']
-    markers = ['1', '2', 'o', 'v', '^', '<', '>', '.', '*', 'h', '3', '4', '5']
-    zorders = [10, 9, 8, 1, 2, 3, 4, 5, 6, 7, 0]
+              'black', '#EEC64F', 'yellow', 'brown']
+    markers = ['1', '2', 'o', 'v', '^', '<', '>', '.', '*', 'h', 's']
+    zorders = [11, 10, 9, 3, 2, 1, 7, 1, 6, 5, 8]
 
     # matplotlib settings
     plt.rc('font', family='serif')
@@ -96,7 +100,7 @@ def main(args):
     width = 5.5  # Neurips 2020
     width, height = set_size(width=width * 3, fraction=1, subplots=(1, 3))
 
-    fig, axs = plt.subplots(1, max(2, len(args.dataset)), figsize=(width, height * 1.15))
+    fig, axs = plt.subplots(1, max(2, len(args.dataset)), figsize=(width, height * 1.25))
     axs = axs.flatten()
 
     lines = []
@@ -119,14 +123,11 @@ def main(args):
         for j, method in enumerate(method_list):
             res = get_results(dataset, method, args)
 
-            print(method)
-            print(res[0].shape)
-
             if res is not None:
                 res_mean, res_std = res
                 line = ax.errorbar(check_pct, res_mean, yerr=res_std,
                                    marker=markers[j], color=colors[j],
-                                   zorder=zorders[j])
+                                   zorder=zorders[j], markersize=3.5)
 
                 if i == 0:
                     lines.append(line[0])
@@ -145,12 +146,11 @@ def main(args):
     out_dir = os.path.join(args.out_dir, args.tree_kernel)
     os.makedirs(out_dir, exist_ok=True)
 
-    n_legend_cols = int(len(lines) / 2) if len(lines) > 3 else len(lines)
-    fig.legend(tuple(lines), tuple(new_labels), loc='center', ncol=n_legend_cols,
-               bbox_to_anchor=(0.525, 0.115))
+    fig.legend(tuple(lines), tuple(new_labels), loc='center', ncol=6,
+               bbox_to_anchor=(0.5, 0.125))
 
     plt.tight_layout()
-    fig.subplots_adjust(bottom=0.445, wspace=0.275)
+    fig.subplots_adjust(bottom=0.425, wspace=0.275)
     plt.savefig(os.path.join(out_dir, 'plot.{}'.format(args.ext)))
 
 

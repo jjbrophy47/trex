@@ -7,7 +7,6 @@ Currently supports: sklearn's RandomForestClassifier and GBMClassifier,
 import os
 import time
 import uuid
-import shutil
 
 import pickle
 import numpy as np

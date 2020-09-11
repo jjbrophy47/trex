@@ -26,7 +26,7 @@ def _get_classifier(args):
     """
     Return the appropriate classifier.
     """
-    if args.model in ['cb', 'lgb', 'xgb']:
+    if args.model in ['cb', 'lgb', 'xgb', 'rf']:
         clf = model_util.get_classifier(args.model,
                                         n_estimators=args.n_estimators,
                                         max_depth=args.max_depth,

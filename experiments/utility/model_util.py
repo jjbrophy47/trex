@@ -27,6 +27,7 @@ def get_classifier(model, n_estimators=20, max_depth=None, learning_rate=0.03, r
         clf = catboost.CatBoostClassifier(random_state=random_state, n_estimators=n_estimators,
                                           max_depth=max_depth, verbose=False, train_dir=train_dir)
     elif model == 'rf':
+        max_depth = None if max_depth == 0 else max_depth
         clf = RandomForestClassifier(random_state=random_state, n_estimators=n_estimators,
                                      max_depth=max_depth)
     elif model == 'gbm':

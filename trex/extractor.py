@@ -122,11 +122,28 @@ class TreeExtractor:
         assert X.ndim == 2, 'X is not 2d!'
 
         if self.model_type_ == 'RandomForestClassifier':
-            exit('{} not currently supported!'.format(str(self.model)))
 
-            one_hot_preds = [tree.predict_proba(X) for tree in self.model.estimators_]
-            encoding = np.hstack(one_hot_preds)
-            self.num_trees_ = len(one_hot_preds)
+            # get leaf ids per prediction and number of leaves per tree
+            leaves = self.model.apply(X)
+            leaves_per_tree = np.array([tree.tree_.node_count for tree in self.model.estimators_])
+
+            # create leaf_path encoding
+            categories = [np.arange(n_leaves) for n_leaves in leaves_per_tree]
+            one_hot_enc = OneHotEncoder(categories=categories).fit(leaves)
+            encoding = np.array(one_hot_enc.transform(leaves).todense())
+
+            # get leaf value of each tree for each sample
+            tree_preds = np.hstack([tree.predict_proba(X)[:, 1].reshape(-1, 1) for tree in self.model.estimators_])
+
+            # replace leaf positions with leaf values
+            for i in range(encoding.shape[0]):
+                tree_cnt = 0
+                for j in range(encoding.shape[1]):
+                    if encoding[i][j] == 1:
+                        encoding[i][j] *= tree_preds[i][tree_cnt]
+                        tree_cnt += 1
+
+            self.num_trees_ = tree_preds.shape[1]
 
         elif self.model_type_ == 'GradientBoostingClassifier':
             exit('{} not currently supported!'.format(str(self.model)))
@@ -354,6 +371,7 @@ class TreeExtractor:
         elif 'LGBMClassifier' in str(self.model):
             self.model_type_ = 'LGBMClassifier'
         elif 'CatBoostClassifier' in str(self.model):
+            print('cat!!!!')
             self.model_type_ = 'CatBoostClassifier'
         elif 'XGBClassifier' in str(self.model):
             self.model_type_ = 'XGBClassifier'
