@@ -6,7 +6,6 @@
 *cb_model.json
 
 myenv
-penv36
 
 dist
 build
@@ -25,3 +24,5 @@ notes
 trex/models/liblinear/*.o
 trex/models/liblinear/train
 trex/models/liblinear/predict
+
+mmd_critic
