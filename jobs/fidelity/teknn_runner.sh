@@ -11,7 +11,7 @@ tree_kernel=$4
 
 if [ $dataset = 'census' ]
 then
-    python3 experiments/scripts/fidelity.py \
+    python3 scripts/experiments/fidelity.py \
       --teknn \
       --dataset $dataset \
       --n_estimators $n_estimators \
@@ -20,7 +20,7 @@ then
       --train_frac 0.1 \
       --pred_size 20
 else
-    python3 experiments/scripts/fidelity.py \
+    python3 scripts/experiments/fidelity.py \
       --teknn \
       --dataset $dataset \
       --n_estimators $n_estimators \

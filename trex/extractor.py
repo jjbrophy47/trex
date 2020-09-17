@@ -371,7 +371,6 @@ class TreeExtractor:
         elif 'LGBMClassifier' in str(self.model):
             self.model_type_ = 'LGBMClassifier'
         elif 'CatBoostClassifier' in str(self.model):
-            print('cat!!!!')
             self.model_type_ = 'CatBoostClassifier'
         elif 'XGBClassifier' in str(self.model):
             self.model_type_ = 'XGBClassifier'

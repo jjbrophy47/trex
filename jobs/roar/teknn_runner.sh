@@ -10,7 +10,7 @@ max_depth=$3
 tree_kernel=$4
 rs=$5
 
-python3 experiments/scripts/roar.py \
+python3 scripts/experiments/roar.py \
   --teknn \
   --dataset $dataset \
   --n_estimators $n_estimators \

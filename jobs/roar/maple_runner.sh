@@ -9,7 +9,7 @@ n_estimators=$2
 max_depth=$3
 rs=$4
 
-python3 experiments/scripts/roar.py \
+python3 scripts/experiments/roar.py \
   --maple \
   --dataset $dataset \
   --n_estimators $n_estimators \

@@ -26,9 +26,9 @@ from sklearn.neighbors import KNeighborsClassifier
 
 import trex
 from utility import model_util, data_util, exp_util, print_util
-from influence_boosting.influence.leaf_influence import CBLeafInfluenceEnsemble
-from maple.MAPLE import MAPLE
-from mmd_critic import mmd
+from baselines.influence_boosting.influence.leaf_influence import CBLeafInfluenceEnsemble
+from baselines.maple.MAPLE import MAPLE
+from baselines.mmd_critic import mmd
 
 TREE_PROTO_K = 10
 N_PROTOTYPES = 10

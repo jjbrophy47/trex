@@ -1,28 +1,47 @@
+# files
 **__pycache__
 **.pyc
 **.npy
 **.csv
-**catboost_info
-*cb_model.json
+**cb_model.json
+**.model.json
 
+# directories
 myenv
-
-dist
-build
-
-.*
-*.egg-info
-
-data
-**output
 results
-supplemental
-temp_output2
-
 notes
+baselines/mmd_critic
+**output
+**dist
+**build
+**.eggs
+**.trex
+**.ipynb_checkpoints
+**catboost_info
+save*
+**temp*
 
+# miscellaneous
 trex/models/liblinear/*.o
 trex/models/liblinear/train
 trex/models/liblinear/predict
 
-mmd_critic
+# data
+data/*/raw/*
+!data/*/raw/readme.txt
+data/bank_marketing
+data/banknote
+data/creditcard
+data/diabetes
+data/dota2
+data/heart
+data/hospital
+data/hospital2
+data/MFC18_EvalPart1
+data/mfc18_mfc19
+data/MFC19_EvalPart1
+data/mfc19_mfc20
+data/mnist
+data/NC17_EvalPart1
+data/nc17_mfc18
+data/wikipedia

@@ -15,7 +15,7 @@ from sklearn.neighbors import KNeighborsClassifier
 from sklearn.model_selection import StratifiedKFold
 from sklearn.base import clone
 
-from influence_boosting.influence.leaf_influence import CBLeafInfluenceEnsemble
+from baselines.influence_boosting.influence.leaf_influence import CBLeafInfluenceEnsemble
 
 
 def get_val_data(X_train, val_frac, seed):

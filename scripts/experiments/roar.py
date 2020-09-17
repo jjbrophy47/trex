@@ -25,8 +25,8 @@ from utility import model_util
 from utility import data_util
 from utility import print_util
 from utility import exp_util
-from influence_boosting.influence.leaf_influence import CBLeafInfluenceEnsemble
-from maple.MAPLE import MAPLE
+from baselines.influence_boosting.influence.leaf_influence import CBLeafInfluenceEnsemble
+from baselines.maple.MAPLE import MAPLE
 
 trex_explainer = None
 maple_explainer = None

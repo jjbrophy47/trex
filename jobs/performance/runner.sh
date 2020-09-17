@@ -13,4 +13,4 @@ module load python3/3.6.1
 dataset=$1
 model=$2
 
-python3 experiments/scripts/performance.py --dataset $1 --model $2
+python3 scripts/experiments/performance.py --dataset $1 --model $2

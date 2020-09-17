@@ -13,7 +13,7 @@ kernel_model=$6
 tree_kernel=$7
 rs=$8
 
-python3 experiments/scripts/cleaning.py \
+python3 scripts/experiments/cleaning.py \
   --trex \
   --dataset $dataset \
   --n_estimators $n_estimators \

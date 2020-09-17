@@ -11,7 +11,7 @@ kernel_model=$4
 tree_kernel=$5
 rs=$6
 
-python3 experiments/scripts/runtime.py \
+python3 scripts/experiments/runtime.py \
   --trex \
   --dataset $dataset \
   --n_estimators $n_estimators \

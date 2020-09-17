@@ -10,7 +10,7 @@ max_depth=$3
 kernel_model=$4
 tree_kernel=$5
 
-python3 experiments/scripts/fidelity.py \
+python3 scripts/experiments/fidelity.py \
   --trex \
   --dataset $dataset \
   --tree_kernel $tree_kernel \

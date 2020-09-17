@@ -11,7 +11,7 @@ check_pct=$4
 train_frac=$5
 rs=$6
 
-python3 experiments/scripts/cleaning.py \
+python3 scripts/experiments/cleaning.py \
   --inf_k -1 \
   --dataset $dataset \
   --n_estimators $n_estimators \

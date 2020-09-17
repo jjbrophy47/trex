@@ -12,7 +12,7 @@ train_frac=$5
 tree_kernel=$6
 rs=$7
 
-python3 experiments/scripts/cleaning.py \
+python3 scripts/experiments/cleaning.py \
   --teknn \
   --dataset $dataset \
   --n_estimators $n_estimators \

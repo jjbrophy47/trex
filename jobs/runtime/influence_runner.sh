@@ -9,7 +9,7 @@ n_estimators=$2
 max_depth=$3
 rs=$4
 
-python3 experiments/scripts/runtime.py \
+python3 scripts/experiments/runtime.py \
   --inf_k 0 \
   --dataset $dataset \
   --n_estimators $n_estimators \
