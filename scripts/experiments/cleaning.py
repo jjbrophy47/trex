@@ -31,7 +31,7 @@ from utility import exp_util
 from utility import print_util
 from baselines.influence_boosting.influence.leaf_influence import CBLeafInfluenceEnsemble
 from baselines.maple.MAPLE import MAPLE
-# from baselines.mmd_critic import mmd
+from baselines.mmd_critic import mmd
 
 TREE_PROTO_K = 10
 N_PROTOTYPES = 10

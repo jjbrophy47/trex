@@ -10,7 +10,6 @@
 myenv
 results
 notes
-baselines/mmd_critic
 **output
 **dist
 **build
