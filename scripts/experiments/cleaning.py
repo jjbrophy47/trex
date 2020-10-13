@@ -25,7 +25,10 @@ from sklearn.metrics.pairwise import rbf_kernel
 from sklearn.neighbors import KNeighborsClassifier
 
 import trex
-from utility import model_util, data_util, exp_util, print_util
+from utility import model_util
+from utility import data_util
+from utility import exp_util
+from utility import print_util
 from baselines.influence_boosting.influence.leaf_influence import CBLeafInfluenceEnsemble
 from baselines.maple.MAPLE import MAPLE
 from baselines.mmd_critic import mmd

@@ -1,7 +1,7 @@
 # tree ensembles
 catboost==0.15.1
 lightgbm==2.2.3
-xgboost==0.90
+xgboost==1.2.0
 scikit-learn==0.21.2
 
 # visualization

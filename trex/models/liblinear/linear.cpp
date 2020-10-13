@@ -983,6 +983,7 @@ static void solve_l2r_l1l2_svc(
 	info("nSV = %d\n",nSV);
 
     // fill up alpha coefficients
+    // NOTE: we multiply alpha by the label here!!
     int j = 0;
     for (int i = 0; i < l; i++) {
         alpha_coef[j] = alpha[i] * prob->y[j];

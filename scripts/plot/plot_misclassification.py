@@ -86,7 +86,7 @@ def main(args):
     ax.axhline(0, color='k')
     ax.axvline(0, color='k')
     ax.set_ylabel(r'$\gamma$')
-    ax.set_xlabel(r'$\alpha$')
+    ax.set_xlabel(r'$\alpha \hat{y}$')
 
     # unweighted
     print('plotting unweighted...')
@@ -115,7 +115,7 @@ def main(args):
     ax.axvline(test_val, color='k', linestyle='--')
     ax.set_ylabel('Density')
     ax.set_xlabel(feature_name.capitalize())
-    ax.set_title(r'Weighted by $\alpha$',)
+    ax.set_title(r'Weighted by $\alpha \hat{y}$')
     ax.ticklabel_format(style='sci', axis='y', scilimits=(0, 0))
     ax.tick_params(axis='both', which='major')
 
@@ -136,7 +136,7 @@ def main(args):
     ax.legend(frameon=False)
     ax.set_ylabel('Density')
     ax.set_xlabel(feature_name.capitalize())
-    ax.set_title(r'Weighted by $\alpha * \gamma$')
+    ax.set_title(r'Weighted by $\alpha \hat{y} \gamma$')
     ax.ticklabel_format(style='sci', axis='y', scilimits=(0, 0))
     ax.tick_params(axis='both', which='major')
 

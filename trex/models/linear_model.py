@@ -1,5 +1,9 @@
 """
 SVM and kernel kernel logistic regression models.
+
+NOTE: We modified liblinear and multiplied alpha by the training labels y
+      INSIDE liblinear; thus, alpha values in this module can be positive
+      or negative, and multiplying alpha by y is not necessary here!
 """
 import os
 

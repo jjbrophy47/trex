@@ -1,11 +1,12 @@
 dataset=$1
-n_estimators=$2
-max_depth=$3
-check_pct=$4
-train_frac=$5
-mem=$6
-time=$7
-partition=$8
+tree_type=$2
+n_estimators=$3
+max_depth=$4
+check_pct=$5
+train_frac=$6
+mem=$7
+time=$8
+partition=$9
 
 rs_list=(1 2 3 4 5)
 
@@ -16,6 +17,6 @@ for rs in ${rs_list[@]}; do
            --job-name=C_MAPLE_$dataset \
            --output=jobs/logs/cleaning/$dataset \
            --error=jobs/errors/cleaning/$dataset \
-           jobs/cleaning/maple_runner.sh $dataset $n_estimators \
+           jobs/cleaning/maple_runner.sh $dataset $tree_type $n_estimators \
            $max_depth $check_pct $train_frac $rs
 done
