@@ -5,7 +5,7 @@
 module load python3/3.6.1
 
 dataset=$1
-tree_type$2
+tree_type=$2
 n_estimators=$3
 max_depth=$4
 check_pct=$5
