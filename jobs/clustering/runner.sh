@@ -11,5 +11,4 @@ max_depth=$3
 python3 scripts/experiments/clustering.py \
   --dataset $dataset \
   --n_estimators $n_estimators \
-  --max_depth $max_depth \
-  --rs $rs
+  --max_depth $max_depth
