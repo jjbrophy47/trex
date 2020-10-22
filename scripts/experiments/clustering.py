@@ -12,7 +12,6 @@ sys.path.insert(0, here + '/../')  # for utility
 sys.path.insert(0, here + '/../../')  # for libliner
 
 import numpy as np
-import matplotlib.pyplot as plt
 from sklearn.base import clone
 from sklearn.manifold import TSNE
 from sklearn.decomposition import PCA
@@ -136,18 +135,6 @@ def experiment(args, logger, out_dir, seed):
     # train_pos_embed = X_embed[:n_train][train_pos]
     # test_neg_embed = X_embed[n_train:][test_neg]
     # test_pos_embed = X_embed[n_train:][test_pos]
-
-    fig, axs = plt.subplots(1, 2)
-
-    ax = axs[0]
-    ax.scatter(X_train[train_neg][:, 0], X_train[train_neg][:, 1], label='train (y=0)')
-    ax.scatter(X_train[train_pos][:, 0], X_train[train_pos][:, 1], label='train (y=1)')
-
-    ax = axs[1]
-    ax.scatter(X_train_tree[train_neg][:, 0], X_train_tree[train_neg][:, 1], label='train (y=0)')
-    ax.scatter(X_train_tree[train_pos][:, 0], X_train_tree[train_pos][:, 1], label='train (y=1)')
-
-    plt.show()
 
     # save original feature space results
     np.save(os.path.join(out_dir, 'train_negative'), X_train[train_neg])
