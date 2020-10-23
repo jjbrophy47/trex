@@ -57,7 +57,7 @@ def main(args):
 
     # plot settings
     markers = ['+', '1']
-    alpha = 0.1
+    alpha = 0.01
     s = 100
 
     result = get_results(args)
