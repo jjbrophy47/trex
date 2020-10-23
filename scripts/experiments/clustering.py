@@ -57,7 +57,7 @@ def reduce_and_embed(args, X_train, X_test, logger, init='random'):
     # embed feature space using TSNE
     start = time.time()
 
-    tsne = TSNE(verbose=args.verbose, random_state=args.rs, init=init, learning_rate=50)
+    tsne = TSNE(verbose=args.verbose, random_state=args.rs, init=init, learning_rate=10)
     X_train = tsne.fit_transform(X_train)
     # X_test = tsne.transform(X_test)
 
