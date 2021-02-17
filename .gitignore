@@ -39,8 +39,6 @@ data/categorical/
 data/old/
 
 # data to ignore
-data/*/raw/*
-!data/*/raw/readme.txt
 data/bank_marketing
 data/banknote
 data/creditcard
