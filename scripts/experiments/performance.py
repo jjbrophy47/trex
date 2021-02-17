@@ -128,7 +128,7 @@ def experiment(args, logger, out_dir, seed):
     auc, acc, ap, ll = model_util.performance(model, X_test, y_test, logger, name=args.model)
 
     # save results
-    result = model.get_params()
+    result = {}
     result['model'] = args.model
     result['auc'] = auc
     result['acc'] = acc
