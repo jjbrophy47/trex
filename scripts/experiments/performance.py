@@ -22,6 +22,7 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
+from sklearn.model_selection import StratifiedKFold
 
 from utility import model_util
 from utility import data_util
@@ -85,7 +86,7 @@ def experiment(args, logger, out_dir, seed):
     begin = time.time()
 
     # get model and data
-    clf, params = get_classifier(args)
+    model, param_grid = get_classifier(args)
     data = data_util.get_data(args.dataset,
                               data_dir=args.data_dir,
                               processing_dir=args.processing_dir)
@@ -96,17 +97,19 @@ def experiment(args, logger, out_dir, seed):
     logger.info('no. features: {:,}'.format(X_train.shape[1]))
 
     # train model
-    logger.info('\nmodel: {}, params: {}'.format(args.model, params))
+    logger.info('\nmodel: {}, param_grid: {}'.format(args.model, param_grid))
 
     # start timer
     start = time.time()
 
     # tune the model
     if not args.no_tune:
-        gs = GridSearchCV(clf, params, cv=args.cv, verbose=args.verbose).fit(X_train, y_train)
+        skf = StratifiedKFold(n_splits=args.cv, shuffle=True, random_state=args.rs)
+        gs = GridSearchCV(model, param_grid, scoring=args.scoring, cv=skf, verbose=args.verbose)
+        gs = gs.fit(X_train, y_train)
 
         cols = ['mean_fit_time', 'mean_test_score', 'rank_test_score']
-        cols += ['param_{}'.format(param) for param in params.keys()]
+        cols += ['param_{}'.format(param) for param in param_grid.keys()]
 
         df = pd.DataFrame(gs.cv_results_)
         logger.info('gridsearch results:')
@@ -117,7 +120,7 @@ def experiment(args, logger, out_dir, seed):
 
     # do not tune the model
     else:
-        model = clf.fit(X_train, y_train)
+        model = model.fit(X_train, y_train)
 
     train_time = time.time() - start
 
@@ -141,20 +144,29 @@ def experiment(args, logger, out_dir, seed):
 
 def main(args):
 
-    # create output directory
+    # define output directory
     out_dir = os.path.join(args.out_dir,
                            args.dataset,
                            args.model,
                            args.processing_dir,
                            'rs_{}'.format(args.rs))
+
+    # create outut directory and clear any previous contents
     os.makedirs(out_dir, exist_ok=True)
+    print_util.clear_dir(out_dir)
 
     # create logger
     logger = print_util.get_logger(os.path.join(out_dir, 'log.txt'))
     logger.info(args)
 
+    # write everything printed to stdout to this log file
+    logfile, stdout, stderr = print_util.stdout_stderr_to_log(os.path.join(out_dir, 'log+.txt'))
+
     # run experiment
     experiment(args, logger, out_dir, seed=args.rs)
+
+    # restore original stdout and stderr settings
+    print_util.reset_stdout_stderr(logfile, stdout, stderr)
 
 
 if __name__ == '__main__':
@@ -171,6 +183,7 @@ if __name__ == '__main__':
     parser.add_argument('--model', type=str, default='cb', help='model to use.')
     parser.add_argument('--no_tune', action='store_true', default=False, help='do not tune the model.')
     parser.add_argument('--cv', type=int, default=5, help='number of cross-val folds.')
+    parser.add_argument('--scoring', type=str, default='accuracy', help='scoring metric.')
 
     # tree hyperparameters
     parser.add_argument('--n_estimators', type=int, default=100, help='Number of trees.')

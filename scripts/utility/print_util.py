@@ -1,8 +1,28 @@
 """
 Utility methods for displaying data.
 """
+import os
 import sys
+import shutil
 import logging
+
+
+class Tee(object):
+    """
+    Class to control where output is printed to.
+    """
+
+    def __init__(self, *files):
+        self.files = files
+
+    def write(self, obj):
+        for f in self.files:
+            f.write(obj)
+            f.flush()   # output to be visible immediately
+
+    def flush(self):
+        for f in self.files:
+            f.flush()
 
 
 def get_logger(filename=''):
@@ -33,6 +53,53 @@ def remove_logger(logger):
     Remove handlers from logger.
     """
     logger.handlers = []
+
+
+def clear_dir(in_dir):
+    """
+    Clear contents of directory.
+    """
+    if not os.path.exists(in_dir):
+        return -1
+
+    # remove contents of the directory
+    for fn in os.listdir(in_dir):
+        fp = os.path.join(in_dir, fn)
+
+        # directory
+        if os.path.isdir(fp):
+            shutil.rmtree(fp)
+
+        # file
+        else:
+            os.remove(fp)
+
+    return 0
+
+
+def stdout_stderr_to_log(filename):
+    """
+    Log everything printed to stdout or
+    stderr to this specified `filename`.
+    """
+    logfile = open(filename, 'w')
+
+    stderr = sys.stderr
+    stdout = sys.stdout
+
+    sys.stdout = Tee(sys.stdout, logfile)
+    sys.stderr = sys.stdout
+
+    return logfile, stdout, stderr
+
+
+def reset_stdout_stderr(logfile, stdout, stderr):
+    """
+    Restore original stdout and stderr
+    """
+    sys.stdout = stdout
+    sys.stderr = stderr
+    logfile.close()
 
 
 def show_test_instance(test_ndx, svm_pred, pred_label, y_test=None, label=None, X_test=None):
