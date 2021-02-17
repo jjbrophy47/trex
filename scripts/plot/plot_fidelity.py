@@ -56,15 +56,24 @@ def _plot_graph(args, ax, dataset, method_list, tree_kernel,
 
     ax.tick_params(axis='both', which='major')
 
-    leg = ax.legend(loc='upper right', ncol=2, handletextpad=0.05, framealpha=1.0)
+    if args.two_col:
+        ncol = 2
+    else:
+        ncol = 1
+    leg = ax.legend(loc='upper right', ncol=ncol, handletextpad=0.05, framealpha=1.0)
 
     # Get the bounding box of the original legend
     bb = leg.get_bbox_to_anchor().inverse_transformed(ax.transAxes)
 
     # Change to location of the legend.
-    yOffset = 0.25
-    xOffset = 0.01
-    bb.y0 += yOffset
+    if args.two_col:
+        yOffset = 0.25
+        xOffset = 0.01
+    else:
+        yOffset = 0.35
+        xOffset = 0.01
+
+    # bb.y0 += yOffset
     bb.y1 += yOffset
     bb.x0 += xOffset
     bb.x1 += xOffset
@@ -104,15 +113,14 @@ def main(args):
         plt.rc('ytick', labelsize=17)
         plt.rc('axes', labelsize=22)
         plt.rc('axes', titlesize=22)
-        plt.rc('legend', fontsize=20)
+        plt.rc('legend', fontsize=11)
         plt.rc('legend', title_fontsize=11)
         plt.rc('lines', linewidth=1)
         plt.rc('lines', markersize=6)
 
         width = 5.5  # One column style
-        width, height = set_size(width=width * 3, fraction=1, subplots=(1, 3))
-        fig, axs = plt.subplots(1, max(2, len(args.dataset)), figsize=(width, height),
-                                sharey='row')
+        width, height = set_size(width=width * 3, fraction=1, subplots=(1, 4))
+        fig, axs = plt.subplots(1, 4, figsize=(width, height * 1.75), sharey='row')
     axs = axs.flatten()
 
     # plot top row

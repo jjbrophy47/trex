@@ -11,6 +11,45 @@ from sklearn.datasets import fetch_20newsgroups
 from sklearn.feature_extraction.text import TfidfVectorizer
 
 
+def get_data(dataset, data_dir='data', processing_dir='categorical'):
+    """
+    Returns a train and test set from the desired dataset.
+    """
+    in_dir = os.path.join(data_dir, dataset)
+
+    # append processing directory
+    assert processing_dir in ['categorical', 'standard']
+    in_dir = os.path.join(in_dir, processing_dir)
+
+    # load in data
+    assert os.path.exists(in_dir)
+    train = np.load(os.path.join(in_dir, 'train.npy'), allow_pickle=True)
+    test = np.load(os.path.join(in_dir, 'test.npy'), allow_pickle=True)
+    feature = np.load(os.path.join(in_dir, 'feature.npy'))
+
+    # load in catgeorical feature indices
+    if processing_dir == 'categorical':
+        cat_indices = np.load(os.path.join(in_dir, 'cat_indices.npy'))
+
+    # standard preprocessing
+    else:
+        cat_indices = None
+        train = train.astype(np.float32)
+        test = test.astype(np.float32)
+
+    # make sure labels are binary
+    assert np.all(np.unique(train[:, -1]) == np.array([0, 1]))
+    assert np.all(np.unique(test[:, -1]) == np.array([0, 1]))
+
+    # split feature values and labels
+    X_train = train[:, :-1]
+    y_train = train[:, -1]
+    X_test = test[:, :-1]
+    y_test = test[:, -1]
+
+    return X_train, X_test, y_train, y_test, feature, cat_indices
+
+
 def _load_wikipedia(test_size=0.2, random_state=69, data_dir='data', return_feature=False):
     data = np.load(os.path.join(data_dir, 'wikipedia/data.npy'))
     X = data[:, :-1]
@@ -482,10 +521,10 @@ def _load_census(data_dir='data', return_feature=False):
     return result
 
 
-def get_data(dataset, test_size=0.2, random_state=69, data_dir='data', return_feature=False,
-             return_manipulation=False, return_image_id=False, remove_missing_features=False,
-             categories='alt.atheism|talk.religion.misc', remove=('headers', 'footers', 'quotes'),
-             return_raw=True, mismatch=False):
+def get_data2(dataset, test_size=0.2, random_state=69, data_dir='data', return_feature=False,
+              return_manipulation=False, return_image_id=False, remove_missing_features=False,
+              categories='alt.atheism|talk.religion.misc', remove=('headers', 'footers', 'quotes'),
+              return_raw=True, mismatch=False):
     """
     Returns a train and test set from the desired dataset.
     """

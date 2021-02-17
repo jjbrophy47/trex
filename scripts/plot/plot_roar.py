@@ -102,7 +102,7 @@ def main(args):
         width = 5.5  # Neurips 2020
         width, height = set_size(width=width * 3, fraction=1, subplots=(1, 3))
         fig, axs = plt.subplots(1, max(2, len(args.dataset)),
-                                figsize=(width, height), sharex=True)
+                                figsize=(width, height * 1.1), sharex=True)
     axs = axs.flatten()
 
     n_pts = 10
@@ -137,7 +137,7 @@ def main(args):
 
             if i == 0:
                 ax.set_ylabel(ylabel)
-                ax.set_xlabel(xlabel)
+            ax.set_xlabel(xlabel)
 
         if i == 1:
             ax.legend(frameon=False)

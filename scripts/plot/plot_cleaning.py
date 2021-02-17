@@ -77,7 +77,7 @@ def main(args):
                    'maple', 'leaf_influence', 'teknn',
                    'teknn_loss', 'proto']
     labels = ['TREX-KLR', 'TREX-SVM', 'Random',
-              'GBDT Loss', 'KLR Loss', 'SVM Loss',
+              'GBDT Loss', 'TREX-KLR Loss', 'TREX-SVM Loss',
               'MAPLE', 'LeafInfluence', 'TEKNN',
               'TEKNN Loss', 'TreeProto']
     colors = ['blue', 'cyan', 'red', 'green', 'purple', 'magenta', 'orange',

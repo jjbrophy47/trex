@@ -20,12 +20,25 @@ notes
 save*
 **temp*
 
-# miscellaneous
+# TREX
+trex/models/liblinear/blas
 trex/models/liblinear/*.o
 trex/models/liblinear/train
 trex/models/liblinear/predict
 
 # data
+data/*/raw
+data/*/*.npy
+data/*/*.csv
+data/*/*.dat
+data/*/*.txt
+data/*/*.data
+data/*/*.test
+data/standard/
+data/categorical/
+data/old/
+
+# data to ignore
 data/*/raw/*
 !data/*/raw/readme.txt
 data/bank_marketing

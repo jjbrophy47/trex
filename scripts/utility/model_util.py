@@ -7,37 +7,60 @@ import warnings
 warnings.simplefilter(action='ignore', category=UserWarning)  # lgb compiler warning
 
 import numpy as np
-from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
-from sklearn.metrics import accuracy_score, log_loss, roc_auc_score
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.ensemble import GradientBoostingClassifier
+from sklearn.metrics import roc_auc_score
+from sklearn.metrics import accuracy_score
+from sklearn.metrics import average_precision_score
+from sklearn.metrics import log_loss
 
 
-def get_classifier(model, n_estimators=20, max_depth=None, learning_rate=0.03, random_state=69):
-    """Returns a tree ensemble classifier."""
+def get_classifier(model,
+                   n_estimators=20,
+                   max_depth=None,
+                   learning_rate=0.03,
+                   random_state=69,
+                   cat_indices=None):
+    """
+    Returns a tree ensemble classifier.
+    """
 
-    # create model
+    # LightGBM
     if model == 'lgb':
         import lightgbm
         max_depth = -1 if max_depth is None else max_depth
-        clf = lightgbm.LGBMClassifier(random_state=random_state, n_estimators=n_estimators,
+        clf = lightgbm.LGBMClassifier(random_state=random_state,
+                                      n_estimators=n_estimators,
                                       max_depth=max_depth)
+    # CatBoost
     elif model == 'cb':
         import catboost
         train_dir = os.path.join('.catboost_info', str(uuid.uuid4()))
         os.makedirs(train_dir, exist_ok=True)
-        clf = catboost.CatBoostClassifier(random_state=random_state, n_estimators=n_estimators,
-                                          max_depth=max_depth, verbose=False, train_dir=train_dir)
+        clf = catboost.CatBoostClassifier(random_state=random_state,
+                                          n_estimators=n_estimators,
+                                          max_depth=max_depth,
+                                          verbose=False,
+                                          train_dir=train_dir,
+                                          cat_features=cat_indices)
+    # Random Forest
     elif model == 'rf':
         max_depth = None if max_depth == 0 else max_depth
-        clf = RandomForestClassifier(random_state=random_state, n_estimators=n_estimators,
+        clf = RandomForestClassifier(random_state=random_state,
+                                     n_estimators=n_estimators,
                                      max_depth=max_depth)
+    # GBM
     elif model == 'gbm':
         max_depth = 3 if max_depth is None else max_depth  # gbm default
-        clf = GradientBoostingClassifier(random_state=random_state, n_estimators=n_estimators,
+        clf = GradientBoostingClassifier(random_state=random_state,
+                                         n_estimators=n_estimators,
                                          max_depth=max_depth)
+    # XGBoost
     elif model == 'xgb':
         import xgboost
         max_depth = 3 if max_depth is None else max_depth  # xgb default
-        clf = xgboost.XGBClassifier(random_state=random_state, n_estimators=n_estimators,
+        clf = xgboost.XGBClassifier(random_state=random_state,
+                                    n_estimators=n_estimators,
                                     max_depth=max_depth)
     else:
         exit('{} model not supported!'.format(model))
@@ -46,7 +69,9 @@ def get_classifier(model, n_estimators=20, max_depth=None, learning_rate=0.03, r
 
 
 def fidelity(y1, y2, return_difference=False):
-    """Returns an (overlap, difference) tuple."""
+    """
+    Returns an (overlap, difference) tuple.
+    """
 
     overlap = np.where(y1 == y2)[0]
     difference = np.where(y1 != y2)[0]
@@ -60,15 +85,46 @@ def fidelity(y1, y2, return_difference=False):
 
 
 def missed_instances(y1, y2, y_true):
-    """Returns indexes missed by both y1 and y2."""
+    """
+    Returns indexes missed by both y1 and y2.
+    """
 
     both_ndx = np.where((y1 == y2) & (y1 != y_true))[0]
     return both_ndx
 
 
-def performance(model, X_train=None, y_train=None, X_test=None, y_test=None,
-                validate=False, logger=None):
-    """Displays train and test performance for a learned model."""
+def performance(model, X_test, y_test, logger=None,
+                name='', do_print=False):
+    """
+    Returns AUROC and accuracy scores.
+    """
+
+    # predict
+    proba = model.predict_proba(X_test)[:, 1]
+    pred = model.predict(X_test)
+
+    # evaluate
+    auc = roc_auc_score(y_test, proba)
+    acc = accuracy_score(y_test, pred)
+    ap = average_precision_score(y_test, proba)
+    ll = log_loss(y_test, proba)
+
+    score_str = '[{}] auc: {:.3f}, acc: {:.3f}, ap: {:.3f}, ll: {:.3f}'
+
+    if logger:
+        logger.info(score_str.format(name, auc, acc, ap, ll))
+
+    elif do_print:
+        print(score_str.format(name, auc, acc, ll))
+
+    return auc, acc, ap, ll
+
+
+def performance2(model, X_train=None, y_train=None, X_test=None, y_test=None,
+                 validate=False, logger=None):
+    """
+    Displays train and test performance for a learned model.
+    """
 
     if not logger:
         return
@@ -117,9 +173,13 @@ def performance(model, X_train=None, y_train=None, X_test=None, y_test=None,
     s = 'test  acc: {:.3f}, auc: {:.3f}, logloss: {:.3f}'
     logger.info(s.format(acc, auc, logloss))
 
+    return auc, acc, ap, ll
+
 
 def validate_model(model):
-    """Make sure the model is a supported model type."""
+    """
+    Make sure the model is a supported model type.
+    """
 
     model_type = str(model).split('(')[0]
     if 'RandomForestClassifier' in str(model):
@@ -149,7 +209,6 @@ def positive_class_proba(labels, probas):
     Given the predicted label of each sample and the probabilities for each class for each sample,
     return the probabilities of the positive class for each sample.
     """
-
     assert labels.ndim == 1, 'labels is not 1d!'
     assert probas.ndim == 2, 'probas is not 2d!'
     assert len(labels) == len(probas), 'num samples do not match between labels and probas!'

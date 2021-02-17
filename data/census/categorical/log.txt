@@ -1,0 +1,145 @@
+Namespace(processing='categorical')
+
+timestamp: 2021-02-13 17:47:43.493112
+
+time to read in data...4.121s
+
+train_df:
+   age                        workclass  industry_code  occupation_code                    education  ...          business taxable_income veterans_admin veterans_benfits      label
+0   73                  Not in universe              0                0         High school graduate  ...   Not in universe              2              0               95   - 50000.
+1   58   Self-employed-not incorporated              4               34   Some college but no degree  ...   Not in universe              2             52               94   - 50000.
+2   18                  Not in universe              0                0                   10th grade  ...   Not in universe              2              0               95   - 50000.
+3    9                  Not in universe              0                0                     Children  ...   Not in universe              0              0               94   - 50000.
+4   10                  Not in universe              0                0                     Children  ...   Not in universe              0              0               94   - 50000.
+
+[5 rows x 42 columns]
+(199523, 42)
+test_df:
+   age                        workclass  industry_code  occupation_code  ... taxable_income  veterans_admin veterans_benfits      label
+0   38                          Private              6               36  ...              2              12               95   - 50000.
+1   44   Self-employed-not incorporated             37               12  ...              2              26               95   - 50000.
+2    2                  Not in universe              0                0  ...              0               0               95   - 50000.
+3   35                          Private             29                3  ...              2              52               94   - 50000.
+4   49                          Private              4               34  ...              2              50               95   - 50000.
+
+[5 rows x 42 columns]
+(99762, 42)
+
+[TRAIN] age, no. missing: 0
+[TEST] age, no. missing: 0
+[TRAIN] workclass, no. missing: 0
+[TEST] workclass, no. missing: 0
+[TRAIN] industry_code, no. missing: 0
+[TEST] industry_code, no. missing: 0
+[TRAIN] occupation_code, no. missing: 0
+[TEST] occupation_code, no. missing: 0
+[TRAIN] education, no. missing: 0
+[TEST] education, no. missing: 0
+[TRAIN] wage_per_hour, no. missing: 0
+[TEST] wage_per_hour, no. missing: 0
+[TRAIN] enrolled_in_edu, no. missing: 0
+[TEST] enrolled_in_edu, no. missing: 0
+[TRAIN] marital_status, no. missing: 0
+[TEST] marital_status, no. missing: 0
+[TRAIN] major_industry_code, no. missing: 0
+[TEST] major_industry_code, no. missing: 0
+[TRAIN] major_occupation_code, no. missing: 0
+[TEST] major_occupation_code, no. missing: 0
+[TRAIN] race, no. missing: 0
+[TEST] race, no. missing: 0
+[TRAIN] hispanic_origin, no. missing: 0
+[TEST] hispanic_origin, no. missing: 0
+[TRAIN] sex, no. missing: 0
+[TEST] sex, no. missing: 0
+[TRAIN] union_member, no. missing: 0
+[TEST] union_member, no. missing: 0
+[TRAIN] unemployment_reason, no. missing: 0
+[TEST] unemployment_reason, no. missing: 0
+[TRAIN] employment, no. missing: 0
+[TEST] employment, no. missing: 0
+[TRAIN] capital_gain, no. missing: 0
+[TEST] capital_gain, no. missing: 0
+[TRAIN] capital_loss, no. missing: 0
+[TEST] capital_loss, no. missing: 0
+[TRAIN] dividends, no. missing: 0
+[TEST] dividends, no. missing: 0
+[TRAIN] tax_staus, no. missing: 0
+[TEST] tax_staus, no. missing: 0
+[TRAIN] prev_region, no. missing: 0
+[TEST] prev_region, no. missing: 0
+[TRAIN] prev_state, no. missing: 0
+[TEST] prev_state, no. missing: 0
+[TRAIN] household_stat, no. missing: 0
+[TEST] household_stat, no. missing: 0
+[TRAIN] household_summary, no. missing: 0
+[TEST] household_summary, no. missing: 0
+[TRAIN] weight, no. missing: 0
+[TEST] weight, no. missing: 0
+[TRAIN] migration_msa, no. missing: 0
+[TEST] migration_msa, no. missing: 0
+[TRAIN] migration_reg, no. missing: 0
+[TEST] migration_reg, no. missing: 0
+[TRAIN] migration_reg_move, no. missing: 0
+[TEST] migration_reg_move, no. missing: 0
+[TRAIN] 1year_house, no. missing: 0
+[TEST] 1year_house, no. missing: 0
+[TRAIN] prev_sunbelt, no. missing: 0
+[TEST] prev_sunbelt, no. missing: 0
+[TRAIN] n_persons_employer, no. missing: 0
+[TEST] n_persons_employer, no. missing: 0
+[TRAIN] parents, no. missing: 0
+[TEST] parents, no. missing: 0
+[TRAIN] father_birth, no. missing: 0
+[TEST] father_birth, no. missing: 0
+[TRAIN] mother_birth, no. missing: 0
+[TEST] mother_birth, no. missing: 0
+[TRAIN] self_birth, no. missing: 0
+[TEST] self_birth, no. missing: 0
+[TRAIN] citizenship, no. missing: 0
+[TEST] citizenship, no. missing: 0
+[TRAIN] income, no. missing: 0
+[TEST] income, no. missing: 0
+[TRAIN] business, no. missing: 0
+[TEST] business, no. missing: 0
+[TRAIN] taxable_income, no. missing: 0
+[TEST] taxable_income, no. missing: 0
+[TRAIN] veterans_admin, no. missing: 0
+[TEST] veterans_admin, no. missing: 0
+[TRAIN] veterans_benfits, no. missing: 0
+[TEST] veterans_benfits, no. missing: 0
+[TRAIN] label, no. missing: 0
+[TEST] label, no. missing: 0
+
+train_df column info:
+
+train:
+[[73.  0.  0. ...  0.  6.  0.]
+ [58.  0.  0. ...  0.  0.  0.]
+ [18.  0.  0. ...  0.  4.  0.]
+ ...
+ [47.  0.  0. ...  0.  2.  0.]
+ [16.  0.  0. ...  0.  4.  0.]
+ [32.  0.  0. ...  0.  4.  0.]], dtype: float64
+train.shape: (199523, 42), label sum: 12382.0
+
+test:
+[[38.  0.  0. ...  0.  2.  0.]
+ [44.  0.  0. ...  0.  2.  0.]
+ [ 2.  0.  0. ...  0.  4.  0.]
+ ...
+ [24.  0.  0. ...  0.  2.  0.]
+ [30.  0.  0. ...  0.  2.  0.]
+ [67.  0.  0. ...  0.  2.  0.]], dtype: float64
+test.shape: (99762, 42), label sum: 6186.0
+
+features:
+['age', 'wage_per_hour', 'capital_gain', 'capital_loss', 'dividends', 'weight', 'n_persons_employer', 'taxable_income', 'occupation_code', 'prev_region', 'education', 'union_member', 'employment', 'prev_sunbelt', 'major_occupation_code', 'hispanic_origin', 'tax_staus', 'unemployment_reason', 'business', 'self_birth', 'mother_birth', 'major_industry_code', 'household_summary', 'father_birth', 'workclass', 'migration_reg_move', 'prev_state', 'household_stat', 'citizenship', 'enrolled_in_edu', 'sex', 'race', '1year_house', 'parents', 'veterans_benfits', 'veterans_admin', 'industry_code', 'migration_reg', 'migration_msa', 'income', 'marital_status']
+
+saving to categorical/...
+
+categorical feature names:
+['taxable_income', 'occupation_code', 'prev_region', 'education', 'union_member', 'employment', 'prev_sunbelt', 'major_occupation_code', 'hispanic_origin', 'tax_staus', 'unemployment_reason', 'business', 'self_birth', 'mother_birth', 'major_industry_code', 'household_summary', 'father_birth', 'workclass', 'migration_reg_move', 'prev_state', 'household_stat', 'citizenship', 'enrolled_in_edu', 'sex', 'race', '1year_house', 'parents', 'veterans_benfits', 'veterans_admin', 'industry_code', 'migration_reg', 'migration_msa', 'income', 'marital_status']
+
+categorical feature indices:
+[ 7  8  9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30
+ 31 32 33 34 35 36 37 38 39 40]

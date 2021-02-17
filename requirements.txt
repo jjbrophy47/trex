@@ -2,11 +2,11 @@
 catboost==0.15.1
 lightgbm==2.2.3
 xgboost==1.2.0
-scikit-learn==0.21.2
+scikit-learn==0.24.1
 
 # visualization
 matplotlib==3.1.0
-seaborn==0.9.0
+# seaborn==0.9.0
 tqdm==4.32.1
 
 # data manipulation
@@ -15,7 +15,7 @@ pandas==0.24.2
 scipy==1.4.1
 
 # extra explainability
-shap==0.29.3
+# shap==0.29.3
 
 # presentation
-jupyterlab==0.35.6
+# jupyterlab==0.35.6

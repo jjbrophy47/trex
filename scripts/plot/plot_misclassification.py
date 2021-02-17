@@ -60,7 +60,7 @@ def main(args):
 
         width = 5.5  # Neurips 2020
         width, height = set_size(width=width * 3, fraction=1, subplots=(1, 4))
-        fig, axs = plt.subplots(1, 4, figsize=(width, height * 1.25))
+        fig, axs = plt.subplots(1, 4, figsize=(width, height * 1.5))
 
     axs = axs.flatten()
 
@@ -113,9 +113,9 @@ def main(args):
             color='r', hatch='\\', alpha=args.alpha,
             weights=train_weight[train_neg_ndx])
     ax.axvline(test_val, color='k', linestyle='--')
-    ax.set_ylabel('Density')
+    # ax.set_ylabel('Density')
     ax.set_xlabel(feature_name.capitalize())
-    ax.set_title(r'Weighted by $\alpha \hat{y}$')
+    ax.set_title(r'Weighted by $\alpha \hat{y}$', loc='right')
     ax.ticklabel_format(style='sci', axis='y', scilimits=(0, 0))
     ax.tick_params(axis='both', which='major')
 
@@ -134,9 +134,9 @@ def main(args):
             label='neg samples')
     ax.axvline(test_val, color='k', linestyle='--')
     ax.legend(frameon=False)
-    ax.set_ylabel('Density')
+    # ax.set_ylabel('Density')
     ax.set_xlabel(feature_name.capitalize())
-    ax.set_title(r'Weighted by $\alpha \hat{y} \gamma$')
+    ax.set_title(r'Weighted by $\alpha \hat{y} \gamma$', loc='right')
     ax.ticklabel_format(style='sci', axis='y', scilimits=(0, 0))
     ax.tick_params(axis='both', which='major')
 
@@ -147,9 +147,8 @@ def main(args):
     plt.tight_layout()
 
     if not args.two_col:
-        fig.subplots_adjust(wspace=0.25, hspace=0.05)
-
-    plt.savefig(os.path.join(out_dir, 'misclassification.{}'.format(args.ext)))
+        fig.subplots_adjust(wspace=0.3, hspace=0.05)
+    plt.savefig(os.path.join(out_dir, 'misclassification.{}'.format(args.ext)), bbox_inches='tight')
 
 
 if __name__ == '__main__':

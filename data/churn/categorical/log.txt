@@ -1,0 +1,114 @@
+Namespace(processing='categorical', seed=1, test_size=0.2)
+
+timestamp: 2021-02-13 16:59:44.265807
+
+time to read in data...0.034s
+train_df:
+      customerID  gender  SeniorCitizen Partner Dependents  tenure  ...        Contract PaperlessBilling              PaymentMethod MonthlyCharges TotalCharges Churn
+2246  7181-BQYBV  Female              0     Yes        Yes       1  ...  Month-to-month              Yes           Electronic check         102.45       102.45   Yes
+6843  9940-HPQPG  Female              0     Yes         No       9  ...  Month-to-month               No  Bank transfer (automatic)          91.75       865.80   Yes
+159   7554-NEWDD    Male              0      No         No      10  ...        Two year               No  Bank transfer (automatic)          25.70       251.60    No
+6259  2661-GKBTK    Male              0     Yes        Yes      60  ...        Two year               No  Bank transfer (automatic)          76.95      4543.95    No
+4291  2789-CZANW  Female              0     Yes        Yes      64  ...        Two year               No  Bank transfer (automatic)         110.30      6997.30    No
+
+[5 rows x 21 columns]
+(5634, 21)
+test_df:
+      customerID  gender  SeniorCitizen Partner Dependents  tenure  ...        Contract PaperlessBilling              PaymentMethod MonthlyCharges TotalCharges Churn
+6826  7976-CICYS    Male              0      No         No       4  ...  Month-to-month              Yes    Credit card (automatic)          20.70        83.75    No
+687   0067-DKWBL    Male              1      No         No       2  ...  Month-to-month              Yes           Electronic check          49.25        91.10   Yes
+3787  2386-OWURY  Female              0      No         No      58  ...  Month-to-month              Yes           Electronic check          95.30      5817.70    No
+4130  4439-YRNVD  Female              0      No         No      10  ...  Month-to-month               No           Electronic check          36.25       374.00    No
+640   9574-BOSMD    Male              0     Yes        Yes      68  ...        Two year               No  Bank transfer (automatic)          25.40      1620.20    No
+
+[5 rows x 21 columns]
+(1409, 21)
+
+train_df column info:
+
+[TRAIN] customerID, no. missing: 0
+[TEST] customerID, no. missing: 0
+[TRAIN] gender, no. missing: 0
+[TEST] gender, no. missing: 0
+[TRAIN] SeniorCitizen, no. missing: 0
+[TEST] SeniorCitizen, no. missing: 0
+[TRAIN] Partner, no. missing: 0
+[TEST] Partner, no. missing: 0
+[TRAIN] Dependents, no. missing: 0
+[TEST] Dependents, no. missing: 0
+[TRAIN] tenure, no. missing: 0
+[TEST] tenure, no. missing: 0
+[TRAIN] PhoneService, no. missing: 0
+[TEST] PhoneService, no. missing: 0
+[TRAIN] MultipleLines, no. missing: 0
+[TEST] MultipleLines, no. missing: 0
+[TRAIN] InternetService, no. missing: 0
+[TEST] InternetService, no. missing: 0
+[TRAIN] OnlineSecurity, no. missing: 0
+[TEST] OnlineSecurity, no. missing: 0
+[TRAIN] OnlineBackup, no. missing: 0
+[TEST] OnlineBackup, no. missing: 0
+[TRAIN] DeviceProtection, no. missing: 0
+[TEST] DeviceProtection, no. missing: 0
+[TRAIN] TechSupport, no. missing: 0
+[TEST] TechSupport, no. missing: 0
+[TRAIN] StreamingTV, no. missing: 0
+[TEST] StreamingTV, no. missing: 0
+[TRAIN] StreamingMovies, no. missing: 0
+[TEST] StreamingMovies, no. missing: 0
+[TRAIN] Contract, no. missing: 0
+[TEST] Contract, no. missing: 0
+[TRAIN] PaperlessBilling, no. missing: 0
+[TEST] PaperlessBilling, no. missing: 0
+[TRAIN] PaymentMethod, no. missing: 0
+[TEST] PaymentMethod, no. missing: 0
+[TRAIN] MonthlyCharges, no. missing: 0
+[TEST] MonthlyCharges, no. missing: 0
+[TRAIN] TotalCharges, no. missing: 6
+[TEST] TotalCharges, no. missing: 5
+[TRAIN] Churn, no. missing: 0
+[TEST] Churn, no. missing: 0
+transforming features...0.080s
+
+train:
+[[1.00000000e+00 1.02449997e+02 1.02449997e+02 ... 2.00000000e+00
+  0.00000000e+00 1.00000000e+00]
+ [9.00000000e+00 9.17500000e+01 8.65799988e+02 ... 0.00000000e+00
+  0.00000000e+00 1.00000000e+00]
+ [1.00000000e+01 2.57000008e+01 2.51600006e+02 ... 1.00000000e+00
+  0.00000000e+00 0.00000000e+00]
+ ...
+ [2.70000000e+01 1.93999996e+01 5.29799988e+02 ... 1.00000000e+00
+  0.00000000e+00 0.00000000e+00]
+ [2.40000000e+01 9.31500015e+01 2.23105005e+03 ... 2.00000000e+00
+  1.00000000e+00 1.00000000e+00]
+ [1.80000000e+01 8.51999969e+01 1.55390002e+03 ... 0.00000000e+00
+  0.00000000e+00 1.00000000e+00]], dtype: float64
+train.shape: (5634, 20), label sum: 1495.0
+
+test:
+[[4.00000000e+00 2.07000008e+01 8.37500000e+01 ... 1.00000000e+00
+  0.00000000e+00 0.00000000e+00]
+ [2.00000000e+00 4.92500000e+01 9.10999985e+01 ... 0.00000000e+00
+  1.00000000e+00 1.00000000e+00]
+ [5.80000000e+01 9.53000031e+01 5.81770020e+03 ... 2.00000000e+00
+  0.00000000e+00 0.00000000e+00]
+ ...
+ [1.00000000e+00 5.57999992e+01 5.57999992e+01 ... 0.00000000e+00
+  1.00000000e+00 1.00000000e+00]
+ [7.20000000e+01 5.37999992e+01 3.95244995e+03 ... 2.00000000e+00
+  0.00000000e+00 0.00000000e+00]
+ [0.00000000e+00 8.08499985e+01 1.39140002e+03 ... 2.00000000e+00
+  0.00000000e+00 0.00000000e+00]], dtype: float64
+test.shape: (1409, 20), label sum: 374.0
+
+features:
+['tenure', 'MonthlyCharges', 'TotalCharges', 'Partner', 'gender', 'PaymentMethod', 'TechSupport', 'Dependents', 'MultipleLines', 'PaperlessBilling', 'OnlineBackup', 'DeviceProtection', 'PhoneService', 'StreamingTV', 'OnlineSecurity', 'InternetService', 'Contract', 'StreamingMovies', 'SeniorCitizen']
+
+saving to categorical/...
+
+categorical feature names:
+['Partner', 'gender', 'PaymentMethod', 'TechSupport', 'Dependents', 'MultipleLines', 'PaperlessBilling', 'OnlineBackup', 'DeviceProtection', 'PhoneService', 'StreamingTV', 'OnlineSecurity', 'InternetService', 'Contract', 'StreamingMovies', 'SeniorCitizen']
+
+categorical feature indices:
+[ 3  4  5  6  7  8  9 10 11 12 13 14 15 16 17 18]

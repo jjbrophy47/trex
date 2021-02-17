@@ -3,6 +3,8 @@ Model performance.
 """
 import os
 import sys
+import time
+import resource
 import argparse
 import warnings
 warnings.simplefilter(action='ignore', category=UserWarning)  # lgb compiler warning
@@ -10,19 +12,23 @@ here = os.path.abspath(os.path.dirname(__file__))
 sys.path.insert(0, here + '/../')  # for utility
 sys.path.insert(0, here + '/../../')  # for libliner
 
+import numpy as np
 import pandas as pd
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.model_selection import GridSearchCV
 from sklearn.svm import SVC
 from sklearn.svm import LinearSVC
 from sklearn.linear_model import LogisticRegression
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import StandardScaler
 
 from utility import model_util
 from utility import data_util
 from utility import print_util
 
 
-def _get_classifier(args):
+def get_classifier(args, cat_indices=None):
     """
     Return the appropriate classifier.
     """
@@ -30,20 +36,35 @@ def _get_classifier(args):
         clf = model_util.get_classifier(args.model,
                                         n_estimators=args.n_estimators,
                                         max_depth=args.max_depth,
-                                        random_state=args.rs)
+                                        random_state=args.rs,
+                                        cat_indices=cat_indices)
         params = {'n_estimators': [10, 100, 250], 'max_depth': [3, 5, 10, None]}
 
+    elif args.model == 'dt':
+        clf = DecisionTreeClassifier(random_state=args.rs)
+        params = {'criterion': ['gini', 'entropy'], 'splitter': ['best', 'random'],
+                  'max_depth': [3, 5, 10, None]}
+
     elif args.model == 'lr':
-        clf = LogisticRegression(penalty=args.penalty, C=args.C)
-        params = {'penalty': ['l1', 'l2'], 'C': [0.1, 1.0, 10.0]}
+        clf = Pipeline(steps=[
+            ('ss', StandardScaler()),
+            ('lr', LogisticRegression(penalty=args.penalty, C=args.C, solver='liblinear', random_state=args.rs))
+        ])
+        params = {'lr__penalty': ['l1', 'l2'], 'lr__C': [0.1, 1.0, 10.0]}
 
     elif args.model == 'svm_linear':
-        clf = LinearSVC(dual=False, penalty=args.penalty, C=args.C)
-        params = {'penalty': ['l1', 'l2'], 'C': [0.1, 1.0, 10.0]}
+        clf = Pipeline(steps=[
+            ('ss', StandardScaler()),
+            ('svm', LinearSVC(dual=False, penalty=args.penalty, C=args.C, random_state=args.rs))
+        ])
+        params = {'svm__penalty': ['l1', 'l2'], 'svm__C': [0.1, 1.0, 10.0]}
 
     elif args.model == 'svm_rbf':
-        clf = SVC(gamma='auto', C=args.C, kernel=args.kernel)
-        params = {'C': [0.1, 1.0, 10.0]}
+        clf = Pipeline(steps=[
+            ('ss', StandardScaler()),
+            ('svm', SVC(gamma='auto', C=args.C, kernel=args.kernel, random_state=args.rs))
+        ])
+        params = {'svm__C': [0.1, 1.0, 10.0]}
 
     elif args.model == 'knn':
         clf = KNeighborsClassifier(weights=args.weights, n_neighbors=args.n_neighbors)
@@ -60,20 +81,27 @@ def experiment(args, logger, out_dir, seed):
     Main method comparing performance of tree ensembles and svm models.
     """
 
-    # get model and data
-    clf, params = _get_classifier(args)
-    data = data_util.get_data(args.dataset,
-                              random_state=seed,
-                              data_dir=args.data_dir)
-    X_train, X_test, y_train, y_test, label = data
+    # start experiment timer
+    begin = time.time()
 
-    logger.info('train instances: {:,}'.format(len(X_train)))
-    logger.info('test instances: {:,}'.format(len(X_test)))
+    # get model and data
+    clf, params = get_classifier(args)
+    data = data_util.get_data(args.dataset,
+                              data_dir=args.data_dir,
+                              processing_dir=args.processing_dir)
+    X_train, X_test, y_train, y_test, feature, cat_indices = data
+
+    logger.info('no. train: {:,}'.format(X_train.shape[0]))
+    logger.info('no. test: {:,}'.format(X_test.shape[0]))
     logger.info('no. features: {:,}'.format(X_train.shape[1]))
 
     # train model
     logger.info('\nmodel: {}, params: {}'.format(args.model, params))
 
+    # start timer
+    start = time.time()
+
+    # tune the model
     if not args.no_tune:
         gs = GridSearchCV(clf, params, cv=args.cv, verbose=args.verbose).fit(X_train, y_train)
 
@@ -87,36 +115,62 @@ def experiment(args, logger, out_dir, seed):
         model = gs.best_estimator_
         logger.info('best params: {}'.format(gs.best_params_))
 
+    # do not tune the model
     else:
         model = clf.fit(X_train, y_train)
 
-    model_util.performance(model, X_train, y_train, X_test=X_test, y_test=y_test, logger=logger)
+    train_time = time.time() - start
+
+    # evaluate
+    auc, acc, ap, ll = model_util.performance(model, X_test, y_test, logger, name=args.model)
+
+    # save results
+    result = model.get_params()
+    result['model'] = args.model
+    result['auc'] = auc
+    result['acc'] = acc
+    result['ap'] = ap
+    result['ll'] = ll
+    result['train_time'] = train_time
+    result['max_rss'] = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+    np.save(os.path.join(out_dir, 'results.npy'), result)
+
+    logger.info('total time: {:.3f}s'.format(time.time() - begin))
+    logger.info('max_rss: {:,}'.format(result['max_rss']))
 
 
 def main(args):
 
-    # make logger
-    dataset = args.dataset
-
-    out_dir = os.path.join(args.out_dir, dataset, args.model)
+    # create output directory
+    out_dir = os.path.join(args.out_dir,
+                           args.dataset,
+                           args.model,
+                           args.processing_dir,
+                           'rs_{}'.format(args.rs))
     os.makedirs(out_dir, exist_ok=True)
-    logger = print_util.get_logger(os.path.join(out_dir, '{}.txt'.format(args.dataset)))
+
+    # create logger
+    logger = print_util.get_logger(os.path.join(out_dir, 'log.txt'))
     logger.info(args)
 
+    # run experiment
     experiment(args, logger, out_dir, seed=args.rs)
 
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='Feature representation extractions for tree ensembles',
-                                     formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    parser = argparse.ArgumentParser()
 
-    parser.add_argument('--dataset', type=str, default='adult', help='dataset to explain.')
+    # I/O settings
+    parser.add_argument('--dataset', type=str, default='churn', help='dataset to explain.')
     parser.add_argument('--data_dir', type=str, default='data', help='data directory.')
+    parser.add_argument('--processing_dir', type=str, default='standard', help='processing directory.')
     parser.add_argument('--out_dir', type=str, default='output/performance/', help='output directory.')
 
+    # Experiment settings
+    parser.add_argument('--rs', type=int, default=1, help='random state.')
     parser.add_argument('--model', type=str, default='cb', help='model to use.')
     parser.add_argument('--no_tune', action='store_true', default=False, help='do not tune the model.')
-    parser.add_argument('--cv', type=int, default=3, help='number of cross-val folds.')
+    parser.add_argument('--cv', type=int, default=5, help='number of cross-val folds.')
 
     # tree hyperparameters
     parser.add_argument('--n_estimators', type=int, default=100, help='Number of trees.')
@@ -131,7 +185,7 @@ if __name__ == '__main__':
     parser.add_argument('--weights', type=str, default='uniform', help='knn weights.')
     parser.add_argument('--n_neighbors', type=int, default=3, help='number of k nearest neighbors.')
 
-    parser.add_argument('--rs', type=int, default=1, help='random state.')
+    # Extra settings
     parser.add_argument('--verbose', default=2, type=int, help='verbosity level.')
 
     args = parser.parse_args()
