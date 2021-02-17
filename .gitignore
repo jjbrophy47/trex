@@ -34,9 +34,9 @@ data/*/*.dat
 data/*/*.txt
 data/*/*.data
 data/*/*.test
-data/standard/
-data/categorical/
-data/old/
+data/*/standard/
+data/*/categorical/
+data/*/old/
 
 # data to ignore
 data/bank_marketing
