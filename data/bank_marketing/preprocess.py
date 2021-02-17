@@ -15,6 +15,7 @@ from sklearn.preprocessing import OrdinalEncoder
 from sklearn.preprocessing import LabelEncoder
 from sklearn.compose import ColumnTransformer
 from sklearn.pipeline import Pipeline
+from sklearn.model_selection import train_test_split
 
 here = os.path.abspath(os.path.dirname(__file__))
 sys.path.insert(0, here + '/../')  # for utility
@@ -22,17 +23,6 @@ from utility import util
 
 
 def main(args):
-
-    # categorize attributes
-    columns = ['age', 'workclass', 'industry_code', 'occupation_code', 'education',
-               'wage_per_hour', 'enrolled_in_edu', 'marital_status', 'major_industry_code', 'major_occupation_code',
-               'race', 'hispanic_origin', 'sex', 'union_member', 'unemployment_reason',
-               'employment', 'capital_gain', 'capital_loss', 'dividends', 'tax_staus',
-               'prev_region', 'prev_state', 'household_stat', 'household_summary', 'weight',
-               'migration_msa', 'migration_reg', 'migration_reg_move', '1year_house', 'prev_sunbelt',
-               'n_persons_employer', 'parents', 'father_birth', 'mother_birth', 'self_birth',
-               'citizenship', 'income', 'business', 'taxable_income', 'veterans_admin',
-               'veterans_benfits', 'label']
 
     # create output directory
     if args.processing == 'standard':
@@ -50,11 +40,18 @@ def main(args):
 
     # retrieve dataset
     start = time.time()
-    train_df = pd.read_csv('census-income.data', header=None, names=columns)
-    test_df = pd.read_csv('census-income.test', header=None, names=columns)
+    df = pd.read_csv('bank-additional_bank-additional-full.csv', sep=';')
     logger.info('\ntime to read in data...{:.3f}s'.format(time.time() - start))
 
-    logger.info('\ntrain_df:\n{}\n{}'.format(train_df.head(5), train_df.shape))
+    # split data into train and test
+    train_df, test_df = train_test_split(df, test_size=args.test_size,
+                                         random_state=args.seed, stratify=df['y'])
+
+    # get features
+    columns = list(train_df.columns)
+
+    # display datasets
+    logger.info('train_df:\n{}\n{}'.format(train_df.head(5), train_df.shape))
     logger.info('test_df:\n{}\n{}'.format(test_df.head(5), test_df.shape))
 
     # count number of NAN values per column
@@ -73,25 +70,30 @@ def main(args):
     if len(remove_cols) > 0:
         train_df = train_df.drop(columns=remove_cols)
         test_df = test_df.drop(columns=remove_cols)
-        columns = [x for x in columns if x not in remove_cols]
 
     # categorize attributes
-    label = ['label']
-    numeric_features = ['age', 'wage_per_hour', 'capital_gain', 'capital_loss',
-                        'dividends', 'weight', 'n_persons_employer']
+    label = ['y']
+    numeric_features = ['age', 'duration', 'campaign', 'pdays', 'previous',
+                        'emp.var.rate', 'cons.price.idx', 'cons.conf.idx',
+                        'euribor3m', 'nr.employed']
     categorical_features = list(set(columns) - set(numeric_features) - set(label))
 
     numeric_transformer = Pipeline(steps=[
-        ('imputer', SimpleImputer(strategy='median'))])
+        ('imputer', SimpleImputer(strategy='median'))]
+    )
 
     categorical_transformer = Pipeline(steps=[
-        ('imputer', SimpleImputer(strategy='constant', fill_value='missing')),
-        ('onehot', OneHotEncoder(handle_unknown='ignore'))])
+        ('imputer', SimpleImputer(strategy='constant', fill_value=-1)),
+        ('onehot', OneHotEncoder(handle_unknown='ignore'))]
+    )
 
     ordinal_transformer = Pipeline(steps=[
         ('imputer', SimpleImputer(strategy='constant', fill_value=-1)),
-        ('ordinal', OrdinalEncoder())]
+        ('ordinal', OrdinalEncoder(handle_unknown='use_encoded_value', unknown_value=-1))]
     )
+
+    # time transforms
+    start = time.time()
 
     # perform one-hot encoding for all cat. attributes
     if args.processing == 'standard':
@@ -144,6 +146,8 @@ def main(args):
     else:
         raise ValueError('args.processing: {} unknown!'.format(args.processing))
 
+    logger.info('transforming features...{:.3f}s'.format(time.time() - start))
+
     feature_list = util.get_feature_names(preprocessor)
     assert len(feature_list) == train.shape[1] - 1 == test.shape[1] - 1
 
@@ -174,5 +178,7 @@ def main(args):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--processing', type=str, default='categorical', help='regular or categorical.')
+    parser.add_argument('--test_size', type=float, default=0.2, help='frac. of samples to use for testing.')
+    parser.add_argument('--seed', type=int, default=1, help='random state.')
     args = parser.parse_args()
     main(args)

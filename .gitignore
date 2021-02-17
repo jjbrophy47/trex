@@ -40,7 +40,6 @@ data/*/categorical/
 data/*/old/
 
 # data to ignore
-data/bank_marketing
 data/banknote
 data/creditcard
 data/diabetes
