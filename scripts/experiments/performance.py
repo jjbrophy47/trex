@@ -139,6 +139,8 @@ def experiment(args, logger, out_dir, seed):
     np.save(os.path.join(out_dir, 'results.npy'), result)
 
     logger.info('total time: {:.3f}s'.format(time.time() - begin))
+
+    # Macs show this in bytes, unix machines show this in KB
     logger.info('max_rss: {:,}'.format(result['max_rss']))
 
 

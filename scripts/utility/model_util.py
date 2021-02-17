@@ -88,9 +88,12 @@ def missed_instances(y1, y2, y_true):
     """
     Returns indexes missed by both y1 and y2.
     """
-
     both_ndx = np.where((y1 == y2) & (y1 != y_true))[0]
     return both_ndx
+
+
+def sigmoid(z):
+    return 1 / (1 + np.exp(-z))
 
 
 def performance(model, X_test, y_test, logger=None,
@@ -99,17 +102,28 @@ def performance(model, X_test, y_test, logger=None,
     Returns AUROC and accuracy scores.
     """
 
-    # predict
-    proba = model.predict_proba(X_test)[:, 1]
+    # generate prediction probabilities
+    proba = None
+    if hasattr(model, 'predict_proba'):
+        proba = model.predict_proba(X_test)[:, 1]
+    elif hasattr(model, 'decision_function'):
+        proba = sigmoid(model.decision_function(X_test)).reshape(-1, 1)
+    else:
+        proba = None
+
+    # generate predictions
     pred = model.predict(X_test)
 
     # evaluate
-    auc = roc_auc_score(y_test, proba)
+    auc = roc_auc_score(y_test, proba) if proba is not None else None
     acc = accuracy_score(y_test, pred)
-    ap = average_precision_score(y_test, proba)
-    ll = log_loss(y_test, proba)
+    ap = average_precision_score(y_test, proba) if proba is not None else None
+    ll = log_loss(y_test, proba) if proba is not None else None
 
-    score_str = '[{}] auc: {:.3f}, acc: {:.3f}, ap: {:.3f}, ll: {:.3f}'
+    if proba is not None:
+        score_str = '[{}] auc: {:.3f}, acc: {:.3f}, ap: {:.3f}, ll: {:.3f}'
+    else:
+        score_str = '[{}] auc: {}, acc: {:.3f}, ap: {}, ll: {}'
 
     if logger:
         logger.info(score_str.format(name, auc, acc, ap, ll))

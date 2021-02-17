@@ -4,7 +4,7 @@ time=$3
 partition=$4
 
 rs_list=(1 2 3 4 5)
-model_list=('dt' 'lr' 'svm_linear' 'svm_rbf' 'knn')
+model_list=('cb' 'dt' 'lr' 'svm_linear' 'svm_rbf' 'knn')
 
 for model in ${model_list[@]}; do
     for rs in ${rs_list[@]}; do
