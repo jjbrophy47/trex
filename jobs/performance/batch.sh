@@ -1,7 +1,7 @@
-sbatch jobs/performance/primer.sh adult 5 1440 short
-sbatch jobs/performance/primer.sh amazon 5 1440 short
-sbatch jobs/performance/primer.sh census 5 1440 short
-sbatch jobs/performance/primer.sh churn 5 1440 short
+./jobs/performance/primer.sh adult 5 1440 short
+./jobs/performance/primer.sh amazon 5 1440 short
+./jobs/performance/primer.sh census 5 1440 short
+./jobs/performance/primer.sh churn 5 1440 short
 
 
 # sbatch jobs/performance/primer.sh churn svm_linear
