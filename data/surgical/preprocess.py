@@ -7,6 +7,7 @@ import time
 import argparse
 
 import pandas as pd
+from sklearn.model_selection import train_test_split
 
 here = os.path.abspath(os.path.dirname(__file__))
 sys.path.insert(0, here + '/../')  # for utility
@@ -17,9 +18,14 @@ def main(args):
 
     # retrieve dataset
     start = time.time()
-    train_df = pd.read_csv('train.csv')
-    test_df = pd.read_csv('test.csv')
+    data_df = pd.read_csv('Surgical-deepnet.csv')
     print('\ntime to read in data...{:.3f}s'.format(time.time() - start))
+
+    # split data into train and test
+    train_df, test_df = train_test_split(data_df,
+                                         test_size=args.test_size,
+                                         random_state=args.seed,
+                                         stratify=data_df['complication'])
 
     # get features
     columns = list(train_df.columns)
@@ -33,8 +39,9 @@ def main(args):
 
     # categorize attributes
     features = {}
-    features['label'] = ['ACTION']
-    features['numeric'] = []
+    features['label'] = ['complication']
+    features['numeric'] = ['bmi', 'Age', 'ccsComplicationRate', 'ccsMort30Rate',
+                           'complication_rsi', 'hour', 'mortality_rsi']
     features['categorical'] = list(set(columns) - set(features['numeric']) - set(features['label']))
 
     util.preprocess(train_df, test_df, features, processing=args.processing)
@@ -43,5 +50,7 @@ def main(args):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--processing', type=str, default='categorical', help='regular or categorical.')
+    parser.add_argument('--test_size', type=float, default=0.2, help='frac. of samples to use for testing.')
+    parser.add_argument('--seed', type=int, default=1, help='random state.')
     args = parser.parse_args()
     main(args)

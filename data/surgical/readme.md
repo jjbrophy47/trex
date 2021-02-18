@@ -1,7 +1,7 @@
-Churn Dataset
+Surgical Dataset
 ---
-* Download the following files from [https://www.kaggle.com/blastchar/telco-customer-churn](https://www.kaggle.com/blastchar/telco-customer-churn) to this directory.
-    * `WA_Fn-UseC_-Telco-Customer-Churn.csv`.
+* Download the following files from [https://www.kaggle.com/omnamahshivai/surgical-dataset-binary-classification/version/1#](https://www.kaggle.com/omnamahshivai/surgical-dataset-binary-classification/version/1#) to this directory.
+	* `Surgical-deepnet.csv`.
 
 * Preprocess the data.
     * Run `python3 preprocess.py` with arguments:

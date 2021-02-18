@@ -3,6 +3,7 @@ mem=$2
 time=$3
 partition=$4
 
+processing='standard'
 rs_list=(1 2 3 4 5)
 model_list=('cb' 'dt' 'lr' 'svm_linear' 'svm_rbf' 'knn')
 
@@ -16,6 +17,6 @@ for model in ${model_list[@]}; do
                --job-name=$job_name \
                --output=jobs/logs/performance/$job_name \
                --error=jobs/errors/performance/$job_name \
-               jobs/performance/runner.sh $dataset $model $rs
+               jobs/performance/runner.sh $dataset $model $rs $processing
     done
 done
