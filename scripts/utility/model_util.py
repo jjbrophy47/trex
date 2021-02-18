@@ -19,7 +19,7 @@ def get_classifier(model,
                    n_estimators=20,
                    max_depth=None,
                    learning_rate=0.03,
-                   random_state=69,
+                   random_state=1,
                    cat_indices=None):
     """
     Returns a tree ensemble classifier.
@@ -35,7 +35,7 @@ def get_classifier(model,
     # CatBoost
     elif model == 'cb':
         import catboost
-        train_dir = os.path.join('.catboost_info', str(uuid.uuid4()))
+        train_dir = os.path.join('.catboost_info', 'rs_{}'.format(random_state), str(uuid.uuid4()))
         os.makedirs(train_dir, exist_ok=True)
         clf = catboost.CatBoostClassifier(random_state=random_state,
                                           n_estimators=n_estimators,
