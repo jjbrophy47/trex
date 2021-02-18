@@ -8,9 +8,11 @@ dataset=$1
 model=$2
 rs=$3
 processing=$4
+tune_frac=$5
 
 python3 scripts/experiments/performance.py \
   --dataset $dataset \
   --model $model \
-  --rs $rs
+  --rs $rs \
   --processing $processing \
+  --tune_frac $tune_frac

@@ -1,9 +1,10 @@
 dataset=$1
 model=$2
 processing=$3
-mem=$4
-time=$5
-partition=$6
+tune_frac=$4
+mem=$5
+time=$6
+partition=$7
 
 rs_list=(1 2 3 4 5)
 
@@ -16,5 +17,5 @@ for rs in ${rs_list[@]}; do
            --job-name=$job_name \
            --output=jobs/logs/performance/$job_name \
            --error=jobs/errors/performance/$job_name \
-           jobs/performance/runner.sh $dataset $model $rs $processing
+           jobs/performance/runner.sh $dataset $model $rs $processing $tune_frac
 done

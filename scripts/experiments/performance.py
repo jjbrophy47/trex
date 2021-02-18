@@ -23,6 +23,8 @@ from sklearn.tree import DecisionTreeClassifier
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import StratifiedKFold
+from sklearn.model_selection import StratifiedShuffleSplit
+from sklearn.base import clone
 
 from utility import model_util
 from utility import data_util
@@ -85,8 +87,7 @@ def experiment(args, logger, out_dir, seed):
     # start experiment timer
     begin = time.time()
 
-    # get model and data
-    model, param_grid = get_classifier(args)
+    # get data
     data = data_util.get_data(args.dataset,
                               data_dir=args.data_dir,
                               processing_dir=args.processing_dir)
@@ -96,17 +97,35 @@ def experiment(args, logger, out_dir, seed):
     logger.info('no. test: {:,}'.format(X_test.shape[0]))
     logger.info('no. features: {:,}'.format(X_train.shape[1]))
 
-    # train model
+    # tune on a fraction of the training data
+    if not args.no_tune:
+
+        if args.tune_frac < 1.0:
+            sss = StratifiedShuffleSplit(n_splits=1, test_size=2,
+                                         train_size=args.tune_frac,
+                                         random_state=args.rs)
+            tune_indices, _ = list(sss.split(X_train, y_train))[0]
+            X_train_sub, y_train_sub = X_train[tune_indices], y_train[tune_indices]
+            logger.info('tune instances: {:,}'.format(X_train_sub.shape[0]))
+
+        else:
+            X_train_sub, y_train_sub = X_train, y_train
+    else:
+        X_train_sub, y_train_sub = X_train, y_train
+
+    # get model
+    model, param_grid = get_classifier(args)
     logger.info('\nmodel: {}, param_grid: {}'.format(args.model, param_grid))
 
     # start timer
     start = time.time()
 
     # tune the model
+    start = time.time()
     if not args.no_tune:
         skf = StratifiedKFold(n_splits=args.cv, shuffle=True, random_state=args.rs)
         gs = GridSearchCV(model, param_grid, scoring=args.scoring, cv=skf, verbose=args.verbose)
-        gs = gs.fit(X_train, y_train)
+        gs = gs.fit(X_train_sub, y_train_sub)
 
         cols = ['mean_fit_time', 'mean_test_score', 'rank_test_score']
         cols += ['param_{}'.format(param) for param in param_grid.keys()]
@@ -115,14 +134,17 @@ def experiment(args, logger, out_dir, seed):
         logger.info('gridsearch results:')
         logger.info(df[cols].sort_values('rank_test_score'))
 
-        model = gs.best_estimator_
+        model = clone(gs.best_estimator_)
         logger.info('best params: {}'.format(gs.best_params_))
 
-    # do not tune the model
-    else:
-        model = model.fit(X_train, y_train)
+    tune_time = time.time() - start
+    logger.info('tune time: {:.3f}s'.format(tune_time))
 
+    # train model
+    start = time.time()
+    model = model.fit(X_train, y_train)
     train_time = time.time() - start
+    logger.info('train time: {:.3f}s'.format(train_time))
 
     # evaluate
     auc, acc, ap, ll = model_util.performance(model, X_test, y_test, logger, name=args.model)
@@ -134,8 +156,10 @@ def experiment(args, logger, out_dir, seed):
     result['acc'] = acc
     result['ap'] = ap
     result['ll'] = ll
+    result['tune_time'] = train_time
     result['train_time'] = train_time
     result['max_rss'] = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+    result['tune_frac'] = args.tune_frac
     np.save(os.path.join(out_dir, 'results.npy'), result)
 
     logger.info('total time: {:.3f}s'.format(time.time() - begin))
@@ -186,6 +210,7 @@ if __name__ == '__main__':
     parser.add_argument('--no_tune', action='store_true', default=False, help='do not tune the model.')
     parser.add_argument('--cv', type=int, default=5, help='number of cross-val folds.')
     parser.add_argument('--scoring', type=str, default='accuracy', help='scoring metric.')
+    parser.add_argument('--tune_frac', type=float, default=1.0, help='fraction of train data to use for tuning.')
 
     # tree hyperparameters
     parser.add_argument('--n_estimators', type=int, default=100, help='Number of trees.')

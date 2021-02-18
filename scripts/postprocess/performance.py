@@ -82,19 +82,15 @@ def process_results(df):
     Averages utility results over different random states.
     """
 
-    groups = ['dataset', 'criterion', 'model', 'bootstrap']
+    groups = ['dataset', 'model', 'processing']
 
     main_result_list = []
-
-    df['max_features'] = df['max_features'].fillna(-1)
 
     for tup, gf in tqdm(df.groupby(groups)):
         main_result = {k: v for k, v in zip(groups, tup)}
         main_result.update(process_utility(gf))
-        main_result['n_estimators'] = gf['n_estimators'].mode()[0]
-        main_result['max_depth'] = gf['max_depth'].mode()[0]
-        main_result['max_features'] = gf['max_features'].mode()[0]
         main_result['num_runs'] = len(gf)
+        main_result['max_rss'] = gf['max_rss'].mean()
         main_result_list.append(main_result)
 
     main_df = pd.DataFrame(main_result_list)
@@ -113,7 +109,7 @@ def create_csv(args, out_dir, logger):
 
     results = []
     for dataset, model, processing, rs in tqdm(experiment_settings):
-        template = {'dataset': dataset, 'model': model, 'processing': processing, 'rf': rs}
+        template = {'dataset': dataset, 'model': model, 'processing': processing, 'rs': rs}
         experiment_dir = os.path.join(args.in_dir,
                                       dataset,
                                       model,
@@ -164,8 +160,9 @@ if __name__ == '__main__':
 
     # experiment settings
     parser.add_argument('--dataset', type=str, nargs='+',
-                        default=['adult', 'amazon', 'census', 'churn'], help='dataset.')
-    parser.add_argument('--model', type=int, nargs='+', help='model to extract the results.',
+                        default=['churn', 'surgical', 'vaccine', 'amazon', 'bank_marketing', 'adult', 'census'],
+                        help='dataset.')
+    parser.add_argument('--model', type=int, nargs='+', help='model to extract the results for.',
                         default=['cb', 'dt', 'lr', 'svm_linear', 'svm_rbf', 'knn'])
     parser.add_argument('--processing', type=int, nargs='+', default=['standard', 'categorical'], help='processing.')
     parser.add_argument('--rs', type=int, nargs='+', default=[1, 2, 3, 4, 5], help='random state.')
