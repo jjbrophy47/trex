@@ -115,7 +115,7 @@ def experiment(args, logger, out_dir, seed):
         X_train_sub, y_train_sub = X_train, y_train
 
     # get model
-    model, param_grid = get_classifier(args)
+    model, param_grid = get_classifier(args, cat_indices=cat_indices)
     logger.info('\nmodel: {}, param_grid: {}'.format(args.model, param_grid))
 
     # start timer

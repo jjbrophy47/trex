@@ -6,7 +6,6 @@ import sys
 import time
 import argparse
 
-import numpy as np
 import pandas as pd
 from sklearn.model_selection import train_test_split
 
@@ -46,11 +45,6 @@ def main(args):
     features['label'] = ['Churn']
     features['numeric'] = ['tenure', 'MonthlyCharges', 'TotalCharges']
     features['categorical'] = list(set(columns) - set(features['numeric']) - set(features['label']))
-
-    # convert columns to floats
-    for c in features['numeric']:
-        train_df[c] = train_df[c].astype(np.float32)
-        test_df[c] = test_df[c].astype(np.float32)
 
     util.preprocess(train_df, test_df, features, processing=args.processing)
 
