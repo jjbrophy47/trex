@@ -8,8 +8,6 @@
 ./jobs/performance/primer.sh 'census' 7 1440 'short'
 
 # single model
-./jobs/performance/primer_single.sh 'census' 'lr' 'standard' 1.0 7 1440 'short'
-./jobs/performance/primer_single.sh 'census' 'svm_linear' 'standard' 1.0 7 1440 'short'
 ./jobs/performance/primer_single.sh 'census' 'svm_rbf' 'standard' 0.25 20 1440 'short'
 ./jobs/performance/primer_single.sh 'amazon' 'lr' 'standard' 1.0 20 1440 'short'
 ./jobs/performance/primer_single.sh 'amazon' 'svm_linear' 'standard' 1.0 20 1440 'short'
