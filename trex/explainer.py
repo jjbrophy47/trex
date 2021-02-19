@@ -24,7 +24,7 @@ class TreeExplainer:
                  kernel_model='klr',
                  tree_kernel='leaf_output',
                  val_frac=0.1,
-                 param_grid={'C': [1e-2, 1e-1, 1e0]},
+                 param_grid={'C': [1e-2, 1e-1, 1e0, 1e1]},
                  metric='pearson',
                  use_predicted_label=True,
                  pred_size=1000,

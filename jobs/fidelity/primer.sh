@@ -6,6 +6,7 @@ mem=$5
 time=$6
 partition=$7
 
+metric='mse'
 surrogate_list=('klr' 'svm' 'knn')
 tree_kernel_list=('leaf_output' 'tree_output' 'leaf_path')
 rs_list=(1 2 3 4 5)
@@ -22,7 +23,7 @@ for surrogate in ${surrogate_list[@]}; do
                    --output=jobs/logs/fidelity/$job_name \
                    --error=jobs/errors/fidelity/$job_name \
                    jobs/fidelity/runner.sh $dataset $model \
-                   $n_estimators $max_depth $surrogate $tree_kernel $rs
+                   $n_estimators $max_depth $surrogate $tree_kernel $metric $rs
         done
     done
 done

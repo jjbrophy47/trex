@@ -129,6 +129,7 @@ def experiment(args, out_dir, logger):
     result['n_estimators'] = args.n_estimators
     result['max_depth'] = args.max_depth
     result['surrogate'] = args.surrogate
+    result['tree_kernel'] = args.tree_kernel
     result['train_time'] = train_time
     result['max_rss'] = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
     result['tune_frac'] = args.tune_frac

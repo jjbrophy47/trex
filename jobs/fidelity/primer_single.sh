@@ -4,9 +4,10 @@ n_estimators=$3
 max_depth=$4
 surrogate=$5
 tree_kernel=$6
-mem=$7
-time=$8
-partition=$9
+metric=$7
+mem=$8
+time=$9
+partition=${10}
 
 rs_list=(1 2 3 4 5)
 
@@ -20,5 +21,5 @@ for rs in ${rs_list[@]}; do
            --output=jobs/logs/fidelity/$dataset \
            --error=jobs/errors/fidelity/$dataset \
            jobs/fidelity/trex_runner.sh $dataset $model \
-           $n_estimators $max_depth $surrogate $tree_kernel $rs
+           $n_estimators $max_depth $surrogate $tree_kernel $metric $rs
 done

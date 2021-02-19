@@ -8,5 +8,5 @@
 ./jobs/fidelity/primer.sh 'census' 'cb' 100 5 7 1440 'short'
 
 # single settings
-./jobs/fidelity/primer.sh 'census' 'cb' 100 5 'klr' 'leaf_output' 7 1440 'short'
+./jobs/fidelity/primer.sh 'census' 'cb' 100 5 'klr' 'leaf_output' 'mse' 7 1440 'short'
 

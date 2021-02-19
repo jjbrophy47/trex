@@ -10,7 +10,8 @@ n_estimators=$3
 max_depth=$4
 surrogate=$5
 tree_kernel=$6
-rs=$7
+metric=$7
+rs=$8
 
 python3 scripts/experiments/fidelity.py \
   --dataset $dataset \
@@ -20,4 +21,5 @@ python3 scripts/experiments/fidelity.py \
   --surrogate $surrogate \
   --kernel_model $surrogate \
   --tree_kernel $tree_kernel \
+  --metric $metric \
   --rs $rs
