@@ -15,12 +15,12 @@ from sklearn.metrics import average_precision_score
 from sklearn.metrics import log_loss
 
 
-def get_classifier(model,
-                   n_estimators=20,
-                   max_depth=None,
-                   learning_rate=0.03,
-                   random_state=1,
-                   cat_indices=None):
+def get_model(model,
+              n_estimators=20,
+              max_depth=None,
+              learning_rate=0.03,
+              random_state=1,
+              cat_indices=None):
     """
     Returns a tree ensemble classifier.
     """

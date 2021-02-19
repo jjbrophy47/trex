@@ -32,16 +32,16 @@ from utility import data_util
 from utility import print_util
 
 
-def get_classifier(args, cat_indices=None):
+def get_model(args, cat_indices=None):
     """
     Return the appropriate classifier.
     """
     if args.model in ['cb', 'lgb', 'xgb', 'rf']:
-        clf = model_util.get_classifier(args.model,
-                                        n_estimators=args.n_estimators,
-                                        max_depth=args.max_depth,
-                                        random_state=args.rs,
-                                        cat_indices=cat_indices)
+        clf = model_util.get_model(args.model,
+                                   n_estimators=args.n_estimators,
+                                   max_depth=args.max_depth,
+                                   random_state=args.rs,
+                                   cat_indices=cat_indices)
         params = {'n_estimators': [10, 25, 50, 100, 250], 'max_depth': [3, 5, 10, None]}
 
     elif args.model == 'dt':
@@ -115,7 +115,7 @@ def experiment(args, logger, out_dir, seed):
         X_train_sub, y_train_sub = X_train, y_train
 
     # get model
-    model, param_grid = get_classifier(args, cat_indices=cat_indices)
+    model, param_grid = get_model(args, cat_indices=None)
     logger.info('\nmodel: {}, param_grid: {}'.format(args.model, param_grid))
 
     # start timer
@@ -162,8 +162,8 @@ def experiment(args, logger, out_dir, seed):
     result['max_rss'] = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
     result['tune_frac'] = args.tune_frac
     if args.model == 'cb':
-        result['n_estimators'] = model.n_estimators
-        result['max_depth'] = model.max_depth
+        result['n_estimators'] = gs.best_params_['n_estimators']
+        result['max_depth'] = gs.best_params_['max_depth']
     np.save(os.path.join(out_dir, 'results.npy'), result)
 
     logger.info('total time: {:.3f}s'.format(time.time() - begin))

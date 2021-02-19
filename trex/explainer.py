@@ -7,7 +7,7 @@ Currently supports: sklearn's RandomForestClassifier and GBMClassifier,
 import os
 import uuid
 
-import pickle
+# import pickle
 import numpy as np
 from sklearn.utils.validation import check_X_y
 
@@ -115,20 +115,20 @@ class TreeExplainer:
     #     s += '\n'
     #     return s
 
-    def save(self, fn):
-        """
-        Stores the model for later use.
-        """
-        with open(fn, 'wb') as f:
-            f.write(pickle.dumps(self))
+    # def save(self, fn):
+    #     """
+    #     Stores the model for later use.
+    #     """
+    #     with open(fn, 'wb') as f:
+    #         f.write(pickle.dumps(self))
 
-    def load(fn):
-        """
-        Loads a previously saved model.
-        """
-        assert os.path.exists(fn)
-        with open(fn, 'rb') as f:
-            return pickle.loads(f.read())
+    # def load(fn):
+    #     """
+    #     Loads a previously saved model.
+    #     """
+    #     assert os.path.exists(fn)
+    #     with open(fn, 'rb') as f:
+    #         return pickle.loads(f.read())
 
     def decision_function(self, X):
         """

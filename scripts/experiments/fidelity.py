@@ -42,11 +42,11 @@ def experiment(args, out_dir, logger):
     logger.info('no. features: {:,}'.format(X_train.shape[1]))
 
     # get tree-ensemble
-    model = model_util.get_classifier(args.model,
-                                      n_estimators=args.n_estimators,
-                                      max_depth=args.max_depth,
-                                      random_state=args.rs,
-                                      cat_indices=cat_indices)
+    model = model_util.get_model(args.model,
+                                 n_estimators=args.n_estimators,
+                                 max_depth=args.max_depth,
+                                 random_state=args.rs,
+                                 cat_indices=cat_indices)
 
     logger.info('\nno. trees: {:,}'.format(args.n_estimators))
     logger.info('max depth: {}'.format(args.max_depth))
