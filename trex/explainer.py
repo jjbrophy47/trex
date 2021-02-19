@@ -89,7 +89,8 @@ class TreeExplainer:
                                           val_frac=val_frac,
                                           metric=self.metric,
                                           seed=self.random_state,
-                                          logger=self.logger)
+                                          logger=self.logger,
+                                          temp_dir=self.temp_dir)
 
         # validation checks
         self.validate()

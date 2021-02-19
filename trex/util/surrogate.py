@@ -17,7 +17,8 @@ from ..models.linear_model import KernelLogisticRegression
 
 
 def train_surrogate(model, surrogate, param_grid, X_train, X_train_alt, y_train,
-                    val_frac=0.1, metric='pearson', cv=5, seed=1, logger=None):
+                    val_frac=0.1, metric='pearson', cv=5, seed=1, logger=None,
+                    temp_dir='.surrogate'):
     """
     Tunes a surrogate model by choosing hyperparameters that provide the best fidelity
     correlation to the tree-ensemble predictions.
@@ -69,7 +70,7 @@ def train_surrogate(model, surrogate, param_grid, X_train, X_train_alt, y_train,
             y_val_train_pred = m1.predict(X_val_train)
 
             # train a surrogate model on the predicted labels
-            m2 = get_surrogate_model(surrogate, params).fit(X_val_alt_train, y_val_train_pred)
+            m2 = get_surrogate_model(surrogate, params, temp_dir).fit(X_val_alt_train, y_val_train_pred)
 
             # generate predictions on the test set
             m1_proba = m1.predict_proba(X_val_test)[:, 1]
@@ -102,7 +103,7 @@ def train_surrogate(model, surrogate, param_grid, X_train, X_train_alt, y_train,
     # train the surrogate model on the train set using predicted labels
     start = time.time()
     y_train_pred = model.predict(X_train)
-    surrogate_model = get_surrogate_model(surrogate, params=best_params)
+    surrogate_model = get_surrogate_model(surrogate, params=best_params, temp_dir=temp_dir)
     surrogate_model = surrogate_model.fit(X_train_alt, y_train_pred)
 
     # display train results
@@ -113,7 +114,7 @@ def train_surrogate(model, surrogate, param_grid, X_train, X_train_alt, y_train,
 
 
 # private
-def get_surrogate_model(surrogate='klr', params={}, temp_dir='.'):
+def get_surrogate_model(surrogate='klr', params={}, temp_dir='.surrogate'):
     """
     Return C implementation of the kernel model.
     """
