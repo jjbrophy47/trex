@@ -7,10 +7,8 @@ import time
 import resource
 import argparse
 import warnings
+from datetime import datetime
 warnings.simplefilter(action='ignore', category=UserWarning)  # lgb compiler warning
-here = os.path.abspath(os.path.dirname(__file__))
-sys.path.insert(0, here + '/../')  # for utility
-sys.path.insert(0, here + '/../../')  # for libliner
 
 import numpy as np
 import pandas as pd
@@ -26,6 +24,9 @@ from sklearn.model_selection import StratifiedKFold
 from sklearn.model_selection import StratifiedShuffleSplit
 from sklearn.base import clone
 
+here = os.path.abspath(os.path.dirname(__file__))
+sys.path.insert(0, here + '/../')  # for utility
+sys.path.insert(0, here + '/../../')  # for libliner
 from utility import model_util
 from utility import data_util
 from utility import print_util
@@ -41,7 +42,7 @@ def get_classifier(args, cat_indices=None):
                                         max_depth=args.max_depth,
                                         random_state=args.rs,
                                         cat_indices=cat_indices)
-        params = {'n_estimators': [10, 100, 250], 'max_depth': [3, 5, 10, None]}
+        params = {'n_estimators': [10, 25, 50, 100, 250], 'max_depth': [3, 5, 10, None]}
 
     elif args.model == 'dt':
         clf = DecisionTreeClassifier(random_state=args.rs)
@@ -53,21 +54,21 @@ def get_classifier(args, cat_indices=None):
             ('ss', StandardScaler()),
             ('lr', LogisticRegression(penalty=args.penalty, C=args.C, solver='liblinear', random_state=args.rs))
         ])
-        params = {'lr__penalty': ['l1', 'l2'], 'lr__C': [0.1, 1.0, 10.0]}
+        params = {'lr__penalty': ['l1', 'l2'], 'lr__C': [1e-2, 1e-1, 1e0]}
 
     elif args.model == 'svm_linear':
         clf = Pipeline(steps=[
             ('ss', StandardScaler()),
             ('svm', LinearSVC(dual=False, penalty=args.penalty, C=args.C, random_state=args.rs))
         ])
-        params = {'svm__penalty': ['l1', 'l2'], 'svm__C': [0.1, 1.0, 10.0]}
+        params = {'svm__penalty': ['l1', 'l2'], 'svm__C': [1e-2, 1e-1, 1e0]}
 
     elif args.model == 'svm_rbf':
         clf = Pipeline(steps=[
             ('ss', StandardScaler()),
             ('svm', SVC(gamma='auto', C=args.C, kernel=args.kernel, random_state=args.rs))
         ])
-        params = {'svm__C': [0.1, 1.0, 10.0]}
+        params = {'svm__C': [1e-2, 1e-1, 1e0]}
 
     elif args.model == 'knn':
         clf = KNeighborsClassifier(weights=args.weights, n_neighbors=args.n_neighbors)
@@ -160,6 +161,9 @@ def experiment(args, logger, out_dir, seed):
     result['train_time'] = train_time
     result['max_rss'] = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
     result['tune_frac'] = args.tune_frac
+    if args.model == 'cb':
+        result['n_estimators'] = model.n_estimators
+        result['max_depth'] = model.max_depth
     np.save(os.path.join(out_dir, 'results.npy'), result)
 
     logger.info('total time: {:.3f}s'.format(time.time() - begin))
@@ -184,6 +188,7 @@ def main(args):
     # create logger
     logger = print_util.get_logger(os.path.join(out_dir, 'log.txt'))
     logger.info(args)
+    logger.info('\ntimestamp: {}'.format(datetime.now()))
 
     # write everything printed to stdout to this log file
     logfile, stdout, stderr = print_util.stdout_stderr_to_log(os.path.join(out_dir, 'log+.txt'))

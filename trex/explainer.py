@@ -22,7 +22,10 @@ from .models.linear_model import SVM, KernelLogisticRegression
 
 class TreeExplainer:
 
-    def __init__(self, tree, X_train, y_train,
+    def __init__(self,
+                 tree,
+                 X_train,
+                 y_train,
                  kernel_model='klr',
                  tree_kernel='leaf_output',
                  C=1.0,

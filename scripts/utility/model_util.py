@@ -134,88 +134,88 @@ def performance(model, X_test, y_test, logger=None,
     return auc, acc, ap, ll
 
 
-def performance2(model, X_train=None, y_train=None, X_test=None, y_test=None,
-                 validate=False, logger=None):
-    """
-    Displays train and test performance for a learned model.
-    """
+# def performance2(model, X_train=None, y_train=None, X_test=None, y_test=None,
+#                  validate=False, logger=None):
+#     """
+#     Displays train and test performance for a learned model.
+#     """
 
-    if not logger:
-        return
+#     if not logger:
+#         return
 
-    logger.info('')
+#     logger.info('')
 
-    if validate:
-        model_type = validate_model(model)
-        logger.info('model ({})'.format(model_type))
+#     if validate:
+#         model_type = validate_model(model)
+#         logger.info('model ({})'.format(model_type))
 
-    acc, auc, logloss = -1, -1, -1
+#     acc, auc, logloss = -1, -1, -1
 
-    if X_train is not None and y_train is not None:
-        y_hat_pred = model.predict(X_train).flatten()
-        acc = accuracy_score(y_train, y_hat_pred)
+#     if X_train is not None and y_train is not None:
+#         y_hat_pred = model.predict(X_train).flatten()
+#         acc = accuracy_score(y_train, y_hat_pred)
 
-        if hasattr(model, 'predict_proba'):
-            y_hat_proba = model.predict_proba(X_train)
-            logloss = log_loss(y_train, y_hat_proba)
+#         if hasattr(model, 'predict_proba'):
+#             y_hat_proba = model.predict_proba(X_train)
+#             logloss = log_loss(y_train, y_hat_proba)
 
-            if len(np.unique(y_train)) == 2:
-                auc = roc_auc_score(y_train, y_hat_proba[:, 1])
+#             if len(np.unique(y_train)) == 2:
+#                 auc = roc_auc_score(y_train, y_hat_proba[:, 1])
 
-        if hasattr(model, 'decision_function') and len(np.unique(y_train)) == 2:
-            y_hat_proba = model.decision_function(X_train)
-            auc = roc_auc_score(y_train, y_hat_proba)
+#         if hasattr(model, 'decision_function') and len(np.unique(y_train)) == 2:
+#             y_hat_proba = model.decision_function(X_train)
+#             auc = roc_auc_score(y_train, y_hat_proba)
 
-    s = 'train acc: {:.3f}, auc: {:.3f}, logloss: {:.3f}'
-    logger.info(s.format(acc, auc, logloss))
+#     s = 'train acc: {:.3f}, auc: {:.3f}, logloss: {:.3f}'
+#     logger.info(s.format(acc, auc, logloss))
 
-    if X_test is not None and y_test is not None:
-        y_hat_pred = model.predict(X_test).flatten()
-        acc = accuracy_score(y_test, y_hat_pred)
+#     if X_test is not None and y_test is not None:
+#         y_hat_pred = model.predict(X_test).flatten()
+#         acc = accuracy_score(y_test, y_hat_pred)
 
-        if hasattr(model, 'predict_proba'):
-            y_hat_proba = model.predict_proba(X_test)
-            logloss = log_loss(y_test, y_hat_proba)
+#         if hasattr(model, 'predict_proba'):
+#             y_hat_proba = model.predict_proba(X_test)
+#             logloss = log_loss(y_test, y_hat_proba)
 
-            if len(np.unique(y_test)) == 2:
-                auc = roc_auc_score(y_test, y_hat_proba[:, 1])
+#             if len(np.unique(y_test)) == 2:
+#                 auc = roc_auc_score(y_test, y_hat_proba[:, 1])
 
-        if hasattr(model, 'decision_function') and len(np.unique(y_test)) == 2:
-            y_hat_proba = model.decision_function(X_test)
-            auc = roc_auc_score(y_test, y_hat_proba)
+#         if hasattr(model, 'decision_function') and len(np.unique(y_test)) == 2:
+#             y_hat_proba = model.decision_function(X_test)
+#             auc = roc_auc_score(y_test, y_hat_proba)
 
-    s = 'test  acc: {:.3f}, auc: {:.3f}, logloss: {:.3f}'
-    logger.info(s.format(acc, auc, logloss))
+#     s = 'test  acc: {:.3f}, auc: {:.3f}, logloss: {:.3f}'
+#     logger.info(s.format(acc, auc, logloss))
 
-    return auc, acc, ap, ll
+#     return auc, acc, ap, ll
 
 
-def validate_model(model):
-    """
-    Make sure the model is a supported model type.
-    """
+# def validate_model(model):
+#     """
+#     Make sure the model is a supported model type.
+#     """
 
-    model_type = str(model).split('(')[0]
-    if 'RandomForestClassifier' in str(model):
-        model_type = 'RandomForestClassifier'
-    elif 'GradientBoostingClassifier' in str(model):
-        model_type = 'GradientBoostingClassifier'
-    elif 'LGBMClassifier' in str(model):
-        model_type = 'LGBMClassifier'
-    elif 'CatBoostClassifier' in str(model):
-        model_type = 'CatBoostClassifier'
-    elif 'XGBClassifier' in str(model):
-        model_type = 'XGBClassifier'
-    elif model_type == 'OneVsRestClassifier':
-        model_type = 'OneVsRestClassifier'
-    elif model_type == 'SVC':
-        model_type = 'SVC'
-    elif 'TreeExplainer' in str(model):
-        model_type = 'trex'
-    else:
-        exit('{} model not currently supported!'.format(str(model)))
+#     model_type = str(model).split('(')[0]
+#     if 'RandomForestClassifier' in str(model):
+#         model_type = 'RandomForestClassifier'
+#     elif 'GradientBoostingClassifier' in str(model):
+#         model_type = 'GradientBoostingClassifier'
+#     elif 'LGBMClassifier' in str(model):
+#         model_type = 'LGBMClassifier'
+#     elif 'CatBoostClassifier' in str(model):
+#         model_type = 'CatBoostClassifier'
+#     elif 'XGBClassifier' in str(model):
+#         model_type = 'XGBClassifier'
+#     elif model_type == 'OneVsRestClassifier':
+#         model_type = 'OneVsRestClassifier'
+#     elif model_type == 'SVC':
+#         model_type = 'SVC'
+#     elif 'TreeExplainer' in str(model):
+#         model_type = 'trex'
+#     else:
+#         exit('{} model not currently supported!'.format(str(model)))
 
-    return model_type
+#     return model_type
 
 
 def positive_class_proba(labels, probas):
