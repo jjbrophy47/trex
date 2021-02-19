@@ -5,6 +5,6 @@ get_deps:
 	pip3 install -r requirements.txt
 
 clean:
-	rm -rf .trex .catboos_info
+	rm -rf .trex .catboost_info
 
 all: get_deps build

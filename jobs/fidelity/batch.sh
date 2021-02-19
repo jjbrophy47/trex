@@ -1,11 +1,12 @@
-# TREX
-# ./jobs/fidelity/trex_primer.sh churn 100 3 3 1440 short
-# ./jobs/fidelity/trex_primer.sh amazon 250 5 5 1440 short
-# ./jobs/fidelity/trex_primer.sh adult 100 5 6 1440 short
-# ./jobs/fidelity/trex_primer.sh census 250 5 30 1440 short
+# all models and all tree kernels
+./jobs/fidelity/primer.sh 'churn' 'cb' 100 5 2 1440 'short'
+./jobs/fidelity/primer.sh 'surgical' 'cb' 100 5 2 1440 'short'
+./jobs/fidelity/primer.sh 'vaccine' 'cb' 100 5 2 1440 'short'
+./jobs/fidelity/primer.sh 'amazon' 'cb' 100 5 7 1440 'short'
+./jobs/fidelity/primer.sh 'bank_marketing' 'cb' 100 5 2 1440 'short'
+./jobs/fidelity/primer.sh 'adult' 'cb' 100 5 2 1440 'short'
+./jobs/fidelity/primer.sh 'census' 'cb' 100 5 7 1440 'short'
 
-# TEKNN
-# ./jobs/fidelity/teknn_primer.sh churn 100 3 3 1440 short
-# ./jobs/fidelity/teknn_primer.sh amazon 250 5 5 1440 short
-# ./jobs/fidelity/teknn_primer.sh adult 100 5 6 1440 short
-# ./jobs/fidelity/teknn_primer.sh census 250 5 30 1440 short
+# single settings
+./jobs/fidelity/primer.sh 'census' 'cb' 100 5 'klr' 'leaf_output' 7 1440 'short'
+

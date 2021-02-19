@@ -68,20 +68,20 @@ def get_model(model,
     return clf
 
 
-def fidelity(y1, y2, return_difference=False):
-    """
-    Returns an (overlap, difference) tuple.
-    """
+# def fidelity(y1, y2, return_difference=False):
+#     """
+#     Returns an (overlap, difference) tuple.
+#     """
 
-    overlap = np.where(y1 == y2)[0]
-    difference = np.where(y1 != y2)[0]
+#     overlap = np.where(y1 == y2)[0]
+#     difference = np.where(y1 != y2)[0]
 
-    if return_difference:
-        result = overlap, difference
-    else:
-        result = overlap
+#     if return_difference:
+#         result = overlap, difference
+#     else:
+#         result = overlap
 
-    return result
+#     return result
 
 
 def missed_instances(y1, y2, y_true):

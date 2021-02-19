@@ -126,6 +126,8 @@ def experiment(args, out_dir, logger):
     # save results
     result = {}
     result['model'] = args.model
+    result['n_estimators'] = args.n_estimators
+    result['max_depth'] = args.max_depth
     result['surrogate'] = args.surrogate
     result['train_time'] = train_time
     result['max_rss'] = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
@@ -148,7 +150,8 @@ def main(args):
                            args.dataset,
                            args.model,
                            args.surrogate,
-                           args.tree_kernel)
+                           args.tree_kernel,
+                           'rs_{}'.format(args.rs))
 
     # create output directory and clear any previous contents
     os.makedirs(out_dir, exist_ok=True)
@@ -159,14 +162,8 @@ def main(args):
     logger.info(args)
     logger.info('\ntimestamp: {}'.format(datetime.now()))
 
-    # write everything printed to stdout to this log file
-    logfile, stdout, stderr = print_util.stdout_stderr_to_log(os.path.join(out_dir, 'log+.txt'))
-
     # run experiment
     experiment(args, out_dir, logger)
-
-    # restore original stdout and stderr settings
-    print_util.reset_stdout_stderr(logfile, stdout, stderr)
 
 
 if __name__ == '__main__':
@@ -187,8 +184,8 @@ if __name__ == '__main__':
     # Surrogate settings
     parser.add_argument('--surrogate', type=str, default='klr', help='klr, svm, or knn.')
     parser.add_argument('--kernel_model', type=str, default='klr', help='klr or svm.')
-    parser.add_argument('--tree_kernel', type=str, default='tree_output', help='type of tree feature extraction.')
-    parser.add_argument('--tune_frac', type=float, default=1.0, help='fraction of training data to use for tuning.')
+    parser.add_argument('--tree_kernel', type=str, default='leaf_output', help='type of tree feature extraction.')
+    parser.add_argument('--tune_frac', type=float, default=0.1, help='fraction of training data to use for tuning.')
     parser.add_argument('--metric', type=str, default='pearson', help='pearson, spearman, or mse.')
 
     # Experiment settings
