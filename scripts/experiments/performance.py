@@ -42,7 +42,7 @@ def get_model(args, cat_indices=None):
                                    max_depth=args.max_depth,
                                    random_state=args.rs,
                                    cat_indices=cat_indices)
-        params = {'n_estimators': [10, 25, 50, 100, 250], 'max_depth': [3, 5, 10, None]}
+        params = {'n_estimators': [10, 25, 50, 100, 250], 'max_depth': [3, 5, 10]}
 
     elif args.model == 'dt':
         clf = DecisionTreeClassifier(random_state=args.rs)
@@ -125,7 +125,8 @@ def experiment(args, logger, out_dir, seed):
     start = time.time()
     if not args.no_tune:
         skf = StratifiedKFold(n_splits=args.cv, shuffle=True, random_state=args.rs)
-        gs = GridSearchCV(model, param_grid, scoring=args.scoring, cv=skf, verbose=args.verbose)
+        # gs = GridSearchCV(model, param_grid, scoring=args.scoring, cv=skf, verbose=args.verbose)
+        gs = GridSearchCV(model, param_grid, scoring=args.scoring, cv=args.cv, verbose=args.verbose)
         gs = gs.fit(X_train_sub, y_train_sub)
 
         cols = ['mean_fit_time', 'mean_test_score', 'rank_test_score']

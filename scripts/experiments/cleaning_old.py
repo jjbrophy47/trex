@@ -37,7 +37,7 @@ TREE_PROTO_K = 10
 N_PROTOTYPES = 10
 
 
-def interval_performance(ckpt_ndx, fix_ndx, noisy_ndx, clf, data, acc_test_noisy):
+def _interval_performance(ckpt_ndx, fix_ndx, noisy_ndx, clf, data, acc_test_noisy):
     """
     Retrains the tree ensemble for each ckeckpoint, where a checkpoint represents
     which flipped labels have been fixed.
@@ -65,7 +65,7 @@ def interval_performance(ckpt_ndx, fix_ndx, noisy_ndx, clf, data, acc_test_noisy
     return checked_pct, accs
 
 
-def record_fixes(train_order, noisy_ndx, train_len, interval):
+def _record_fixes(train_order, noisy_ndx, train_len, interval):
     """
     Returns the number of train instances checked and which train instances were
     fixed for each checkpoint.
@@ -89,18 +89,18 @@ def record_fixes(train_order, noisy_ndx, train_len, interval):
     return ckpt_ndx, fix_ndx
 
 
-def trex_method(explainer, noisy_ndx, y_train, n_check, interval):
+def _our_method(explainer, noisy_ndx, y_train, n_check, interval):
     """
     Order instnces by largest absolute values of TREX weights.
     """
     train_weight = explainer.get_weight()[0]
     train_order = np.argsort(np.abs(train_weight))[::-1][:n_check]
-    ckpt_ndx, fix_ndx = record_fixes(train_order, noisy_ndx, len(y_train), interval)
+    ckpt_ndx, fix_ndx = _record_fixes(train_order, noisy_ndx, len(y_train), interval)
 
     return ckpt_ndx, fix_ndx, train_weight
 
 
-def random_method(noisy_ndx, y_train, interval, to_check=1, random_state=1):
+def _random_method(noisy_ndx, y_train, interval, to_check=1, random_state=1):
     """
     Randomly picks train instances from the train data.
     """
@@ -115,11 +115,11 @@ def random_method(noisy_ndx, y_train, interval, to_check=1, random_state=1):
 
     np.random.seed(random_state + 1)  # +1 to avoid choosing the same indices as the noisy labels
     train_order = np.random.choice(n_train, size=n_check, replace=False)
-    ckpt_ndx, fix_ndx = _ecord_fixes(train_order, noisy_ndx, n_train, interval)
+    ckpt_ndx, fix_ndx = _record_fixes(train_order, noisy_ndx, n_train, interval)
     return ckpt_ndx, fix_ndx
 
 
-def loss_method(noisy_ndx, y_train_proba, y_train, interval, to_check=1, logloss=False):
+def _loss_method(noisy_ndx, y_train_proba, y_train, interval, to_check=1, logloss=False):
     """
     Sorts train instances by largest train loss.
     """
@@ -147,11 +147,11 @@ def loss_method(noisy_ndx, y_train_proba, y_train, interval, to_check=1, logloss
     else:
         train_order = np.argsort(y_loss)[::-1][:n_check]  # descending order, most positive first
 
-    ckpt_ndx, fix_ndx = record_fixes(train_order, noisy_ndx, len(y_train), interval)
+    ckpt_ndx, fix_ndx = _record_fixes(train_order, noisy_ndx, len(y_train), interval)
     return ckpt_ndx, fix_ndx, y_loss, train_order
 
 
-def influence_method(explainer, noisy_ndx, X_train, y_train, y_train_noisy, interval, to_check=1):
+def _influence_method(explainer, noisy_ndx, X_train, y_train, y_train_noisy, interval, to_check=1):
     """
     Computes the influence on train instance i if train instance i were upweighted/removed.
     Reference: https://github.com/kohpangwei/influence-release/blob/master/influence/experiments.py
@@ -176,11 +176,11 @@ def influence_method(explainer, noisy_ndx, X_train, y_train, y_train_noisy, inte
     # sort by ascending order; the most negative train instances
     # are the ones that increase the log loss the most, and are the most harmful
     train_order = np.argsort(influence_scores)[:n_check]
-    ckpt_ndx, fix_ndx = record_fixes(train_order, noisy_ndx, n_train, interval)
+    ckpt_ndx, fix_ndx = _record_fixes(train_order, noisy_ndx, n_train, interval)
     return ckpt_ndx, fix_ndx, influence_scores, train_order
 
 
-def maple_method(explainer, X_train, noisy_ndx, interval, to_check=1):
+def _maple_method(explainer, X_train, noisy_ndx, interval, to_check=1):
     """
     Orders instances by tree kernel similarity density.
     """
@@ -199,11 +199,11 @@ def maple_method(explainer, X_train, noisy_ndx, interval, to_check=1):
         train_weight[i] += np.sum(weights)
 
     train_order = np.argsort(train_weight)[::-1][:n_check]
-    ckpt_ndx, fix_ndx = record_fixes(train_order, noisy_ndx, n_train, interval)
+    ckpt_ndx, fix_ndx = _record_fixes(train_order, noisy_ndx, n_train, interval)
     return ckpt_ndx, fix_ndx, train_weight, train_order
 
 
-def knn_method(knn_clf, X_train, noisy_ndx, interval, to_check=1):
+def _knn_method(knn_clf, X_train, noisy_ndx, interval, to_check=1):
     """
     Count impact by the number of times a training sample shows up in
     one another's neighborhoods, this can be weighted by 1 / distance.
@@ -223,11 +223,11 @@ def knn_method(knn_clf, X_train, noisy_ndx, interval, to_check=1):
         train_impact[neighbor_ids[0]] += 1
 
     train_order = np.argsort(train_impact)[::-1][:n_check]
-    ckpt_ndx, fix_ndx = record_fixes(train_order, noisy_ndx, n_train, interval)
+    ckpt_ndx, fix_ndx = _record_fixes(train_order, noisy_ndx, n_train, interval)
     return ckpt_ndx, fix_ndx, train_order
 
 
-def proto_method(model, X_train, y_train, noisy_ndx, interval, n_check):
+def _proto_method(model, X_train, y_train, noisy_ndx, interval, n_check):
     """
     Orders instances by using the GBT distance similarity formula in
     https://arxiv.org/pdf/1611.07115.pdf, then ranks training samples
@@ -275,14 +275,14 @@ def proto_method(model, X_train, y_train, noisy_ndx, interval, n_check):
 
     # rank training instances by low label agreement with its neighbors
     train_order = np.argsort(train_impact)[:n_check]
-    ckpt_ndx, fix_ndx = record_fixes(train_order, noisy_ndx, len(y_train), interval)
+    ckpt_ndx, fix_ndx = _record_fixes(train_order, noisy_ndx, len(y_train), interval)
 
     os.system('rm {}'.format(temp_fp))
 
     return ckpt_ndx, fix_ndx
 
 
-def mmd_method(model, X_train, y_train, noisy_ndx, interval, n_check):
+def _mmd_method(model, X_train, y_train, noisy_ndx, interval, n_check):
     """
     Orders instances by prototypes and/or criticisms.
     """
@@ -297,46 +297,39 @@ def mmd_method(model, X_train, y_train, noisy_ndx, interval, n_check):
     criticisms = mmd.select_criticism_regularized(K, prototypes, n_criticisms, is_K_sparse=False)
 
     train_order = criticisms[:n_check]
-    ckpt_ndx, fix_ndx = record_fixes(train_order, noisy_ndx, len(y_train), interval)
+    ckpt_ndx, fix_ndx = _record_fixes(train_order, noisy_ndx, len(y_train), interval)
 
     return ckpt_ndx, fix_ndx
 
 
-def experiment(args, logger, out_dir):
+def experiment(args, logger, out_dir, seed):
     """
-    Cleaning Experiment:
-      1) Train a tree ensemble.
-      2) Flip a percentage of train labels.
-      3) Prioritize train instances to be checked using various methods.
-      4) Check and correct any flipped train labels.
-      5) Compute how effective each method is at cleaning the data.
+    Main method that trains a tree ensemble, flips a percentage of train labels, prioritizes train
+    instances using various methods, and computes how effective each method is at cleaning the data.
     """
 
-    # get data
-    data = data_util.get_data(args.dataset,
-                              data_dir=args.data_dir,
-                              processing_dir=args.processing_dir)
-    X_train, X_test, y_train, y_test, feature, cat_indices = data
+    # get model and data
+    clf = model_util.get_classifier(args.tree_type,
+                                    n_estimators=args.n_estimators,
+                                    max_depth=args.max_depth,
+                                    random_state=seed)
 
-    # get tree-ensemble
-    clf = model_util.get_model(args.model,
-                               n_estimators=args.n_estimators,
-                               max_depth=args.max_depth,
-                               random_state=args.rs,
-                               cat_indices=cat_indices)
+    X_train, X_test, y_train, y_test, label = data_util.get_data(args.dataset,
+                                                                 random_state=seed,
+                                                                 data_dir=args.data_dir)
 
-    # use a subset of the training data
+    # reduce train size
     if args.train_frac < 1.0 and args.train_frac > 0.0:
         n_train = int(X_train.shape[0] * args.train_frac)
         X_train, y_train = X_train[:n_train], y_train[:n_train]
-    # data = X_train, y_train, X_test, y_test
+    data = X_train, y_train, X_test, y_test
 
     logger.info('no. train instances: {:,}'.format(len(X_train)))
     logger.info('no. test instances: {:,}'.format(len(X_test)))
     logger.info('no. features: {:,}'.format(X_train.shape[1]))
 
     # add noise
-    y_train_noisy, noisy_ndx = data_util.flip_labels(y_train, k=args.flip_frac, random_state=args.rs)
+    y_train_noisy, noisy_ndx = data_util.flip_labels(y_train, k=args.flip_frac, random_state=seed)
     noisy_ndx = np.array(sorted(noisy_ndx))
     logger.info('no. noisy labels: {:,}'.format(len(noisy_ndx)))
 
@@ -347,7 +340,6 @@ def experiment(args, logger, out_dir):
     # show model performance before and after noise
     logger.info('\nBefore noise:')
     model_util.performance(model, X_train, y_train, X_test=X_test, y_test=y_test, logger=logger)
-
     logger.info('\nAfter noise:')
     model_util.performance(model_noisy, X_train, y_train_noisy, X_test=X_test, y_test=y_test, logger=logger)
 
@@ -371,10 +363,10 @@ def experiment(args, logger, out_dir):
     # random method
     logger.info('\nordering by random...')
     start = time.time()
-    ckpt_ndx, fix_ndx = random_method(noisy_ndx, y_train, interval,
-                                      to_check=n_check,
-                                      random_state=args.rs)
-    check_pct, random_res = interval_performance(ckpt_ndx, fix_ndx, noisy_ndx, clf, data, acc_test_noisy)
+    ckpt_ndx, fix_ndx = _random_method(noisy_ndx, y_train, interval,
+                                       to_check=n_check,
+                                       random_state=seed)
+    check_pct, random_res = _interval_performance(ckpt_ndx, fix_ndx, noisy_ndx, clf, data, acc_test_noisy)
     logger.info('time: {:3f}s'.format(time.time() - start))
     np.save(os.path.join(out_dir, 'random.npy'), random_res)
 
@@ -515,28 +507,37 @@ def experiment(args, logger, out_dir):
 
 def main(args):
 
-    # change name of dataset if using a subset of the dataset
-    if args.train_frac < 1.0 and args.train_frac > 0.0:
-        dataset = '_{}'.format(str(args.train_frac).replace('.', 'p'))
+    # make logger
+    dataset = args.dataset
 
-    # define output directory
-    out_dir = os.path.join(args.out_dir,
-                           dataset,
-                           args.model,
-                           args.method,
+    if args.train_frac < 1.0 and args.train_frac > 0.0:
+        dataset += '_{}'.format(str(args.train_frac).replace('.', 'p'))
+
+    out_dir = os.path.join(args.out_dir, dataset, args.tree_type,
                            'rs{}'.format(args.rs))
 
-    # create output directory and clear any previous contents
-    os.makedirs(out_dir, exist_ok=True)
-    print_util.clear_dir(out_dir)
+    if args.trex:
+        out_dir = os.path.join(out_dir, args.kernel_model, args.tree_kernel)
+    elif args.teknn:
+        out_dir = os.path.join(out_dir, 'teknn', args.tree_kernel)
+    elif args.maple:
+        out_dir = os.path.join(out_dir, 'maple')
+    elif args.inf_k is not None:
+        out_dir = os.path.join(out_dir, 'leaf_influence')
+    elif args.mmd:
+        out_dir = os.path.join(out_dir, 'mmd')
+    elif args.proto:
+        out_dir = os.path.join(out_dir, 'proto')
 
-    # create logger
+    os.makedirs(out_dir, exist_ok=True)
     logger = print_util.get_logger(os.path.join(out_dir, 'log.txt'))
     logger.info(args)
     logger.info(datetime.now())
 
-    # run experiment
-    experiment(args, logger, out_dir)
+    seed = args.rs
+    logger.info('\nSeed: {}'.format(seed))
+    experiment(args, logger, out_dir, seed=seed)
+    print_util.remove_logger(logger)
 
 
 if __name__ == '__main__':
@@ -544,32 +545,39 @@ if __name__ == '__main__':
                                      formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
     # I/O settings
-    parser.add_argument('--dataset', type=str, default='churn', help='dataset to explain.')
+    parser.add_argument('--dataset', type=str, default='adult', help='dataset to explain.')
     parser.add_argument('--data_dir', type=str, default='data', help='data directory.')
-    parser.add_argument('--processing_dir', type=str, default='standard', help='processing type.')
     parser.add_argument('--out_dir', type=str, default='output/cleaning/', help='output directory.')
 
-    # Data settings
+    # data settings
     parser.add_argument('--train_frac', type=float, default=1.0, help='amount of training data to use.')
     parser.add_argument('--val_frac', type=float, default=0.1, help='amount of training data to use for validation.')
+    parser.add_argument('--flip_frac', type=float, default=0.4, help='fraction of train labels to flip.')
 
-    # Tree-ensemble settings
-    parser.add_argument('--model', type=str, default='cb', help='model to use.')
+    # tree settings
+    parser.add_argument('--tree_type', type=str, default='cb', help='tree model to use.')
     parser.add_argument('--n_estimators', type=int, default=100, help='number of trees in random forest.')
-    parser.add_argument('--max_depth', type=int, default=5, help='maximum depth in tree ensemble.')
+    parser.add_argument('--max_depth', type=int, default=None, help='maximum depth in tree ensemble.')
 
-    # Method settings
-    parser.add_argument('--method', type=str, default='klr_leaf_output', help='explanation method.')
+    # TREX settings
+    parser.add_argument('--trex', action='store_true', default=False, help='use TREX.')
     parser.add_argument('--tree_kernel', type=str, default='leaf_output', help='type of encoding.')
+    parser.add_argument('--true_label', action='store_true', default=False, help='train model on true labels.')
     parser.add_argument('--kernel_model', type=str, default='klr', help='kernel model to use.')
 
-    # Experiment settings
-    parser.add_argument('--rs', type=int, default=1, help='random state.')
-    parser.add_argument('--flip_frac', type=float, default=0.4, help='fraction of train labels to flip.')
-    parser.add_argument('--check_pct', type=float, default=0.3, help='max percentage of train instances to check.')
-    parser.add_argument('--n_check_points', type=int, default=10, help='number of points to plot.')
+    # method settings
+    parser.add_argument('--inf_k', type=int, default=None, help='number of leaves to use for leafinfluence.')
+    parser.add_argument('--maple', action='store_true', default=False, help='whether to use MAPLE as a baseline.')
+    parser.add_argument('--teknn', action='store_true', default=False, help='use KNN on top of TREX features.')
+    parser.add_argument('--mmd', action='store_true', default=False, help='MMD-Critic prototypes.')
+    parser.add_argument('--proto', action='store_true', default=False, help='Tree prototypes.')
 
-    # Additional Settings
+    # plot settings
+    parser.add_argument('--check_pct', type=float, default=0.3, help='max percentage of train instances to check.')
+    parser.add_argument('--n_plot_points', type=int, default=10, help='number of points to plot.')
+
+    # experiment settings
+    parser.add_argument('--rs', type=int, default=1, help='random state.')
     parser.add_argument('--verbose', type=int, default=0, help='verbosity level.')
 
     args = parser.parse_args()
