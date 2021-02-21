@@ -29,49 +29,8 @@ def get_result(template, in_dir):
         result = None
 
     else:
-        print(fp)
         d = np.load(fp, allow_pickle=True)[()]
         result.update(d)
-
-    return result
-
-
-def process_utility(gf):
-    """
-    Processes utility differences BEFORE addition/deletion,
-    and averages the results over different random states.
-    """
-    result = {}
-
-    # pearson_list = []
-    # spearman_list = []
-    # mse_list = []
-
-    # train_time_list = []
-
-    # get results from each run
-    # for row in gf.itertuples(index=False):
-    #     acc_list.append(row.acc)
-    #     auc_list.append(row.auc)
-    #     ap_list.append(row.ap)
-    #     ll_list.append(row.ll)
-    #     train_time_list.append(row.train_time)
-
-    # # compute mean and std. error for each metric
-    # result['acc_mean'] = np.mean(acc_list)
-    # result['acc_sem'] = sem(acc_list)
-
-    # result['auc_mean'] = np.mean(auc_list)
-    # result['auc_sem'] = sem(auc_list)
-
-    # result['ap_mean'] = np.mean(ap_list)
-    # result['ap_sem'] = sem(ap_list)
-
-    # result['ll_mean'] = np.mean(ap_list)
-    # result['ll_sem'] = sem(ap_list)
-
-    # result['train_time_mean'] = np.mean(train_time_list)
-    # result['train_time_std'] = np.std(train_time_list)
 
     return result
 
@@ -87,7 +46,6 @@ def process_results(df):
 
     for tup, gf in tqdm(df.groupby(groups)):
         main_result = {k: v for k, v in zip(groups, tup)}
-        main_result.update(process_utility(gf))
         main_result['num_runs'] = len(gf)
         main_result['max_rss'] = gf['max_rss'].mean()
         main_result['pearson_mean'] = gf['pearson'].mean()

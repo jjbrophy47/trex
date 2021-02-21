@@ -29,7 +29,6 @@ def get_result(template, in_dir):
         result = None
 
     else:
-        print(fp)
         d = np.load(fp, allow_pickle=True)[()]
         result.update(d)
 
@@ -91,7 +90,7 @@ def process_results(df):
         main_result.update(process_utility(gf))
         main_result['num_runs'] = len(gf)
         main_result['max_rss'] = gf['max_rss'].mean()
-        if 'cb' in gf['model']:
+        if 'cb' == gf.iloc[0]['model']:
             main_result['n_estimators'] = gf['n_estimators'].mode()[0]
             main_result['max_depth'] = gf['max_depth'].mode()[0]
         main_result_list.append(main_result)

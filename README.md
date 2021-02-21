@@ -7,6 +7,6 @@
 
 Install
 ---
-1. Install Python 3.7.9+
+1. Install Python 3.7+
 2. Install dependencies and compile project.
     * Run `make all`.

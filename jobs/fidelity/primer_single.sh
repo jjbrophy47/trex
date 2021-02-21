@@ -17,9 +17,9 @@ for rs in ${rs_list[@]}; do
     sbatch --mem=${mem}G \
            --time=$time \
            --partition=$partition \
-           --job-name=F_TREX_$dataset \
-           --output=jobs/logs/fidelity/$dataset \
-           --error=jobs/errors/fidelity/$dataset \
-           jobs/fidelity/trex_runner.sh $dataset $model \
+           --job-name=$job_name \
+           --output=jobs/logs/fidelity/$job_name \
+           --error=jobs/errors/fidelity/$job_name \
+           jobs/fidelity/runner.sh $dataset $model \
            $n_estimators $max_depth $surrogate $tree_kernel $metric $rs
 done
