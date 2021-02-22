@@ -26,7 +26,6 @@ class TreeExplainer:
                  val_frac=0.1,
                  param_grid={'C': [1e-2, 1e-1, 1e0, 1e1]},
                  metric='pearson',
-                 use_predicted_label=True,
                  pred_size=1000,
                  random_state=None,
                  logger=None,
@@ -36,7 +35,7 @@ class TreeExplainer:
 
         Parameters
         ----------
-        tree : object
+        model : object
             Learned tree ensemble. Supported: RandomForestClassifier, GBM, LightGBM, CatBoost, XGBoost.
         X_train : 2d array-like
             Train instances in original feature space.
@@ -46,20 +45,20 @@ class TreeExplainer:
             Kernel model to approximate the tree ensemble.
         tree_kernel : str (default='leaf_output', {'leaf_output', 'tree_output', leaf_path', 'feature_path'})
             Feature representation to extract from the tree ensemble.
-        C : float (default=0.1)
-            Regularization parameter for the kernel model. Lower C values result
-            in stronger regularization.
         val_frac : float (default=0.1)
-            Fraction of training data used to tune the hyperparameters of KLR or SVM.
+            Fraction of training data used to tune the hyperparameters of the surrogate model.
+        param_grid : dict (default={'C': 1e-2, 1e-1, 1e0, 1e1})
+            Hyperparameter values to try during tuning.
+        metric : str (default='mse')
+            Metric to use for scoring during tuning.
         pred_size : int (default=1000)
             Break predictions up into chunks of pred_size.
-        true_label : bool (default=False)
-            If False, predicted labels from the tree ensemble are used to train the kernel model.
         random_state : int (default=None)
             Random state to promote reproducibility.
-        random_state : int (default=5)
-            Number of cross-validation folds to use for tuning.
+        logger : obj (default=None)
+            Logging object; if not None, shows progress during tuning.
         temp_dir : str (default='.trex')
+            Directory to store liblinear metadata.
         """
         self.model = model
         self.kernel_model = kernel_model
@@ -67,7 +66,6 @@ class TreeExplainer:
         self.param_grid = param_grid
         self.metric = metric
         self.pred_size = pred_size
-        self.use_predicted_label = use_predicted_label
         self.random_state = random_state
         self.logger = logger
         self.temp_dir = os.path.join(temp_dir, str(uuid.uuid4()))
@@ -77,7 +75,7 @@ class TreeExplainer:
 
         # transform train data
         self.X_train_alt_ = self.feature_extractor_.fit_transform(X_train)
-        self.y_train_ = self.model.predict(X_train) if use_predicted_label else y_train
+        self.y_train_ = self.model.predict(X_train)
 
         # train surrogate model
         self.surrogate_ = train_surrogate(model,
@@ -85,7 +83,7 @@ class TreeExplainer:
                                           param_grid,
                                           X_train,
                                           self.X_train_alt_,
-                                          self.y_train_,
+                                          y_train,
                                           val_frac=val_frac,
                                           metric=self.metric,
                                           seed=self.random_state,
@@ -211,7 +209,7 @@ class TreeExplainer:
             If binary, returns an array of shape (1, n_train_samples).
             If multiclass, returns an array of shape (n_classes, n_train_samples).
         """
-        weight = self.kernel_model_.get_weight()
+        weight = self.surrogate_.get_weight()
 
         if self.n_classes_ == 2:
             assert weight.shape == (1, self.n_samples_)

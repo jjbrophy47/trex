@@ -96,35 +96,39 @@ def sigmoid(z):
     return 1 / (1 + np.exp(-z))
 
 
-def performance(model, X_test, y_test, logger=None,
+def performance(model, X, y, logger=None,
                 name='', do_print=False):
     """
     Returns AUROC and accuracy scores.
     """
 
     # generate prediction probabilities
-    proba = None
     if hasattr(model, 'predict_proba'):
-        proba = model.predict_proba(X_test)[:, 1]
+        y_proba = model.predict_proba(X)[:, 1]
+
     elif hasattr(model, 'decision_function'):
-        proba = sigmoid(model.decision_function(X_test)).reshape(-1, 1)
+        y_proba = sigmoid(model.decision_function(X)).reshape(-1, 1)
+
     else:
-        proba = None
+        y_proba = None
 
     # generate predictions
-    pred = model.predict(X_test)
+    y_pred = model.predict(X)
 
     # evaluate
-    auc = roc_auc_score(y_test, proba) if proba is not None else None
-    acc = accuracy_score(y_test, pred)
-    ap = average_precision_score(y_test, proba) if proba is not None else None
-    ll = log_loss(y_test, proba) if proba is not None else None
+    auc = roc_auc_score(y, y_proba) if y_proba is not None else None
+    acc = accuracy_score(y, y_pred)
+    ap = average_precision_score(y, y_proba) if y_proba is not None else None
+    ll = log_loss(y, y_proba) if y_proba is not None else None
 
-    if proba is not None:
+    # get display string
+    if y_proba is not None:
         score_str = '[{}] auc: {:.3f}, acc: {:.3f}, ap: {:.3f}, ll: {:.3f}'
+
     else:
         score_str = '[{}] auc: {}, acc: {:.3f}, ap: {}, ll: {}'
 
+    # print scores
     if logger:
         logger.info(score_str.format(name, auc, acc, ap, ll))
 

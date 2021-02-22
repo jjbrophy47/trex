@@ -125,8 +125,7 @@ def experiment(args, logger, out_dir, seed):
     start = time.time()
     if not args.no_tune:
         skf = StratifiedKFold(n_splits=args.cv, shuffle=True, random_state=args.rs)
-        # gs = GridSearchCV(model, param_grid, scoring=args.scoring, cv=skf, verbose=args.verbose)
-        gs = GridSearchCV(model, param_grid, scoring=args.scoring, cv=args.cv, verbose=args.verbose)
+        gs = GridSearchCV(model, param_grid, scoring=args.scoring, cv=skf, verbose=args.verbose)
         gs = gs.fit(X_train_sub, y_train_sub)
 
         cols = ['mean_fit_time', 'mean_test_score', 'rank_test_score']
