@@ -15,7 +15,6 @@ warnings.simplefilter(action='ignore', category=UserWarning)  # lgb compiler war
 from copy import deepcopy
 from datetime import datetime
 
-import tqdm
 import numpy as np
 from sklearn.base import clone
 from sklearn.metrics.pairwise import rbf_kernel
@@ -183,8 +182,8 @@ def trex_method(args, model_noisy, y_train_noisy,
     """
 
     # train surrogate model
-    kernel_model = args.method.split('|')[0].split('_')[0]
-    tree_kernel = args.method.split('|')[-1]
+    kernel_model = args.method.split('-')[0].split('_')[0]
+    tree_kernel = args.method.split('-')[-1]
     surrogate = trex.TreeExplainer(model_noisy,
                                    X_train,
                                    y_train_noisy,
@@ -234,7 +233,7 @@ def leaf_influence_method(model_noisy, y_train_noisy,
                           noisy_indices, n_check, n_checkpoint,
                           clf, X_train, y_train, X_test, y_test,
                           acc_noisy, auc_noisy, seed=1, logger=None,
-                          k=-1, out_dir='.'):
+                          k=-1, out_dir='.', frac_progress_update=0.1):
     """
     Computes the influence on train instance i if train
     instance i were upweighted/removed. This uses the FastLeafInfluence
@@ -260,16 +259,20 @@ def leaf_influence_method(model_noisy, y_train_noisy,
 
     # display progress
     if logger:
-        logger.info('\n computing self-influence of training instances...')
+        logger.info('\ncomputing self-influence of training instances...')
 
     # score container
     influence_scores = []
 
     # compute self-influence score for each training instance
     buf = deepcopy(explainer)
-    for i in tqdm.tqdm(range(len(X_train))):
+    for i in range(X_train.shape[0]):
         explainer.fit(removed_point_idx=i, destination_model=buf)
         influence_scores.append(buf.loss_derivative(X_train[[i]], y_train_noisy[[i]])[0])
+
+        # display progress
+        if i % int(X_train.shape[0] * frac_progress_update) == 0:
+            logger.info('finished {:,} instances...'.format(i))
 
     # convert scores to a numpy array
     influence_scores = np.array(influence_scores)
@@ -291,7 +294,8 @@ def leaf_influence_method(model_noisy, y_train_noisy,
 def maple_method(model_noisy,
                  noisy_indices, n_check, n_checkpoint,
                  clf, X_train, y_train, X_test, y_test,
-                 acc_noisy, auc_noisy, seed=1, logger=None):
+                 acc_noisy, auc_noisy, seed=1, logger=None,
+                 frac_progress_update=0.1):
     """
     Orders instances by tree kernel similarity density.
     """
@@ -307,9 +311,13 @@ def maple_method(model_noisy,
 
     # compute similarity density per training instance
     train_weight = np.zeros(X_train.shape[0])
-    for i in tqdm.tqdm(range(X_train.shape[0])):
+    for i in range(X_train.shape[0]):
         weights = explainer.get_weights(X_train[i])
         train_weight[i] += np.sum(weights)
+
+        # display progress
+        if i % int(X_train.shape[0] * frac_progress_update) == 0:
+            logger.info('finished {:,} instances...'.format(i))
 
     # sort by training instance densities
     train_indices = np.argsort(train_weight)[::-1]
@@ -323,14 +331,15 @@ def maple_method(model_noisy,
 def teknn_method(model_noisy, y_train_noisy,
                  noisy_indices, n_check, n_checkpoint,
                  clf, X_train, y_train, X_test, y_test,
-                 acc_noisy, auc_noisy, seed=1, logger=None):
+                 acc_noisy, auc_noisy, seed=1, logger=None,
+                 frac_progress_update=0.1):
     """
     Count impact by the number of times a training sample shows up in
     one another's neighborhood, this can be weighted by 1 / distance.
     """
 
     # transform the data
-    tree_kernel = args.method.split('|')[-1]
+    tree_kernel = args.method.split('-')[-1]
     extractor = trex.TreeExtractor(model_noisy, tree_kernel=tree_kernel)
     X_train_alt = extractor.fit_transform(X_train)
 
@@ -367,9 +376,13 @@ def teknn_method(model_noisy, y_train_noisy,
 
         # compute similarity density
         train_weight = np.zeros(X_train_alt.shape[0])
-        for i in tqdm.tqdm(range(X_train_alt.shape[0])):
+        for i in range(X_train_alt.shape[0]):
             distances, neighbor_ids = surrogate.kneighbors([X_train_alt[i]])
             train_weight[neighbor_ids[0]] += 1
+
+            # display progress
+            if i % int(X_train.shape[0] * frac_progress_update) == 0:
+                logger.info('finished {:,} instances...'.format(i))
 
         # sort instances by their similarity density
         train_indices = np.argsort(train_weight)[::-1]
@@ -385,7 +398,8 @@ def teknn_method(model_noisy, y_train_noisy,
 def tree_prototype_method(model_noisy, y_train_noisy,
                           noisy_indices, n_check, n_checkpoint,
                           clf, X_train, y_train, X_test, y_test,
-                          acc_noisy, auc_noisy, seed=1, logger=None, k=10):
+                          acc_noisy, auc_noisy, seed=1, logger=None,
+                          k=10, frac_progress_update=0.1):
     """
     Orders instances by using the GBT distance similarity formula.
     It then ranks training samples based on the proportion of
@@ -432,9 +446,13 @@ def tree_prototype_method(model_noisy, y_train_noisy,
 
     # compute proportion of neighbors that share the same label
     train_weight = np.zeros(X_train_alt.shape[0])
-    for i in tqdm.tqdm(range(X_train_alt.shape[0])):
+    for i in range(X_train_alt.shape[0]):
         _, neighbor_ids = knn.kneighbors([X_train_alt[i]])
         train_weight[i] = len(np.where(y_train_noisy[i] == y_train_noisy[neighbor_ids[0]])[0]) / len(neighbor_ids[0])
+
+        # display progress
+        if i % int(X_train.shape[0] * frac_progress_update) == 0:
+            logger.info('finished {:,} instances...'.format(i))
 
     # rank training instances by low label agreement with its neighbors
     train_indices = np.argsort(train_weight)
@@ -665,7 +683,7 @@ if __name__ == '__main__':
     parser.add_argument('--max_depth', type=int, default=5, help='maximum depth in tree ensemble.')
 
     # Method settings
-    parser.add_argument('--method', type=str, default='klr|leaf_output', help='explanation method.')
+    parser.add_argument('--method', type=str, default='klr-leaf_output', help='explanation method.')
     parser.add_argument('--metric', type=str, default='mse', help='fidelity metric to use for TREX.')
 
     # Experiment settings
