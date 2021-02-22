@@ -15,8 +15,8 @@ method_list=('random' \
              'tree_loss' 'leaf_influence' 'maple' \
              'teknn|leaf_output' 'teknn_loss|leaf_output' 'tree_prototype')
 
-for rs in ${rs_list[@]}; do
-    for method in ${method_list[@]}; do
+for method in ${method_list[@]}; do
+    for rs in ${rs_list[@]}; do
         job_name="C_${dataset}_${method}"
 
         sbatch --mem=${mem}G \
