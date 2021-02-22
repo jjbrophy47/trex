@@ -49,6 +49,8 @@ def process_results(df):
         main_result['num_runs'] = len(gf)
         main_result['max_rss'] = gf['max_rss'].mean()
         main_result['total_time'] = gf['total_time'].mean()
+        main_result['acc_clean'] = gf['acc_clean'].mean()
+        main_result['auc_clean'] = gf['auc_clean'].mean()
 
         # compute average accuracy
         accs = [np.array(x) for x in gf['accs'].values]

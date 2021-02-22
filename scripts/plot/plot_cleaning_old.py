@@ -20,6 +20,50 @@ def set_size(width, fraction=1, subplots=(1, 1)):
     return width, height
 
 
+def get_results(dataset, method, args):
+
+    # get results from each run
+    res_list = []
+
+    # get method directory
+    method_dir = 'klr' if method in ['tree', 'random'] else method
+    if 'loss' in method:
+        method_dir = method.split('_')[0]
+
+    # add tree kernel to specific methods
+    if method_dir in ['klr', 'svm', 'teknn']:
+        method_dir = os.path.join(method_dir, args.tree_kernel)
+
+    # get method name
+    method_name = 'method_loss' if 'loss' in method else 'method'
+    if method in ['tree', 'random']:
+        method_name = method
+
+    for i in args.rs:
+        res_path = os.path.join(args.in_dir, dataset, args.tree_type,
+                                'rs{}'.format(i), method_dir,
+                                '{}.npy'.format(method_name))
+
+        if not os.path.exists(res_path):
+            if args.verbose > 0:
+                print(res_path)
+            continue
+
+        res = np.load(res_path)
+        res_list.append(np.load(res_path))
+
+    # error checking
+    if len(res_list) == 0:
+        return None
+
+    # process results
+    res = np.vstack(res_list)
+    res_mean = np.mean(res, axis=0)
+    res_std = sem(res, axis=0)
+
+    return res_mean, res_std
+
+
 def main(args):
     print(args)
 
@@ -28,39 +72,18 @@ def main(args):
                    'tree', 'klr_loss', 'svm_loss',
                    'maple', 'leaf_influence', 'teknn',
                    'teknn_loss', 'proto']
-
-    label_list = ['TREX-KLR', 'TREX-SVM', 'Random',
-                  'GBDT Loss', 'TREX-KLR Loss', 'TREX-SVM Loss',
-                  'MAPLE', 'LeafInfluence', 'TEKNN',
-                  'TEKNN Loss', 'TreeProto']
-
-    color_list = ['blue', 'cyan', 'red', 'green', 'purple', 'magenta', 'orange',
-                  'black', '#EEC64F', 'yellow', 'brown']
-
-    marker_list = ['1', '2', 'o', 'v', '^', '<', '>', '.', '*', 'h', 's']
-
-    zorder_list = [11, 10, 9, 3, 2, 1, 7, 1, 6, 5, 8]
-
-    fig, ax = plt.subplots()
-
-    # plot each method
-    methods = list(zip(method_list, label_list, color_list, marker_list, zorder_list))
-    for method, label, color, marker, zorder in list(zip(method_list, label)):
-
-        # extract results
-        temp_df = df[df['method'] == method]
-        metric_mean = temp_df['{}_mean'.format(args.metric)]
-        metric_sem = temp_df['{}_sem'.format(args.metric)]
-        checked_pcts = temp_df['checked_pcts']
-
-        # plot
-        line = ax.errorbar(checked_pcts, metric_mean, yerr=metric_sem,
-                           marker=marker, color=color, zorder=zorder)
-
-        ax.set_xlabel('% train data checked')
-        ax.set_title('Census (10%)' if args.dataset == 'census_0p1' else args.dataset.capitalize())
-        ax.tick_params(axis='both', which='major')
-        ax.axhline(test_clean, color='k', linestyle='--')
+    method_list = ['klr', 'svm', 'random',
+                   'tree', 'klr_loss', 'svm_loss',
+                   'maple', 'leaf_influence', 'teknn',
+                   'teknn_loss', 'proto']
+    labels = ['TREX-KLR', 'TREX-SVM', 'Random',
+              'GBDT Loss', 'TREX-KLR Loss', 'TREX-SVM Loss',
+              'MAPLE', 'LeafInfluence', 'TEKNN',
+              'TEKNN Loss', 'TreeProto']
+    colors = ['blue', 'cyan', 'red', 'green', 'purple', 'magenta', 'orange',
+              'black', '#EEC64F', 'yellow', 'brown']
+    markers = ['1', '2', 'o', 'v', '^', '<', '>', '.', '*', 'h', 's']
+    zorders = [11, 10, 9, 3, 2, 1, 7, 1, 6, 5, 8]
 
     # matplotlib settings
     plt.rc('font', family='serif')

@@ -627,6 +627,8 @@ def experiment(args, logger, out_dir):
     # save results
     result['max_rss'] = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
     result['total_time'] = time.time() - begin
+    result['acc_clean'] = acc_clean
+    result['auc_clean'] = auc_clean
     np.save(os.path.join(out_dir, 'results.npy'), result)
 
     # display results
