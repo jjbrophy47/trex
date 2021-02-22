@@ -26,6 +26,6 @@ for method in ${method_list[@]}; do
                --output=jobs/logs/cleaning/$job_name \
                --error=jobs/errors/cleaning/$job_name \
                jobs/cleaning/runner.sh $dataset $model $n_estimators \
-               $max_depth $check_pct $train_frac $rs
+               $max_depth $method $check_pct $train_frac $rs
     done
 done

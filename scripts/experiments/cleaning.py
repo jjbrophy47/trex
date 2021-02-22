@@ -630,7 +630,7 @@ def main(args):
                            dataset,
                            args.model,
                            args.method,
-                           'rs{}'.format(args.rs))
+                           'rs_{}'.format(args.rs))
 
     # create output directory and clear any previous contents
     os.makedirs(out_dir, exist_ok=True)
@@ -665,7 +665,7 @@ if __name__ == '__main__':
     parser.add_argument('--max_depth', type=int, default=5, help='maximum depth in tree ensemble.')
 
     # Method settings
-    parser.add_argument('--method', type=str, default='klr_leaf_output', help='explanation method.')
+    parser.add_argument('--method', type=str, default='klr|leaf_output', help='explanation method.')
     parser.add_argument('--metric', type=str, default='mse', help='fidelity metric to use for TREX.')
 
     # Experiment settings
