@@ -147,12 +147,12 @@ def fix_noisy_instances(train_indices, noisy_indices, n_check, n_checkpoint,
             # add to list of results
             result['accs'].append(acc_semi_noisy)
             result['aucs'].append(auc_semi_noisy)
-            result['checked_pcts'].append(float(n_checked / y_train.shape[0]))
-            result['fixed_pcts'].append(float(len(indices_to_fix) / y_train.shape[0]))
+            result['checked_pcts'].append(float(n_checked / y_train.shape[0]) * 100)
+            result['fixed_pcts'].append(float(len(indices_to_fix) / y_train.shape[0]) * 100)
 
             # display progress
             if logger:
-                logger.info(s.format(result['checked_pcts'][-1] * 100, result['fixed_pcts'][-1] * 100,
+                logger.info(s.format(result['checked_pcts'][-1], result['fixed_pcts'][-1],
                                      result['accs'][-1], result['aucs'][-1], time.time() - start))
 
     return result
