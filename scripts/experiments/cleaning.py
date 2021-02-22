@@ -272,7 +272,7 @@ def leaf_influence_method(model_noisy, y_train_noisy,
 
         # display progress
         if i % int(X_train.shape[0] * frac_progress_update) == 0:
-            logger.info('finished {:,} instances...'.format(i))
+            logger.info('finished {:.1f}% instances...'.format((i / X_train.shape[0]) * 100))
 
     # convert scores to a numpy array
     influence_scores = np.array(influence_scores)
@@ -317,7 +317,7 @@ def maple_method(model_noisy,
 
         # display progress
         if i % int(X_train.shape[0] * frac_progress_update) == 0:
-            logger.info('finished {:,} instances...'.format(i))
+            logger.info('finished {:.1f}% instances...'.format((i / X_train.shape[0]) * 100))
 
     # sort by training instance densities
     train_indices = np.argsort(train_weight)[::-1]
@@ -382,7 +382,7 @@ def teknn_method(model_noisy, y_train_noisy,
 
             # display progress
             if i % int(X_train.shape[0] * frac_progress_update) == 0:
-                logger.info('finished {:,} instances...'.format(i))
+                logger.info('finished {:.1f}% instances...'.format((i / X_train.shape[0]) * 100))
 
         # sort instances by their similarity density
         train_indices = np.argsort(train_weight)[::-1]
@@ -452,7 +452,7 @@ def tree_prototype_method(model_noisy, y_train_noisy,
 
         # display progress
         if i % int(X_train.shape[0] * frac_progress_update) == 0:
-            logger.info('finished {:,} instances...'.format(i))
+            logger.info('finished {:.1f}% instances...'.format((i / X_train.shape[0]) * 100))
 
     # rank training instances by low label agreement with its neighbors
     train_indices = np.argsort(train_weight)
@@ -601,7 +601,7 @@ def experiment(args, logger, out_dir):
                               acc_noisy, auc_noisy, seed=args.rs, logger=logger)
 
     # TEKNN
-    elif 'teknn' in args.method:
+    elif 'knn' in args.method:
         result = teknn_method(model_noisy, y_train_noisy,
                               noisy_indices, n_check, n_checkpoint,
                               clf, X_train, y_train, X_test, y_test,

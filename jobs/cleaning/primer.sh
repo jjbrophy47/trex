@@ -13,7 +13,7 @@ method_list=('random' \
              'klr-leaf_output' 'svm-leaf_output' \
              'klr_loss-leaf_output' 'svm_loss-leaf_output' \
              'tree_loss' 'leaf_influence' 'maple' \
-             'teknn-leaf_output' 'teknn_loss-leaf_output' 'tree_prototype')
+             'knn-leaf_output' 'knn_loss-leaf_output' 'tree_prototype')
 
 for method in ${method_list[@]}; do
     for rs in ${rs_list[@]}; do
