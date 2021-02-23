@@ -114,9 +114,9 @@ def fix_noisy_instances(train_indices, noisy_indices, n_check, n_checkpoint,
     # result containers
     indices_to_fix = []
     start = time.time()
-    s = '[Checkpoint] checked: {:.1f}%, fixed: {:.1f}%, Acc.: {:.3f}, AUC: {:.3f}, time: {:.3f}s'
+    s = '[Checkpoint] checked: {:.1f}%, fixed: {:.1f}%, Acc.: {:.3f}, AUC: {:.3f}, cum. time: {:.3f}s'
 
-    # display progress
+    # display status
     if logger:
         logger.info('\nchecking and fixing training instances...')
 
@@ -260,6 +260,7 @@ def leaf_influence_method(model_noisy, y_train_noisy,
     # display progress
     if logger:
         logger.info('\ncomputing self-influence of training instances...')
+        start = time.time()
 
     # score container
     influence_scores = []
@@ -271,8 +272,9 @@ def leaf_influence_method(model_noisy, y_train_noisy,
         influence_scores.append(buf.loss_derivative(X_train[[i]], y_train_noisy[[i]])[0])
 
         # display progress
-        if i % int(X_train.shape[0] * frac_progress_update) == 0:
-            logger.info('finished {:.1f}% instances...'.format((i / X_train.shape[0]) * 100))
+        if logger and i % int(X_train.shape[0] * frac_progress_update) == 0:
+            elapsed = time.time() - start
+            logger.info('finished {:.1f}% test instances...{:.3f}s'.format((i / X_test.shape[0]) * 100, elapsed))
 
     # convert scores to a numpy array
     influence_scores = np.array(influence_scores)
@@ -303,6 +305,7 @@ def maple_method(model_noisy,
     # display progress
     if logger:
         logger.info('\ncomputing similarity density...')
+        start = time.time()
 
     # train explainer
     train_label = model_noisy.predict(X_train)
@@ -316,8 +319,9 @@ def maple_method(model_noisy,
         train_weight[i] += np.sum(weights)
 
         # display progress
-        if i % int(X_train.shape[0] * frac_progress_update) == 0:
-            logger.info('finished {:.1f}% instances...'.format((i / X_train.shape[0]) * 100))
+        if logger and i % int(X_train.shape[0] * frac_progress_update) == 0:
+            elapsed = time.time() - start
+            logger.info('finished {:.1f}% test instances...{:.3f}s'.format((i / X_test.shape[0]) * 100, elapsed))
 
     # sort by training instance densities
     train_indices = np.argsort(train_weight)[::-1]
@@ -373,6 +377,7 @@ def teknn_method(model_noisy, y_train_noisy,
         # display progress
         if logger:
             logger.info('\ncomputing similarity density...')
+            start = time.time()
 
         # compute similarity density
         train_weight = np.zeros(X_train_alt.shape[0])
@@ -381,8 +386,9 @@ def teknn_method(model_noisy, y_train_noisy,
             train_weight[neighbor_ids[0]] += 1
 
             # display progress
-            if i % int(X_train.shape[0] * frac_progress_update) == 0:
-                logger.info('finished {:.1f}% instances...'.format((i / X_train.shape[0]) * 100))
+            if logger and i % int(X_train.shape[0] * frac_progress_update) == 0:
+                elapsed = time.time() - start
+                logger.info('finished {:.1f}% test instances...{:.3f}s'.format((i / X_test.shape[0]) * 100, elapsed))
 
         # sort instances by their similarity density
         train_indices = np.argsort(train_weight)[::-1]
@@ -445,14 +451,16 @@ def tree_prototype_method(model_noisy, y_train_noisy,
     knn = knn.fit(X_train_alt, y_train_noisy)
 
     # compute proportion of neighbors that share the same label
+    start = time.time()
     train_weight = np.zeros(X_train_alt.shape[0])
     for i in range(X_train_alt.shape[0]):
         _, neighbor_ids = knn.kneighbors([X_train_alt[i]])
         train_weight[i] = len(np.where(y_train_noisy[i] == y_train_noisy[neighbor_ids[0]])[0]) / len(neighbor_ids[0])
 
         # display progress
-        if i % int(X_train.shape[0] * frac_progress_update) == 0:
-            logger.info('finished {:.1f}% instances...'.format((i / X_train.shape[0]) * 100))
+        if logger and i % int(X_train.shape[0] * frac_progress_update) == 0:
+            elapsed = time.time() - start
+            logger.info('finished {:.1f}% test instances...{:.3f}s'.format((i / X_test.shape[0]) * 100, elapsed))
 
     # rank training instances by low label agreement with its neighbors
     train_indices = np.argsort(train_weight)
@@ -528,7 +536,7 @@ def experiment(args, logger, out_dir):
         n_train = int(X_train.shape[0] * args.train_frac)
         X_train, y_train = X_train[:n_train], y_train[:n_train]
 
-    logger.info('no. train instances: {:,}'.format(len(X_train)))
+    logger.info('\nno. train instances: {:,}'.format(len(X_train)))
     logger.info('no. test instances: {:,}'.format(len(X_test)))
     logger.info('no. features: {:,}'.format(X_train.shape[1]))
 
@@ -659,7 +667,7 @@ def main(args):
     # create logger
     logger = print_util.get_logger(os.path.join(out_dir, 'log.txt'))
     logger.info(args)
-    logger.info(datetime.now())
+    logger.info('\ntimestamp: {}'.format(datetime.now()))
 
     # run experiment
     experiment(args, logger, out_dir)

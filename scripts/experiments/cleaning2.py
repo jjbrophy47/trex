@@ -123,9 +123,6 @@ def fix_noisy_instances(train_indices, noisy_indices,
     logger.info('training semi-noisy model...{:.3f}s, params: {}'.format(time.time() - start, params))
     acc, auc = score(model, X_test, y_test)
 
-    # model_semi_noisy = clone(clf).fit(X_train, y_train_semi_noisy)
-    # acc_semi_noisy, auc_semi_noisy = score(model_semi_noisy, X_test, y_test)
-
     # add to list of results
     result['acc'] = acc
     result['auc'] = auc
