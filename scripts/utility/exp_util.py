@@ -1,22 +1,45 @@
 """
 Utility methods used by different experiments.
 """
-import time
-import os
-import sys
-import pickle
-sys.path.insert(0, os.getcwd())  # for influence_boosting
-from copy import deepcopy
-
-import tqdm
 import numpy as np
-from scipy.stats import pearsonr
-from sklearn.neighbors import KNeighborsClassifier
-from sklearn.model_selection import StratifiedKFold
 from sklearn.base import clone
 from sklearn.metrics import log_loss
+from sklearn.model_selection import GridSearchCV
+from sklearn.model_selection import StratifiedKFold
+from sklearn.model_selection import StratifiedShuffleSplit
 
-from baselines.influence_boosting.influence.leaf_influence import CBLeafInfluenceEnsemble
+
+def train_tree_ensemble(model, X_train, y_train,
+                        param_grid={'n_estimators': [10, 25, 50, 100, 250],
+                                    'max_depth': [3, 5, 10]},
+                        scoring='accuracy', tune_frac=0.1, cv=5, seed=1):
+    """
+    Tune and train a tree-ensemble model.
+    """
+
+    # tune on a fraction of the training data
+    if tune_frac < 1.0:
+        sss = StratifiedShuffleSplit(n_splits=1,
+                                     test_size=2,
+                                     train_size=tune_frac,
+                                     random_state=seed)
+        tune_indices, _ = list(sss.split(X_train, y_train))[0]
+        X_train_sub, y_train_sub = X_train[tune_indices], y_train[tune_indices]
+
+    # tune using the entire training set
+    else:
+        X_train_sub, y_train_sub = X_train, y_train
+
+    # tune
+    skf = StratifiedKFold(n_splits=cv, shuffle=True, random_state=seed)
+    gs = GridSearchCV(model, param_grid, scoring=scoring, cv=skf, verbose=1)
+    gs = gs.fit(X_train_sub, y_train_sub)
+
+    # train on the entire training set
+    model = clone(gs.best_estimator_)
+    model = model.fit(X_train, y_train)
+
+    return model, gs.best_params_
 
 
 # def get_val_data(X_train, val_frac, seed):

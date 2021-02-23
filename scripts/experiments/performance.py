@@ -118,9 +118,6 @@ def experiment(args, logger, out_dir, seed):
     model, param_grid = get_model(args, cat_indices=None)
     logger.info('\nmodel: {}, param_grid: {}'.format(args.model, param_grid))
 
-    # start timer
-    start = time.time()
-
     # tune the model
     start = time.time()
     if not args.no_tune:
@@ -157,7 +154,7 @@ def experiment(args, logger, out_dir, seed):
     result['acc'] = acc
     result['ap'] = ap
     result['ll'] = ll
-    result['tune_time'] = train_time
+    result['tune_time'] = tune_time
     result['train_time'] = train_time
     result['max_rss'] = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
     result['tune_frac'] = args.tune_frac
@@ -166,10 +163,10 @@ def experiment(args, logger, out_dir, seed):
         result['max_depth'] = gs.best_params_['max_depth']
     np.save(os.path.join(out_dir, 'results.npy'), result)
 
-    logger.info('total time: {:.3f}s'.format(time.time() - begin))
-
     # Macs show this in bytes, unix machines show this in KB
     logger.info('max_rss: {:,}'.format(result['max_rss']))
+    logger.info('total time: {:.3f}s'.format(time.time() - begin))
+    logger.info('saving results to {}...'.format(os.path.join(out_dir, 'results.npy')))
 
 
 def main(args):

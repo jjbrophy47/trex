@@ -48,6 +48,7 @@ def process_utility(gf):
     ll_list = []
 
     train_time_list = []
+    tune_time_list = []
 
     # get results from each run
     for row in gf.itertuples(index=False):
@@ -56,6 +57,7 @@ def process_utility(gf):
         ap_list.append(row.ap)
         ll_list.append(row.ll)
         train_time_list.append(row.train_time)
+        tune_time_list.append(row.tune_time)
 
     # compute mean and std. error for each metric
     result['acc_mean'] = np.mean(acc_list)
@@ -72,6 +74,9 @@ def process_utility(gf):
 
     result['train_time_mean'] = np.mean(train_time_list)
     result['train_time_std'] = np.std(train_time_list)
+
+    result['tune_time_mean'] = np.mean(tune_time_list)
+    result['tune_time_std'] = np.std(tune_time_list)
 
     return result
 

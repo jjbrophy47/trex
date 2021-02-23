@@ -68,7 +68,8 @@ def process_results(df):
         main_result['fixed_pcts_sem'] = sem(fixed_pcts, axis=0)
 
         # get checked percentages
-        main_result['checked_pcts'] = gf['checked_pcts'].values[0]
+        checked_pcts = [np.array(x) for x in gf['checked_pcts'].values]
+        main_result['checked_pcts'] = np.mean(checked_pcts, axis=0)
 
         main_result_list.append(main_result)
 
