@@ -10,8 +10,8 @@ partition=$9
 
 method_list=('random' 'klr-leaf_output' 'maple' 'knn-leaf_output')
 
-for rs in {0..19}; do
-    for method in ${method_list[@]}; do
+for method in ${method_list[@]}; do
+    for rs in {0..19}; do
         job_name="R_${dataset}_${method}"
 
         sbatch --mem=${mem}G \

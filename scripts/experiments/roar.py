@@ -415,7 +415,7 @@ def main(args):
                            args.model,
                            args.method,
                            args.scoring,
-                           'rs{}'.format(args.rs))
+                           'rs_{}'.format(args.rs))
 
     # create output directory
     os.makedirs(out_dir, exist_ok=True)
