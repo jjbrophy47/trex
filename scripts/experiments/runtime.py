@@ -1,36 +1,38 @@
 """
-Experiment: Compare runtimes for explaining a
-            single test instance for different methods.
+Experiment:
+    1) Train / initialize explainer.
+    2) Compute influence of ALL training instances on a SINGLE test instance.
 """
-import time
-import argparse
 import os
 import sys
+import time
+import uuid
 import signal
+import argparse
+import resource
 import warnings
 warnings.simplefilter(action='ignore', category=UserWarning)  # lgb compiler warning
-here = os.path.abspath(os.path.dirname(__file__))
-sys.path.insert(0, here + '/../../')  # for influence_boosting
-sys.path.insert(0, here + '/../')  # for utility
+from copy import deepcopy
+from datetime import datetime
 
 import numpy as np
 from sklearn.base import clone
-from maple import MAPLE
 
+here = os.path.abspath(os.path.dirname(__file__))
+sys.path.insert(0, here + '/../../')  # for influence_boosting
+sys.path.insert(0, here + '/../')  # for utility
 import trex
 from utility import model_util
 from utility import data_util
 from utility import print_util
-from utility import exp_util
-
-MAX_TIME = 43200  # number of seconds in 12 hours
+from baselines.influence_boosting.influence.leaf_influence import CBLeafInfluenceEnsemble
+from baselines.maple.MAPLE import MAPLE
 
 
 class timeout:
     """
     Timeout class to throw a TimeoutError if a piece of code runs for too long.
     """
-
     def __init__(self, seconds=1, error_message='Timeout'):
         self.seconds = seconds
         self.error_message = error_message
@@ -46,251 +48,286 @@ class timeout:
         signal.alarm(0)
 
 
-def _trex_method(args, model, test_ndx, X_test, X_train, y_train,
-                 seed, logger=None):
+def trex_method(args, model, test_ndx, X_train, y_train, X_test,
+                logger=None):
     """
-    Explains the predictions of each test instance.
+    Generate an training instance attributions for a test instance.
     """
-    start = time.time()
-    explainer = trex.TreeExplainer(model, X_train, y_train,
-                                   tree_kernel=args.tree_kernel,
-                                   random_state=seed,
-                                   true_label=args.true_label,
-                                   kernel_model=args.kernel_model,
-                                   verbose=args.verbose,
-                                   val_frac=args.val_frac,
-                                   logger=logger)
-    fine_tune = time.time() - start
 
+    # train surrogate model
+    kernel_model = args.method.split('-')[0].split('_')[0]
+    tree_kernel = args.method.split('-')[-1]
     start = time.time()
-    explainer.explain(X_test[test_ndx].reshape(1, -1))
+    surrogate = trex.TreeExplainer(model,
+                                   X_train,
+                                   y_train,
+                                   kernel_model=kernel_model,
+                                   tree_kernel=tree_kernel,
+                                   val_frac=args.tune_frac,
+                                   metric=args.metric,
+                                   random_state=args.rs,
+                                   logger=logger)
+    train_time = time.time() - start
+
+    # compute influential training instances on the test instance
+    start = time.time()
+    surrogate.explain(X_test[test_ndx].reshape(1, -1))
     test_time = time.time() - start
 
-    return fine_tune, test_time
+    # result object
+    result = {'train_time': train_time, 'test_time': test_time}
+
+    return result
 
 
-def _influence_method(model, test_ndx, X_train, y_train,
-                      X_test, y_test, inf_k, logger=None):
+def leaf_influence_method(args, model, test_ndx, X_train, y_train,
+                          X_test, y_test, k=0,
+                          frac_progress_update=0.1, logger=None):
     """
     Computes the influence on each test instance if train
     instance i were upweighted/removed.
-    This uses the fastleafinfluence method by Sharchilev et al.
+
+    NOTE: This uses the FastLeafInfluence (k=0) method by Sharchilev et al.
+    NOTE: requires the label for the test instance.
     """
 
+    # initialize Leaf Influence
     start = time.time()
-    leaf_influence = exp_util.get_influence_explainer(model, X_train, y_train, inf_k)
-    fine_tune = time.time() - start
+    temp_fp = '.{}_cb.json'.format(str(uuid.uuid4()))
+    model.save_model(temp_fp, format='json')
 
-    with timeout(seconds=MAX_TIME):
+    explainer = CBLeafInfluenceEnsemble(temp_fp, X_train, y_train, k=k,
+                                        learning_rate=model.learning_rate_,
+                                        update_set='SinglePoint')
+    train_time = time.time() - start
+
+    # compute influence of each training instance on the test instance
+    with timeout(seconds=args.max_time):
         try:
             start = time.time()
-            exp_util.influence_explain_instance(leaf_influence, test_ndx, X_train, X_test, y_test)
+
+            contributions = []
+            contributions_sum = np.zeros(X_train.shape[0])
+            buf = deepcopy(explainer)
+
+            for i in range(X_train.shape[0]):
+                explainer.fit(removed_point_idx=i, destination_model=buf)
+                contributions.append(buf.loss_derivative(X_test[[test_ndx]], y_test[[test_ndx]])[0])
+
+                # display progress
+                if logger and i % int(X_train.shape[0] * frac_progress_update) == 0:
+                    elapsed = time.time() - start
+                    train_frac_complete = i / X_train.shape * 100
+                    logger.info('Train {:.1f}%...{:.3f}s'.format(train_frac_complete, elapsed))
+
+                contributions = np.array(contributions)
+                contributions_sum += contributions
+
             test_time = time.time() - start
 
-        except:
+        except TimeoutError:
             if logger:
-                logger.info('LeafInfluence computation time exceeded!')
+                logger.info('Leaf Influence test time exceeded!')
+                exit(0)
 
-            return fine_tune, None
+    # clean up
+    os.system('rm {}'.format(temp_fp))
 
-    return fine_tune, test_time
+    # result object
+    result = {'train_time': train_time, 'test_time': test_time}
+
+    return result
 
 
-def _maple_method(model, test_ndx, X_train, y_train, X_test, y_test, dstump=False, logger=None):
+def maple_method(args, model, test_ndx, X_train, y_train, X_test,
+                 dstump=True, logger=None):
     """
     Produces a train weight distribution for a single test instance.
     """
-    with timeout(seconds=MAX_TIME):
+    train_label = model.predict(X_train)
+
+    with timeout(seconds=args.max_time):
         try:
             start = time.time()
-            maple = MAPLE.MAPLE(X_train, y_train, X_train, y_train, dstump=dstump)
-            fine_tune = time.time() - start
+            maple = MAPLE(X_train, train_label, X_train, train_label, dstump=dstump)
+            train_time = time.time() - start
 
-        except:
+        except TimeoutError:
             if logger:
                 logger.info('MAPLE fine-tuning exceeded!')
+            exit(0)
 
-            return None, None
-
+    # compute "local training distribution" for the test instance
     start = time.time()
     maple.explain(X_test[test_ndx]) if dstump else maple.get_weights(X_test[test_ndx])
     test_time = time.time() - start
 
-    return fine_tune, test_time
+    # result object
+    result = {'train_time': train_time, 'test_time': test_time}
+
+    return result
 
 
-def _teknn_method(args, tree, test_ndx, X_train, train_label, X_test, seed, logger=None):
+def teknn_method(args, model, test_ndx, X_train, y_train, X_test,
+                 logger=None):
     """
-    TEKNN fine tuning and computation.
+    KNN surrogate method that retrieves its k nearest neighbors as most influential.
     """
-
-    with timeout(seconds=MAX_TIME):
+    with timeout(seconds=args.max_time):
         try:
             start = time.time()
-            extractor = trex.TreeExtractor(tree, tree_kernel=args.tree_kernel)
+
+            # transform the data
+            tree_kernel = args.method.split('-')[-1]
+            extractor = trex.TreeExtractor(model, tree_kernel=tree_kernel)
             X_train_alt = extractor.fit_transform(X_train)
 
-            # tune and train teknn
-            knn_clf = exp_util.tune_knn(tree, X_train, X_train_alt, train_label,
-                                        args.val_frac, seed=seed, logger=logger)
-            fine_tune = time.time() - start
+            # train surrogate model
+            param_grid = {'n_neighbors': [3, 5, 7, 9, 11, 13, 15, 31, 45, 61]}
+            surrogate = trex.util.train_surrogate(model,
+                                                  'knn',
+                                                  param_grid,
+                                                  X_train,
+                                                  X_train_alt,
+                                                  y_train,
+                                                  val_frac=args.tune_frac,
+                                                  metric=args.metric,
+                                                  seed=args.rs,
+                                                  logger=logger)
+            train_time = time.time() - start
 
-        except:
+        except TimeoutError:
             if logger:
                 logger.info('TEKNN fine-tuning exceeded!')
+            exit(0)
 
-            return None, None
-
+    # retrieve k nearest neighbors as most influential to the test instance
     start = time.time()
     x_test_alt = extractor.transform(X_test[test_ndx])
-    distances, neighbor_ids = knn_clf.kneighbors(x_test_alt)
+    distances, neighbor_ids = surrogate.kneighbors(x_test_alt)
     test_time = time.time() - start
 
-    return fine_tune, test_time
+    # result object
+    result = {'train_time': train_time, 'test_time': test_time}
+
+    return result
 
 
-def experiment(args, logger, out_dir, seed):
+def experiment(args, logger, out_dir):
     """
     Main method that trains a tree ensemble, then compares the
     runtime of different methods to explain a single test instance.
     """
 
-    # get model and data
-    clf = model_util.get_classifier(args.tree_type,
-                                    n_estimators=args.n_estimators,
-                                    max_depth=args.max_depth,
-                                    random_state=seed)
+    # start timer
+    begin = time.time()
 
+    # create random number generator
+    rng = np.random.default_rng(args.rs)
+
+    # get data
     data = data_util.get_data(args.dataset,
-                              random_state=seed,
-                              data_dir=args.data_dir)
-    X_train, X_test, y_train, y_test, label = data
+                              data_dir=args.data_dir,
+                              processing_dir=args.processing_dir)
+    X_train, X_test, y_train, y_test, feature, cat_indices = data
 
-    logger.info('train instances: {:,}'.format(len(X_train)))
-    logger.info('test instances: {:,}'.format(len(X_test)))
-    logger.info('no. features: {:,}'.format(X_train.shape[1]))
+    # get tree-ensemble
+    clf = model_util.get_model(args.model,
+                               n_estimators=args.n_estimators,
+                               max_depth=args.max_depth,
+                               random_state=args.rs,
+                               cat_indices=cat_indices)
+
+    logger.info('\nno. train instances: {:,}'.format(X_train.shape[0]))
+    logger.info('no. test instances: {:,}'.format(X_test.shape[0]))
+    logger.info('no. features: {:,}\n'.format(X_train.shape[1]))
 
     # train a tree ensemble
     model = clone(clf).fit(X_train, y_train)
-    model_util.performance(model, X_train, y_train,
-                           X_test=X_test, y_test=y_test,
-                           logger=logger)
+    model_util.performance(model, X_train, y_train, logger=logger, name='Train')
+    model_util.performance(model, X_test, y_test, logger=logger, name='Test')
 
-    # randomly pick test instances to explain
-    np.random.seed(seed)
-    test_ndx = np.random.choice(len(y_test), size=1, replace=False)
-
-    # train on predicted labels
-    train_label = y_train if args.true_label else model.predict(X_train)
+    # randomly pick a test instances to explain
+    test_ndx = rng.choice(y_test.shape[0], size=1, replace=False)
 
     # TREX
-    if args.trex:
-        logger.info('\nTREX...')
-        fine_tune, test_time = _trex_method(args, model, test_ndx, X_test, X_train, y_train,
-                                            seed=seed, logger=logger)
-
-        logger.info('fine tune: {:.3f}s'.format(fine_tune))
-        logger.info('computation time: {:.3f}s'.format(test_time))
-        r = {'fine_tune': fine_tune, 'test_time': test_time}
-        np.save(os.path.join(out_dir, 'method.npy'), r)
+    if 'klr' in args.method or 'svm' in args.method:
+        result = trex_method(args, model, test_ndx, X_train, y_train, X_test, logger=logger)
 
     # Leaf Influence
-    if args.tree_type == 'cb' and args.inf_k is not None:
-        logger.info('\nleafinfluence...')
-        fine_tune, test_time = _influence_method(model, test_ndx, X_train,
-                                                 y_train, X_test, y_test, args.inf_k)
+    elif args.method == 'leaf_influence':
+        result = leaf_influence_method(args, model, test_ndx, X_train, y_train, X_test, y_test, logger=logger)
 
-        if test_time is not None:
-            logger.info('fine tune: {:.3f}s'.format(fine_tune))
-            logger.info('computation time: {:.3f}s'.format(test_time))
-            r = {'fine_tune': fine_tune, 'test_time': test_time}
-            np.save(os.path.join(out_dir, 'method.npy'), r)
-        else:
-            logger.info('time limit reached!')
+    # MAPLE
+    elif args.method == 'maple':
+        result = maple_method(args, model, test_ndx, X_train, y_train, X_test, logger=logger)
 
-    if args.maple:
-        logger.info('\nMAPLE...')
-        fine_tune, test_time = _maple_method(model, test_ndx, X_train, train_label, X_test, y_test,
-                                             dstump=args.dstump, logger=logger)
+    # TEKNN
+    elif 'knn' in args.method:
+        result = teknn_method(args, model, test_ndx, X_train, y_train, X_test, logger=logger)
 
-        if fine_tune is not None and test_time is not None:
-            logger.info('fine tune: {:.3f}s'.format(fine_tune))
-            logger.info('computation time: {:.3f}s'.format(test_time))
-            r = {'fine_tune': fine_tune, 'test_time': test_time}
-            np.save(os.path.join(out_dir, 'method.npy'), r)
-        else:
-            logger.info('time limit reached!')
+    else:
+        raise ValueError('method {} unknown!'.format(args.method))
 
-    if args.teknn:
-        logger.info('\nTEKNN...')
-        fine_tune, test_time = _teknn_method(args, model, test_ndx, X_train, train_label,
-                                             X_test, seed, logger=logger)
-        if fine_tune is not None and test_time is not None:
-            logger.info('fine tune: {:.3f}s'.format(fine_tune))
-            logger.info('computation time: {:.3f}s'.format(test_time))
-            r = {'fine_tune': fine_tune, 'test_time': test_time}
-            np.save(os.path.join(out_dir, 'method.npy'), r)
-        else:
-            logger.info('time limit reached!')
+    # save results
+    result['max_rss'] = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+    result['total_time'] = time.time() - begin
+    np.save(os.path.join(out_dir, 'results.npy'), result)
+
+    # display results
+    logger.info('\nResults:\n{}'.format(result))
+    logger.info('\nsaving results to {}...'.format(os.path.join(out_dir, 'results.npy')))
 
 
 def main(args):
 
     # make logger
-    out_dir = os.path.join(args.out_dir, args.dataset, args.tree_type,
-                           'rs{}'.format(args.rs))
+    out_dir = os.path.join(args.out_dir,
+                           args.dataset,
+                           args.model,
+                           args.method,
+                           'rs_{}'.format(args.rs))
 
-    if args.trex:
-        out_dir = os.path.join(out_dir, args.kernel_model, args.tree_kernel)
-    elif args.teknn:
-        out_dir = os.path.join(out_dir, 'teknn', args.tree_kernel)
-    elif args.maple:
-        out_dir = os.path.join(out_dir, 'maple')
-    elif args.inf_k is not None:
-        out_dir = os.path.join(out_dir, 'leaf_influence')
-
+    # create output directory
     os.makedirs(out_dir, exist_ok=True)
+    print_util.clear_dir(out_dir)
+
+    # create logger
     logger = print_util.get_logger(os.path.join(out_dir, 'log.txt'))
     logger.info(args)
+    logger.info('\ntimestamp: {}'.format(datetime.now()))
 
-    seed = args.rs
-    logger.info('\nSeed: {}'.format(seed))
-    experiment(args, logger, out_dir, seed=args.rs)
-    print_util.remove_logger(logger)
+    # run experiment
+    experiment(args, logger, out_dir)
 
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='Feature representation extractions for tree ensembles',
-                                     formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    parser = argparse.ArgumentParser()
 
     # I/O settings
-    parser.add_argument('--dataset', type=str, default='adult', help='dataset to explain.')
+    parser.add_argument('--dataset', type=str, default='churn', help='dataset to evaluate.')
     parser.add_argument('--data_dir', type=str, default='data', help='data directory.')
+    parser.add_argument('--processing_dir', type=str, default='standard', help='processing directory.')
     parser.add_argument('--out_dir', type=str, default='output/runtime/', help='output directory.')
 
-    # data settings
+    # Data settings
     parser.add_argument('--train_frac', type=float, default=1.0, help='dataset to explain.')
-    parser.add_argument('--val_frac', type=float, default=0.1, help='Amount of data for validation.')
+    parser.add_argument('--tune_frac', type=float, default=0.1, help='fraction of train data for validation.')
 
-    # tree settings
-    parser.add_argument('--tree_type', type=str, default='cb', help='Model to use.')
-    parser.add_argument('--n_estimators', type=int, default=100, help='Number of trees.')
-    parser.add_argument('--max_depth', type=int, default=None, help='Maximum depth in tree ensemble.')
+    # Tree-ensemble settings
+    parser.add_argument('--model', type=str, default='cb', help='tree-ensemble.')
+    parser.add_argument('--n_estimators', type=int, default=10, help='no. trees.')
+    parser.add_argument('--max_depth', type=int, default=3, help='max. depth in tree ensemble.')
 
-    # TREX settings
-    parser.add_argument('--trex', action='store_true', default=False, help='TREX method.')
-    parser.add_argument('--tree_kernel', type=str, default='leaf_output', help='Type of encoding.')
-    parser.add_argument('--kernel_model', type=str, default='klr', help='Kernel model to use.')
-    parser.add_argument('--true_label', action='store_true', default=False, help='Train TREX on the true labels.')
+    # Method settings
+    parser.add_argument('--method', type=str, default='klr-leaf_output', help='influence method.')
+    parser.add_argument('--metric', type=str, default='mse', help='surrogate tuning metric.')
 
-    # method settings
-    parser.add_argument('--teknn', action='store_true', default=False, help='Use KNN on top of TREX features.')
-    parser.add_argument('--inf_k', type=int, default=None, help='Number of leaves for leafinfluence.')
-    parser.add_argument('--maple', action='store_true', default=False, help='Run experiment using MAPLE.')
-    parser.add_argument('--dstump', action='store_true', default=False, help='Enable DSTUMP with Maple.')
+    # Experiment settings
+    parser.add_argument('--rs', type=int, default=1, help='random state.')
+    parser.add_argument('--max_time', type=int, default=172800, help='max. experiment time in seconds.')
 
-    # experiment settings
-    parser.add_argument('--rs', type=int, default=1, help='Random state.')
+    # Additional Settings
     parser.add_argument('--verbose', type=int, default=0, help='Verbosity level.')
 
     args = parser.parse_args()

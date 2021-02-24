@@ -31,9 +31,9 @@ def main(args):
                    'knn-leaf_output', 'knn_loss-leaf_output']
 
     label_list = ['TREX-KLR', 'TREX-SVM', 'Random',
-                  'GBDT Loss', 'TREX-KLR Loss', 'TREX-SVM Loss',
+                  'GBDT Loss', 'KLR Loss', 'SVM Loss',
                   'MAPLE', 'LeafInfluence', 'TreeProto',
-                  'TEKNN', 'TEKNN Loss']
+                  'TEKNN', 'KNN Loss']
 
     color_list = ['blue', 'cyan', 'red', 'green', 'purple', 'magenta', 'orange',
                   'black', '#EEC64F', 'yellow', 'brown']
@@ -47,6 +47,7 @@ def main(args):
 
     # filter results
     df = df[df['dataset'] == args.dataset]
+    df = df[df['model'] == args.model]
 
     # obtain clean results
     if args.metric in ['acc', 'auc']:
@@ -106,8 +107,8 @@ def main(args):
 
     # save plot
     fp = os.path.join(out_dir, '{}.pdf'.format(args.dataset))
-    plt.savefig(fp)
-    print('saving to {}'.format(fp))
+    plt.savefig(fp, bbox_inches='tight')
+    print('saving to {}...'.format(fp))
 
     exit(0)
 
@@ -188,8 +189,7 @@ if __name__ == '__main__':
     parser.add_argument('--out_dir', type=str, default='output/plots/cleaning/', help='output directory.')
 
     parser.add_argument('--dataset', type=str, default='churn', help='dataset.')
-    parser.add_argument('--tree_type', type=str, default='cb', help='tree type.')
-    parser.add_argument('--tree_kernel', type=str, default='leaf_output', help='tree kernel.')
+    parser.add_argument('--model', type=str, default='cb', help='tree-ensemble.')
     parser.add_argument('--metric', type=str, default='acc', help='acc, auc, or fixed_pcts.')
 
     parser.add_argument('--rs', type=int, nargs='+', default=[1, 2, 3, 4, 5], help='random state.')

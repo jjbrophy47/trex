@@ -49,8 +49,6 @@ def process_results(df):
         main_result['num_runs'] = len(gf)
         main_result['max_rss'] = gf['max_rss'].mean()
         main_result['total_time'] = gf['total_time'].mean()
-        main_result['acc_clean'] = gf['acc_clean'].mean()
-        main_result['auc_clean'] = gf['auc_clean'].mean()
 
         # compute average accuracy
         accs = [np.array(x) for x in gf['accs'].values]
@@ -62,14 +60,19 @@ def process_results(df):
         main_result['aucs_mean'] = np.mean(aucs, axis=0)
         main_result['aucs_sem'] = sem(aucs, axis=0)
 
-        # compute average fixed percentages
-        fixed_pcts = [np.array(x) for x in gf['fixed_pcts'].values]
-        main_result['fixed_pcts_mean'] = np.mean(fixed_pcts, axis=0)
-        main_result['fixed_pcts_sem'] = sem(fixed_pcts, axis=0)
+        # compute average of average prob. deltas
+        avg_proba_deltas = [np.array(x) for x in gf['avg_proba_deltas'].values]
+        main_result['avg_proba_deltas_mean'] = np.mean(avg_proba_deltas, axis=0)
+        main_result['avg_proba_deltas_sem'] = sem(avg_proba_deltas, axis=0)
 
-        # get checked percentages
-        checked_pcts = [np.array(x) for x in gf['checked_pcts'].values]
-        main_result['checked_pcts'] = np.mean(checked_pcts, axis=0)
+        # compute average of median prob. deltas
+        median_proba_deltas = [np.array(x) for x in gf['median_proba_deltas'].values]
+        main_result['median_proba_deltas_mean'] = np.mean(median_proba_deltas, axis=0)
+        main_result['median_proba_deltas_sem'] = sem(median_proba_deltas, axis=0)
+
+        # get removed percentages
+        removed_pcts = [np.array(x) for x in gf['removed_pcts'].values]
+        main_result['removed_pcts'] = np.mean(removed_pcts, axis=0)
 
         main_result_list.append(main_result)
 
@@ -86,16 +89,18 @@ def create_csv(args, out_dir, logger):
     experiment_settings = list(product(*[args.dataset,
                                          args.model,
                                          args.method,
+                                         args.scoring,
                                          args.rs]))
 
     # organize results
     results = []
-    for dataset, model, method, rs in tqdm(experiment_settings):
+    for dataset, model, method, scoring, rs in tqdm(experiment_settings):
 
         # create result
         template = {'dataset': dataset,
                     'model': model,
                     'method': method,
+                    'scoring': scoring,
                     'rs': rs}
 
         # get results directory
@@ -103,6 +108,7 @@ def create_csv(args, out_dir, logger):
                                       dataset,
                                       model,
                                       method,
+                                      scoring,
                                       'rs_{}'.format(rs))
 
         # skip empty experiments
@@ -149,20 +155,20 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
 
     # I/O settings
-    parser.add_argument('--in_dir', type=str, default='output/cleaning/', help='input directory.')
-    parser.add_argument('--out_dir', type=str, default='output/cleaning/csv/', help='output directory.')
+    parser.add_argument('--in_dir', type=str, default='output/roar/', help='input directory.')
+    parser.add_argument('--out_dir', type=str, default='output/roar/csv/', help='output directory.')
 
     # experiment settings
     parser.add_argument('--dataset', type=str, nargs='+', help='dataset.',
-                        default=['churn', 'surgical', 'vaccine', 'amazon',
-                                 'bank_marketing', 'adult', 'census', 'census_0p1'])
+                        default=['churn', 'surgical', 'vaccine', 'amazon', 'bank_marketing', 'adult', 'census'])
     parser.add_argument('--model', type=int, nargs='+', default=['cb'], help='model to extract the results for.')
+    parser.add_argument('--scoring', type=int, nargs='+', default=['accuracy', 'roc_auc'],
+                        help='metric to tune tree-ensemble.')
     parser.add_argument('--method', type=int, nargs='+',
                         default=['random', 'klr-leaf_output', 'svm-leaf_output',
-                                 'klr_loss-leaf_output', 'svm_loss-leaf_output',
-                                 'knn-leaf_output', 'knn_loss-leaf_output', 'tree_loss',
-                                 'leaf_influence', 'maple', 'tree_prototype'], help='method for checking train data.')
-    parser.add_argument('--rs', type=int, nargs='+', default=[1, 2, 3, 4, 5], help='random state.')
+                                 'maple', 'knn-leaf_output', 'leaf_influence'],
+                        help='method for sorting train data.')
+    parser.add_argument('--rs', type=int, nargs='+', default=list(range(20)), help='random state.')
 
     args = parser.parse_args()
     main(args)

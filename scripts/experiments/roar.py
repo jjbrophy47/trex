@@ -398,7 +398,7 @@ def experiment(args, logger, out_dir):
     result = measure_performance(train_indices, n_checkpoint, args.n_checkpoints,
                                  clf, X_train, y_train, X_test, y_test, logger=logger)
 
-    # save rsults
+    # save results
     result['max_rss'] = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
     result['total_time'] = time.time() - begin
     np.save(os.path.join(out_dir, 'results.npy'), result)
