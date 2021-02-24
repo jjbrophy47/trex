@@ -274,7 +274,7 @@ def leaf_influence_method(model_noisy, y_train_noisy,
         # display progress
         if logger and i % int(X_train.shape[0] * frac_progress_update) == 0:
             elapsed = time.time() - start
-            logger.info('finished {:.1f}% test instances...{:.3f}s'.format((i / X_test.shape[0]) * 100, elapsed))
+            logger.info('finished {:.1f}% train instances...{:.3f}s'.format((i / X_train.shape[0]) * 100, elapsed))
 
     # convert scores to a numpy array
     influence_scores = np.array(influence_scores)
@@ -321,7 +321,7 @@ def maple_method(model_noisy,
         # display progress
         if logger and i % int(X_train.shape[0] * frac_progress_update) == 0:
             elapsed = time.time() - start
-            logger.info('finished {:.1f}% test instances...{:.3f}s'.format((i / X_test.shape[0]) * 100, elapsed))
+            logger.info('finished {:.1f}% train instances...{:.3f}s'.format((i / X_train.shape[0]) * 100, elapsed))
 
     # sort by training instance densities
     train_indices = np.argsort(train_weight)[::-1]
@@ -388,7 +388,7 @@ def teknn_method(model_noisy, y_train_noisy,
             # display progress
             if logger and i % int(X_train.shape[0] * frac_progress_update) == 0:
                 elapsed = time.time() - start
-                logger.info('finished {:.1f}% test instances...{:.3f}s'.format((i / X_test.shape[0]) * 100, elapsed))
+                logger.info('finished {:.1f}% train instances...{:.3f}s'.format((i / X_train.shape[0]) * 100, elapsed))
 
         # sort instances by their similarity density
         train_indices = np.argsort(train_weight)[::-1]
@@ -460,7 +460,7 @@ def tree_prototype_method(model_noisy, y_train_noisy,
         # display progress
         if logger and i % int(X_train.shape[0] * frac_progress_update) == 0:
             elapsed = time.time() - start
-            logger.info('finished {:.1f}% test instances...{:.3f}s'.format((i / X_test.shape[0]) * 100, elapsed))
+            logger.info('finished {:.1f}% train instances...{:.3f}s'.format((i / X_train.shape[0]) * 100, elapsed))
 
     # rank training instances by low label agreement with its neighbors
     train_indices = np.argsort(train_weight)
@@ -647,7 +647,7 @@ def main(args):
 
     # change name of dataset if using a subset of the dataset
     if args.train_frac < 1.0 and args.train_frac > 0.0:
-        dataset = '_{}'.format(str(args.train_frac).replace('.', 'p'))
+        dataset = '{}_{}'.format(args.dataset, str(args.train_frac).replace('.', 'p'))
 
     # leave name unchanged
     else:
