@@ -117,7 +117,7 @@ def leaf_influence_method(args, model, test_ndx, X_train, y_train,
                 # display progress
                 if logger and i % int(X_train.shape[0] * frac_progress_update) == 0:
                     elapsed = time.time() - start
-                    train_frac_complete = i / X_train.shape * 100
+                    train_frac_complete = i / X_train.shape[0] * 100
                     logger.info('Train {:.1f}%...{:.3f}s'.format(train_frac_complete, elapsed))
 
                 contributions = np.array(contributions)

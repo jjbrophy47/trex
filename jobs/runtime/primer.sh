@@ -7,7 +7,7 @@ time=$6
 partition=$7
 
 rs_list=(1 2 3 4 5)
-method_list=('klr-leaf_output' 'svm-leaf_output',
+method_list=('klr-leaf_output' 'svm-leaf_output' \
              'leaf_influence' 'maple' 'knn-leaf_output')
 
 for method in ${method_list[@]}; do
