@@ -1,10 +1,10 @@
-build:
-	cd trex/models/liblinear; make clean; make all; cd -
+clean:
+	rm -rf .catboost_info
 
 get_deps:
 	pip3 install -r requirements.txt
 
-clean:
-	rm -rf .trex .catboost_info
+build:
+	cd trex/models/; rm -rf *.so *.c *.html build/ __pycache__; python3 setup.py build_ext --inplace; cd -
 
-all: get_deps build
+all: clean get_deps build
