@@ -40,9 +40,18 @@ def score(model, X_test, y_test):
     """
     Evaluates the model the on test set and returns metric scores.
     """
-    acc = accuracy_score(y_test, model.predict(X_test))
-    auc = roc_auc_score(y_test, model.predict_proba(X_test)[:, 1])
-    return acc, auc
+
+    # 1 test sample
+    if y_test.shape[0] == 1:
+        result = (-1, -1)
+
+    # >1 test sample
+    else:
+        acc = accuracy_score(y_test, model.predict(X_test))
+        auc = roc_auc_score(y_test, model.predict_proba(X_test)[:, 1])
+        return (acc, auc)
+
+    return result
 
 
 def measure_performance(train_indices, n_checkpoint, n_checkpoints,
@@ -373,9 +382,10 @@ def experiment(args, logger, out_dir):
     X_test_sub, y_test_sub = X_test[test_indices], y_test[test_indices]
 
     # choose new subset if test subset all contain the same label
-    while y_test_sub.sum() == len(y_test_sub) or y_test_sub.sum() == 0:
-        test_indices = rng.choice(X_test.shape[0], size=args.n_test, replace=False)
-        X_test_sub, y_test_sub = X_test[test_indices], y_test[test_indices]
+    if args.n_test > 1:
+        while y_test_sub.sum() == len(y_test_sub) or y_test_sub.sum() == 0:
+            test_indices = rng.choice(X_test.shape[0], size=args.n_test, replace=False)
+            X_test_sub, y_test_sub = X_test[test_indices], y_test[test_indices]
 
     # display dataset statistics
     logger.info('\nno. train instances: {:,}'.format(X_train.shape[0]))
@@ -388,12 +398,17 @@ def experiment(args, logger, out_dir):
     model_util.performance(model, X_test_sub, y_test_sub, logger=logger, name='Test')
 
     # compute how many samples to remove before a checkpoint
-    n_checkpoint = int(args.train_frac_to_remove * X_train.shape[0] / args.n_checkpoints)
+    if args.train_frac_to_remove >= 1.0:
+        n_checkpoint = int(args.train_frac_to_remove)
+    elif args.train_frac_to_remove > 0:
+        n_checkpoint = int(args.train_frac_to_remove * X_train.shape[0])
+    else:
+        raise ValueError('invalid train_frac_to_remove: {}'.format(args.train_frac_to_remove))
 
     # sort train instances, then remove, retrain, and re-evaluate
-    train_indices = sort_train_instances(args, model, X_train, y_train, X_test, y_test, rng, logger=logger)
+    train_indices = sort_train_instances(args, model, X_train, y_train, X_test_sub, y_test_sub, rng, logger=logger)
     result = measure_performance(train_indices, n_checkpoint, args.n_checkpoints,
-                                 clf, X_train, y_train, X_test, y_test, logger=logger)
+                                 clf, X_train, y_train, X_test_sub, y_test_sub, logger=logger)
 
     # save results
     result['max_rss'] = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
@@ -437,7 +452,7 @@ if __name__ == '__main__':
     parser.add_argument('--out_dir', type=str, default='output/roar/', help='directory to save results.')
 
     # Data settings
-    parser.add_argument('--train_frac', type=float, default=1.0, help='dataset to explain.')
+    parser.add_argument('--train_frac', type=float, default=1.0, help='fraction of train data to evaluate.')
     parser.add_argument('--tune_frac', type=float, default=0.1, help='amount of data for validation.')
     parser.add_argument('--scoring', type=str, default='accuracy', help='metric for tuning.')
 

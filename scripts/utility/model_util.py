@@ -78,6 +78,10 @@ def performance(model, X, y, logger=None,
     Returns AUROC and accuracy scores.
     """
 
+    # only 1 sample
+    if y.shape[0] == 1:
+        return
+
     # generate prediction probabilities
     if hasattr(model, 'predict_proba'):
         y_proba = model.predict_proba(X)[:, 1]
