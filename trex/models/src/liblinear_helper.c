@@ -23,7 +23,7 @@ static struct feature_node **dense_to_sparse(char *x, int double_precision,
     float *x32 = (float *)x;
     double *x64 = (double *)x;
     struct feature_node **sparse;
-    int i, j;                           /* number of nonzero elements in row i */
+    int i=0, j=0;                           /* number of nonzero elements in row i */
     struct feature_node *T;             /* pointer to the top of the stack */
     int have_bias = (bias > 0);
 
@@ -38,10 +38,9 @@ static struct feature_node **dense_to_sparse(char *x, int double_precision,
         return NULL;
     }
 
-    for (i=0; i<n_samples; ++i) {
+    for (i=0; i < n_samples; i++) {
         sparse[i] = T;
-
-        for (j=1; j<=n_features; ++j) {
+        for (j=1; j<=n_features; j++) {
             if (double_precision) {
                 if (*x64 != 0) {
                     T->value = *x64;
@@ -74,6 +73,76 @@ static struct feature_node **dense_to_sparse(char *x, int double_precision,
     return sparse;
 }
 
+// /*
+//  * Convert matrix to sparse representation suitable for liblinear. x is
+//  * expected to be an array of length n_samples*n_features.
+//  *
+//  * Whether the matrix is densely or sparsely populated, the fastest way to
+//  * convert it to liblinear's sparse format is to calculate the amount of memory
+//  * needed and allocate a single big block.
+//  *
+//  * Special care must be taken with indices, since liblinear indices start at 1
+//  * and not at 0.
+//  *
+//  * If bias is > 0, we append an item at the end.
+//  */
+// static struct feature_node **dense_to_sparse(char *x, int double_precision,
+//         int n_samples, int n_features, int n_nonzero, double bias)
+// {
+//     float *x32 = (float *)x;
+//     double *x64 = (double *)x;
+//     struct feature_node **sparse;
+//     int i, j;                           /* number of nonzero elements in row i */
+//     struct feature_node *T;             /* pointer to the top of the stack */
+//     int have_bias = (bias > 0);
+
+//     sparse = malloc (n_samples * sizeof(struct feature_node *));
+//     if (sparse == NULL)
+//         return NULL;
+
+//     n_nonzero += (have_bias+1) * n_samples;
+//     T = malloc (n_nonzero * sizeof(struct feature_node));
+//     if (T == NULL) {
+//         free(sparse);
+//         return NULL;
+//     }
+
+//     for (i=0; i<n_samples; ++i) {
+//         sparse[i] = T;
+
+//         for (j=1; j<=n_features; ++j) {
+//             if (double_precision) {
+//                 if (*x64 != 0) {
+//                     T->value = *x64;
+//                     T->index = j;
+//                     ++ T;
+//                 }
+//                 ++ x64; /* go to next element */
+//             } else {
+//                 if (*x32 != 0) {
+//                     T->value = *x32;
+//                     T->index = j;
+//                     ++ T;
+//                 }
+//                 ++ x32; /* go to next element */
+//             }
+//         }
+
+//         /* set bias element */
+//         if (have_bias) {
+//                 T->value = bias;
+//                 T->index = j;
+//                 ++ T;
+//             }
+
+//         /* set sentinel */
+//         T->index = -1;
+//         ++ T;
+//     }
+
+//     return sparse;
+// }
+
 
 /*
  * Convert scipy.sparse.csr to liblinear's sparse data structure
@@ -85,7 +154,7 @@ static struct feature_node **csr_to_sparse(char *x, int double_precision,
     float *x32 = (float *)x;
     double *x64 = (double *)x;
     struct feature_node **sparse;
-    int i, j=0, k=0, n;
+    int i=0, j=0, k=0, n;
     struct feature_node *T;
     int have_bias = (bias > 0);
 
@@ -100,11 +169,11 @@ static struct feature_node **csr_to_sparse(char *x, int double_precision,
         return NULL;
     }
 
-    for (i=0; i<n_samples; ++i) {
+    for (i=0; i < n_samples; i++) {
         sparse[i] = T;
         n = indptr[i+1] - indptr[i]; /* count elements in row i */
 
-        for (j=0; j<n; ++j) {
+        for (j=0; j < n; j++) {
             T->value = double_precision ? x64[k] : x32[k];
             T->index = indices[k] + 1; /* liblinear uses 1-based indexing */
             ++T;
@@ -115,7 +184,6 @@ static struct feature_node **csr_to_sparse(char *x, int double_precision,
             T->value = bias;
             T->index = n_features + 1;
             ++T;
-            ++j;
         }
 
         /* set sentinel */
@@ -219,8 +287,10 @@ void copy_alpha(void *data, struct model *model, int len)
     // unwind alpha values to original indices
     double *alpha_ = Malloc(double, model->alpha_size);
 
-    for (int i = 0; i < model->alpha_size; i++) {
-        for (int j = 0; j < model->alpha_size; j++) {
+    int i = 0, j = 0;
+
+    for (i=0; i < model->alpha_size; i++) {
+        for (j=0; j < model->alpha_size; j++) {
             if (model->perm[j] == i) {
                 alpha_[i] = model->alpha[j];
                 break;

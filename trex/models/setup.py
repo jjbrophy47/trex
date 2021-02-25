@@ -36,7 +36,7 @@ def configuration(parent_package='', top_path=None):
                          libraries=['liblinear-skl'] + libraries,
                          include_dirs=[os.path.join('.', 'src'),
                                        numpy.get_include()],
-                         depends=liblinear_depends,
+                         depends=liblinear_depends
                          )
 
     config.ext_modules = cythonize(
