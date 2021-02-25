@@ -21,8 +21,9 @@ save*
 **temp*
 
 # TREX
-trex/models/*.o
+trex/models/*.so
 trex/models/*.html
+trex/models/*.c
 trex/models/build/
 
 # data
