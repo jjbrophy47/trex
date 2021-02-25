@@ -5,6 +5,7 @@
 #include <stdarg.h>
 #include <locale.h>
 #include "linear.h"
+#include "tron.h"
 int liblinear_version = LIBLINEAR_VERSION;
 typedef signed char schar;
 template <class T> static inline void swap(T& x, T& y) { T t=x; x=y; y=t; }
@@ -21,18 +22,6 @@ template <class S, class T> static inline void clone(T*& dst, S* src, int n)
 }
 #define INF HUGE_VAL
 #define Malloc(type,n) (type *)malloc((n)*sizeof(type))
-
-class function
-{
-public:
-    virtual double fun(double *w) = 0 ;
-    virtual void grad(double *w, double *g) = 0 ;
-    virtual void Hv(double *s, double *Hs) = 0 ;
-
-    virtual int get_nr_variable(void) = 0 ;
-    virtual void get_diag_preconditioner(double *M) = 0 ;
-    virtual ~function(void){}
-};
 
 static void print_string_stdout(const char *s)
 {
@@ -1036,190 +1025,190 @@ static void solve_l2r_l1l2_svc(
 #define GETI(i) (0)
 // To support weights for instances, use GETI(i) (i)
 
-// static void solve_l2r_l1l2_svr(
-// 	const problem *prob, double *w, const parameter *param,
-// 	int solver_type)
-// {
-// 	int l = prob->l;
-// 	double C = param->C;
-// 	double p = param->p;
-// 	int w_size = prob->n;
-// 	double eps = param->eps;
-// 	int i, s, iter = 0;
-// 	int max_iter = 1000;
-// 	int active_size = l;
-// 	int *index = new int[l];
+static void solve_l2r_l1l2_svr(
+	const problem *prob, double *w, const parameter *param,
+	int solver_type)
+{
+	int l = prob->l;
+	double C = param->C;
+	double p = param->p;
+	int w_size = prob->n;
+	double eps = param->eps;
+	int i, s, iter = 0;
+	int max_iter = 1000;
+	int active_size = l;
+	int *index = new int[l];
 
-// 	double d, G, H;
-// 	double Gmax_old = INF;
-// 	double Gmax_new, Gnorm1_new;
-// 	double Gnorm1_init = -1.0; // Gnorm1_init is initialized at the first iteration
-// 	double *beta = new double[l];
-// 	double *QD = new double[l];
-// 	double *y = prob->y;
+	double d, G, H;
+	double Gmax_old = INF;
+	double Gmax_new, Gnorm1_new;
+	double Gnorm1_init = -1.0; // Gnorm1_init is initialized at the first iteration
+	double *beta = new double[l];
+	double *QD = new double[l];
+	double *y = prob->y;
 
-// 	// L2R_L2LOSS_SVR_DUAL
-// 	double lambda[1], upper_bound[1];
-// 	lambda[0] = 0.5/C;
-// 	upper_bound[0] = INF;
+	// L2R_L2LOSS_SVR_DUAL
+	double lambda[1], upper_bound[1];
+	lambda[0] = 0.5/C;
+	upper_bound[0] = INF;
 
-// 	if(solver_type == L2R_L1LOSS_SVR_DUAL)
-// 	{
-// 		lambda[0] = 0;
-// 		upper_bound[0] = C;
-// 	}
+	if(solver_type == L2R_L1LOSS_SVR_DUAL)
+	{
+		lambda[0] = 0;
+		upper_bound[0] = C;
+	}
 
-// 	// Initial beta can be set here. Note that
-// 	// -upper_bound <= beta[i] <= upper_bound
-// 	for(i=0; i<l; i++)
-// 		beta[i] = 0;
+	// Initial beta can be set here. Note that
+	// -upper_bound <= beta[i] <= upper_bound
+	for(i=0; i<l; i++)
+		beta[i] = 0;
 
-// 	for(i=0; i<w_size; i++)
-// 		w[i] = 0;
-// 	for(i=0; i<l; i++)
-// 	{
-// 		feature_node * const xi = prob->x[i];
-// 		QD[i] = sparse_operator::nrm2_sq(xi);
-// 		sparse_operator::axpy(beta[i], xi, w);
+	for(i=0; i<w_size; i++)
+		w[i] = 0;
+	for(i=0; i<l; i++)
+	{
+		feature_node * const xi = prob->x[i];
+		QD[i] = sparse_operator::nrm2_sq(xi);
+		sparse_operator::axpy(beta[i], xi, w);
 
-// 		index[i] = i;
-// 	}
+		index[i] = i;
+	}
 
 
-// 	while(iter < max_iter)
-// 	{
-// 		Gmax_new = 0;
-// 		Gnorm1_new = 0;
+	while(iter < max_iter)
+	{
+		Gmax_new = 0;
+		Gnorm1_new = 0;
 
-// 		for(i=0; i<active_size; i++)
-// 		{
-// 			int j = i+rand()%(active_size-i);
-// 			swap(index[i], index[j]);
-// 		}
+		for(i=0; i<active_size; i++)
+		{
+			int j = i+rand()%(active_size-i);
+			swap(index[i], index[j]);
+		}
 
-// 		for(s=0; s<active_size; s++)
-// 		{
-// 			i = index[s];
-// 			G = -y[i] + lambda[GETI(i)]*beta[i];
-// 			H = QD[i] + lambda[GETI(i)];
+		for(s=0; s<active_size; s++)
+		{
+			i = index[s];
+			G = -y[i] + lambda[GETI(i)]*beta[i];
+			H = QD[i] + lambda[GETI(i)];
 
-// 			feature_node * const xi = prob->x[i];
-// 			G += sparse_operator::dot(w, xi);
+			feature_node * const xi = prob->x[i];
+			G += sparse_operator::dot(w, xi);
 
-// 			double Gp = G+p;
-// 			double Gn = G-p;
-// 			double violation = 0;
-// 			if(beta[i] == 0)
-// 			{
-// 				if(Gp < 0)
-// 					violation = -Gp;
-// 				else if(Gn > 0)
-// 					violation = Gn;
-// 				else if(Gp>Gmax_old && Gn<-Gmax_old)
-// 				{
-// 					active_size--;
-// 					swap(index[s], index[active_size]);
-// 					s--;
-// 					continue;
-// 				}
-// 			}
-// 			else if(beta[i] >= upper_bound[GETI(i)])
-// 			{
-// 				if(Gp > 0)
-// 					violation = Gp;
-// 				else if(Gp < -Gmax_old)
-// 				{
-// 					active_size--;
-// 					swap(index[s], index[active_size]);
-// 					s--;
-// 					continue;
-// 				}
-// 			}
-// 			else if(beta[i] <= -upper_bound[GETI(i)])
-// 			{
-// 				if(Gn < 0)
-// 					violation = -Gn;
-// 				else if(Gn > Gmax_old)
-// 				{
-// 					active_size--;
-// 					swap(index[s], index[active_size]);
-// 					s--;
-// 					continue;
-// 				}
-// 			}
-// 			else if(beta[i] > 0)
-// 				violation = fabs(Gp);
-// 			else
-// 				violation = fabs(Gn);
+			double Gp = G+p;
+			double Gn = G-p;
+			double violation = 0;
+			if(beta[i] == 0)
+			{
+				if(Gp < 0)
+					violation = -Gp;
+				else if(Gn > 0)
+					violation = Gn;
+				else if(Gp>Gmax_old && Gn<-Gmax_old)
+				{
+					active_size--;
+					swap(index[s], index[active_size]);
+					s--;
+					continue;
+				}
+			}
+			else if(beta[i] >= upper_bound[GETI(i)])
+			{
+				if(Gp > 0)
+					violation = Gp;
+				else if(Gp < -Gmax_old)
+				{
+					active_size--;
+					swap(index[s], index[active_size]);
+					s--;
+					continue;
+				}
+			}
+			else if(beta[i] <= -upper_bound[GETI(i)])
+			{
+				if(Gn < 0)
+					violation = -Gn;
+				else if(Gn > Gmax_old)
+				{
+					active_size--;
+					swap(index[s], index[active_size]);
+					s--;
+					continue;
+				}
+			}
+			else if(beta[i] > 0)
+				violation = fabs(Gp);
+			else
+				violation = fabs(Gn);
 
-// 			Gmax_new = max(Gmax_new, violation);
-// 			Gnorm1_new += violation;
+			Gmax_new = max(Gmax_new, violation);
+			Gnorm1_new += violation;
 
-// 			// obtain Newton direction d
-// 			if(Gp < H*beta[i])
-// 				d = -Gp/H;
-// 			else if(Gn > H*beta[i])
-// 				d = -Gn/H;
-// 			else
-// 				d = -beta[i];
+			// obtain Newton direction d
+			if(Gp < H*beta[i])
+				d = -Gp/H;
+			else if(Gn > H*beta[i])
+				d = -Gn/H;
+			else
+				d = -beta[i];
 
-// 			if(fabs(d) < 1.0e-12)
-// 				continue;
+			if(fabs(d) < 1.0e-12)
+				continue;
 
-// 			double beta_old = beta[i];
-// 			beta[i] = min(max(beta[i]+d, -upper_bound[GETI(i)]), upper_bound[GETI(i)]);
-// 			d = beta[i]-beta_old;
+			double beta_old = beta[i];
+			beta[i] = min(max(beta[i]+d, -upper_bound[GETI(i)]), upper_bound[GETI(i)]);
+			d = beta[i]-beta_old;
 
-// 			if(d != 0)
-// 				sparse_operator::axpy(d, xi, w);
-// 		}
+			if(d != 0)
+				sparse_operator::axpy(d, xi, w);
+		}
 
-// 		if(iter == 0)
-// 			Gnorm1_init = Gnorm1_new;
-// 		iter++;
-// 		if(iter % 10 == 0)
-// 			info(".");
+		if(iter == 0)
+			Gnorm1_init = Gnorm1_new;
+		iter++;
+		if(iter % 10 == 0)
+			info(".");
 
-// 		if(Gnorm1_new <= eps*Gnorm1_init)
-// 		{
-// 			if(active_size == l)
-// 				break;
-// 			else
-// 			{
-// 				active_size = l;
-// 				info("*");
-// 				Gmax_old = INF;
-// 				continue;
-// 			}
-// 		}
+		if(Gnorm1_new <= eps*Gnorm1_init)
+		{
+			if(active_size == l)
+				break;
+			else
+			{
+				active_size = l;
+				info("*");
+				Gmax_old = INF;
+				continue;
+			}
+		}
 
-// 		Gmax_old = Gmax_new;
-// 	}
+		Gmax_old = Gmax_new;
+	}
 
-// 	info("\noptimization finished, #iter = %d\n", iter);
-// 	if(iter >= max_iter)
-// 		info("\nWARNING: reaching max number of iterations\nUsing -s 11 may be faster\n\n");
+	info("\noptimization finished, #iter = %d\n", iter);
+	if(iter >= max_iter)
+		info("\nWARNING: reaching max number of iterations\nUsing -s 11 may be faster\n\n");
 
-// 	// calculate objective value
-// 	double v = 0;
-// 	int nSV = 0;
-// 	for(i=0; i<w_size; i++)
-// 		v += w[i]*w[i];
-// 	v = 0.5*v;
-// 	for(i=0; i<l; i++)
-// 	{
-// 		v += p*fabs(beta[i]) - y[i]*beta[i] + 0.5*lambda[GETI(i)]*beta[i]*beta[i];
-// 		if(beta[i] != 0)
-// 			nSV++;
-// 	}
+	// calculate objective value
+	double v = 0;
+	int nSV = 0;
+	for(i=0; i<w_size; i++)
+		v += w[i]*w[i];
+	v = 0.5*v;
+	for(i=0; i<l; i++)
+	{
+		v += p*fabs(beta[i]) - y[i]*beta[i] + 0.5*lambda[GETI(i)]*beta[i]*beta[i];
+		if(beta[i] != 0)
+			nSV++;
+	}
 
-// 	info("Objective value = %lf\n", v);
-// 	info("nSV = %d\n",nSV);
+	info("Objective value = %lf\n", v);
+	info("nSV = %d\n",nSV);
 
-// 	delete [] beta;
-// 	delete [] QD;
-// 	delete [] index;
-// }
+	delete [] beta;
+	delete [] QD;
+	delete [] index;
+}
 
 
 // A coordinate descent algorithm for
@@ -1409,267 +1398,267 @@ void solve_l2r_lr_dual(const problem *prob, double *w, double eps, double Cp, do
 #define GETI(i) (y[i]+1)
 // To support weights for instances, use GETI(i) (i)
 
-// static void solve_l1r_l2_svc(
-// 	problem *prob_col, double *w, double eps,
-// 	double Cp, double Cn)
-// {
-// 	int l = prob_col->l;
-// 	int w_size = prob_col->n;
-// 	int j, s, iter = 0;
-// 	int max_iter = 1000;
-// 	int active_size = w_size;
-// 	int max_num_linesearch = 20;
+static void solve_l1r_l2_svc(
+	problem *prob_col, double *w, double eps,
+	double Cp, double Cn)
+{
+	int l = prob_col->l;
+	int w_size = prob_col->n;
+	int j, s, iter = 0;
+	int max_iter = 1000;
+	int active_size = w_size;
+	int max_num_linesearch = 20;
 
-// 	double sigma = 0.01;
-// 	double d, G_loss, G, H;
-// 	double Gmax_old = INF;
-// 	double Gmax_new, Gnorm1_new;
-// 	double Gnorm1_init = -1.0; // Gnorm1_init is initialized at the first iteration
-// 	double d_old, d_diff;
-// 	double loss_old = 0, loss_new;
-// 	double appxcond, cond;
+	double sigma = 0.01;
+	double d, G_loss, G, H;
+	double Gmax_old = INF;
+	double Gmax_new, Gnorm1_new;
+	double Gnorm1_init = -1.0; // Gnorm1_init is initialized at the first iteration
+	double d_old, d_diff;
+	double loss_old = 0, loss_new;
+	double appxcond, cond;
 
-// 	int *index = new int[w_size];
-// 	schar *y = new schar[l];
-// 	double *b = new double[l]; // b = 1-ywTx
-// 	double *xj_sq = new double[w_size];
-// 	feature_node *x;
+	int *index = new int[w_size];
+	schar *y = new schar[l];
+	double *b = new double[l]; // b = 1-ywTx
+	double *xj_sq = new double[w_size];
+	feature_node *x;
 
-// 	double C[3] = {Cn,0,Cp};
+	double C[3] = {Cn,0,Cp};
 
-// 	// Initial w can be set here.
-// 	for(j=0; j<w_size; j++)
-// 		w[j] = 0;
+	// Initial w can be set here.
+	for(j=0; j<w_size; j++)
+		w[j] = 0;
 
-// 	for(j=0; j<l; j++)
-// 	{
-// 		b[j] = 1;
-// 		if(prob_col->y[j] > 0)
-// 			y[j] = 1;
-// 		else
-// 			y[j] = -1;
-// 	}
-// 	for(j=0; j<w_size; j++)
-// 	{
-// 		index[j] = j;
-// 		xj_sq[j] = 0;
-// 		x = prob_col->x[j];
-// 		while(x->index != -1)
-// 		{
-// 			int ind = x->index-1;
-// 			x->value *= y[ind]; // x->value stores yi*xij
-// 			double val = x->value;
-// 			b[ind] -= w[j]*val;
-// 			xj_sq[j] += C[GETI(ind)]*val*val;
-// 			x++;
-// 		}
-// 	}
+	for(j=0; j<l; j++)
+	{
+		b[j] = 1;
+		if(prob_col->y[j] > 0)
+			y[j] = 1;
+		else
+			y[j] = -1;
+	}
+	for(j=0; j<w_size; j++)
+	{
+		index[j] = j;
+		xj_sq[j] = 0;
+		x = prob_col->x[j];
+		while(x->index != -1)
+		{
+			int ind = x->index-1;
+			x->value *= y[ind]; // x->value stores yi*xij
+			double val = x->value;
+			b[ind] -= w[j]*val;
+			xj_sq[j] += C[GETI(ind)]*val*val;
+			x++;
+		}
+	}
 
-// 	while(iter < max_iter)
-// 	{
-// 		Gmax_new = 0;
-// 		Gnorm1_new = 0;
+	while(iter < max_iter)
+	{
+		Gmax_new = 0;
+		Gnorm1_new = 0;
 
-// 		for(j=0; j<active_size; j++)
-// 		{
-// 			int i = j+rand()%(active_size-j);
-// 			swap(index[i], index[j]);
-// 		}
+		for(j=0; j<active_size; j++)
+		{
+			int i = j+rand()%(active_size-j);
+			swap(index[i], index[j]);
+		}
 
-// 		for(s=0; s<active_size; s++)
-// 		{
-// 			j = index[s];
-// 			G_loss = 0;
-// 			H = 0;
+		for(s=0; s<active_size; s++)
+		{
+			j = index[s];
+			G_loss = 0;
+			H = 0;
 
-// 			x = prob_col->x[j];
-// 			while(x->index != -1)
-// 			{
-// 				int ind = x->index-1;
-// 				if(b[ind] > 0)
-// 				{
-// 					double val = x->value;
-// 					double tmp = C[GETI(ind)]*val;
-// 					G_loss -= tmp*b[ind];
-// 					H += tmp*val;
-// 				}
-// 				x++;
-// 			}
-// 			G_loss *= 2;
+			x = prob_col->x[j];
+			while(x->index != -1)
+			{
+				int ind = x->index-1;
+				if(b[ind] > 0)
+				{
+					double val = x->value;
+					double tmp = C[GETI(ind)]*val;
+					G_loss -= tmp*b[ind];
+					H += tmp*val;
+				}
+				x++;
+			}
+			G_loss *= 2;
 
-// 			G = G_loss;
-// 			H *= 2;
-// 			H = max(H, 1e-12);
+			G = G_loss;
+			H *= 2;
+			H = max(H, 1e-12);
 
-// 			double Gp = G+1;
-// 			double Gn = G-1;
-// 			double violation = 0;
-// 			if(w[j] == 0)
-// 			{
-// 				if(Gp < 0)
-// 					violation = -Gp;
-// 				else if(Gn > 0)
-// 					violation = Gn;
-// 				else if(Gp>Gmax_old/l && Gn<-Gmax_old/l)
-// 				{
-// 					active_size--;
-// 					swap(index[s], index[active_size]);
-// 					s--;
-// 					continue;
-// 				}
-// 			}
-// 			else if(w[j] > 0)
-// 				violation = fabs(Gp);
-// 			else
-// 				violation = fabs(Gn);
+			double Gp = G+1;
+			double Gn = G-1;
+			double violation = 0;
+			if(w[j] == 0)
+			{
+				if(Gp < 0)
+					violation = -Gp;
+				else if(Gn > 0)
+					violation = Gn;
+				else if(Gp>Gmax_old/l && Gn<-Gmax_old/l)
+				{
+					active_size--;
+					swap(index[s], index[active_size]);
+					s--;
+					continue;
+				}
+			}
+			else if(w[j] > 0)
+				violation = fabs(Gp);
+			else
+				violation = fabs(Gn);
 
-// 			Gmax_new = max(Gmax_new, violation);
-// 			Gnorm1_new += violation;
+			Gmax_new = max(Gmax_new, violation);
+			Gnorm1_new += violation;
 
-// 			// obtain Newton direction d
-// 			if(Gp < H*w[j])
-// 				d = -Gp/H;
-// 			else if(Gn > H*w[j])
-// 				d = -Gn/H;
-// 			else
-// 				d = -w[j];
+			// obtain Newton direction d
+			if(Gp < H*w[j])
+				d = -Gp/H;
+			else if(Gn > H*w[j])
+				d = -Gn/H;
+			else
+				d = -w[j];
 
-// 			if(fabs(d) < 1.0e-12)
-// 				continue;
+			if(fabs(d) < 1.0e-12)
+				continue;
 
-// 			double delta = fabs(w[j]+d)-fabs(w[j]) + G*d;
-// 			d_old = 0;
-// 			int num_linesearch;
-// 			for(num_linesearch=0; num_linesearch < max_num_linesearch; num_linesearch++)
-// 			{
-// 				d_diff = d_old - d;
-// 				cond = fabs(w[j]+d)-fabs(w[j]) - sigma*delta;
+			double delta = fabs(w[j]+d)-fabs(w[j]) + G*d;
+			d_old = 0;
+			int num_linesearch;
+			for(num_linesearch=0; num_linesearch < max_num_linesearch; num_linesearch++)
+			{
+				d_diff = d_old - d;
+				cond = fabs(w[j]+d)-fabs(w[j]) - sigma*delta;
 
-// 				appxcond = xj_sq[j]*d*d + G_loss*d + cond;
-// 				if(appxcond <= 0)
-// 				{
-// 					x = prob_col->x[j];
-// 					sparse_operator::axpy(d_diff, x, b);
-// 					break;
-// 				}
+				appxcond = xj_sq[j]*d*d + G_loss*d + cond;
+				if(appxcond <= 0)
+				{
+					x = prob_col->x[j];
+					sparse_operator::axpy(d_diff, x, b);
+					break;
+				}
 
-// 				if(num_linesearch == 0)
-// 				{
-// 					loss_old = 0;
-// 					loss_new = 0;
-// 					x = prob_col->x[j];
-// 					while(x->index != -1)
-// 					{
-// 						int ind = x->index-1;
-// 						if(b[ind] > 0)
-// 							loss_old += C[GETI(ind)]*b[ind]*b[ind];
-// 						double b_new = b[ind] + d_diff*x->value;
-// 						b[ind] = b_new;
-// 						if(b_new > 0)
-// 							loss_new += C[GETI(ind)]*b_new*b_new;
-// 						x++;
-// 					}
-// 				}
-// 				else
-// 				{
-// 					loss_new = 0;
-// 					x = prob_col->x[j];
-// 					while(x->index != -1)
-// 					{
-// 						int ind = x->index-1;
-// 						double b_new = b[ind] + d_diff*x->value;
-// 						b[ind] = b_new;
-// 						if(b_new > 0)
-// 							loss_new += C[GETI(ind)]*b_new*b_new;
-// 						x++;
-// 					}
-// 				}
+				if(num_linesearch == 0)
+				{
+					loss_old = 0;
+					loss_new = 0;
+					x = prob_col->x[j];
+					while(x->index != -1)
+					{
+						int ind = x->index-1;
+						if(b[ind] > 0)
+							loss_old += C[GETI(ind)]*b[ind]*b[ind];
+						double b_new = b[ind] + d_diff*x->value;
+						b[ind] = b_new;
+						if(b_new > 0)
+							loss_new += C[GETI(ind)]*b_new*b_new;
+						x++;
+					}
+				}
+				else
+				{
+					loss_new = 0;
+					x = prob_col->x[j];
+					while(x->index != -1)
+					{
+						int ind = x->index-1;
+						double b_new = b[ind] + d_diff*x->value;
+						b[ind] = b_new;
+						if(b_new > 0)
+							loss_new += C[GETI(ind)]*b_new*b_new;
+						x++;
+					}
+				}
 
-// 				cond = cond + loss_new - loss_old;
-// 				if(cond <= 0)
-// 					break;
-// 				else
-// 				{
-// 					d_old = d;
-// 					d *= 0.5;
-// 					delta *= 0.5;
-// 				}
-// 			}
+				cond = cond + loss_new - loss_old;
+				if(cond <= 0)
+					break;
+				else
+				{
+					d_old = d;
+					d *= 0.5;
+					delta *= 0.5;
+				}
+			}
 
-// 			w[j] += d;
+			w[j] += d;
 
-// 			// recompute b[] if line search takes too many steps
-// 			if(num_linesearch >= max_num_linesearch)
-// 			{
-// 				info("#");
-// 				for(int i=0; i<l; i++)
-// 					b[i] = 1;
+			// recompute b[] if line search takes too many steps
+			if(num_linesearch >= max_num_linesearch)
+			{
+				info("#");
+				for(int i=0; i<l; i++)
+					b[i] = 1;
 
-// 				for(int i=0; i<w_size; i++)
-// 				{
-// 					if(w[i]==0) continue;
-// 					x = prob_col->x[i];
-// 					sparse_operator::axpy(-w[i], x, b);
-// 				}
-// 			}
-// 		}
+				for(int i=0; i<w_size; i++)
+				{
+					if(w[i]==0) continue;
+					x = prob_col->x[i];
+					sparse_operator::axpy(-w[i], x, b);
+				}
+			}
+		}
 
-// 		if(iter == 0)
-// 			Gnorm1_init = Gnorm1_new;
-// 		iter++;
-// 		if(iter % 10 == 0)
-// 			info(".");
+		if(iter == 0)
+			Gnorm1_init = Gnorm1_new;
+		iter++;
+		if(iter % 10 == 0)
+			info(".");
 
-// 		if(Gnorm1_new <= eps*Gnorm1_init)
-// 		{
-// 			if(active_size == w_size)
-// 				break;
-// 			else
-// 			{
-// 				active_size = w_size;
-// 				info("*");
-// 				Gmax_old = INF;
-// 				continue;
-// 			}
-// 		}
+		if(Gnorm1_new <= eps*Gnorm1_init)
+		{
+			if(active_size == w_size)
+				break;
+			else
+			{
+				active_size = w_size;
+				info("*");
+				Gmax_old = INF;
+				continue;
+			}
+		}
 
-// 		Gmax_old = Gmax_new;
-// 	}
+		Gmax_old = Gmax_new;
+	}
 
-// 	info("\noptimization finished, #iter = %d\n", iter);
-// 	if(iter >= max_iter)
-// 		info("\nWARNING: reaching max number of iterations\n");
+	info("\noptimization finished, #iter = %d\n", iter);
+	if(iter >= max_iter)
+		info("\nWARNING: reaching max number of iterations\n");
 
-// 	// calculate objective value
+	// calculate objective value
 
-// 	double v = 0;
-// 	int nnz = 0;
-// 	for(j=0; j<w_size; j++)
-// 	{
-// 		x = prob_col->x[j];
-// 		while(x->index != -1)
-// 		{
-// 			x->value *= prob_col->y[x->index-1]; // restore x->value
-// 			x++;
-// 		}
-// 		if(w[j] != 0)
-// 		{
-// 			v += fabs(w[j]);
-// 			nnz++;
-// 		}
-// 	}
-// 	for(j=0; j<l; j++)
-// 		if(b[j] > 0)
-// 			v += C[GETI(j)]*b[j]*b[j];
+	double v = 0;
+	int nnz = 0;
+	for(j=0; j<w_size; j++)
+	{
+		x = prob_col->x[j];
+		while(x->index != -1)
+		{
+			x->value *= prob_col->y[x->index-1]; // restore x->value
+			x++;
+		}
+		if(w[j] != 0)
+		{
+			v += fabs(w[j]);
+			nnz++;
+		}
+	}
+	for(j=0; j<l; j++)
+		if(b[j] > 0)
+			v += C[GETI(j)]*b[j]*b[j];
 
-// 	info("Objective value = %lf\n", v);
-// 	info("#nonzeros/#features = %d/%d\n", nnz, w_size);
+	info("Objective value = %lf\n", v);
+	info("#nonzeros/#features = %d/%d\n", nnz, w_size);
 
-// 	delete [] index;
-// 	delete [] y;
-// 	delete [] b;
-// 	delete [] xj_sq;
-// }
+	delete [] index;
+	delete [] y;
+	delete [] b;
+	delete [] xj_sq;
+}
 
 // A coordinate descent algorithm for
 // L1-regularized logistic regression problems
@@ -1688,416 +1677,416 @@ void solve_l2r_lr_dual(const problem *prob, double *w, double eps, double Cp, do
 #define GETI(i) (y[i]+1)
 // To support weights for instances, use GETI(i) (i)
 
-// static void solve_l1r_lr(
-// 	const problem *prob_col, double *w, double eps,
-// 	double Cp, double Cn)
-// {
-// 	int l = prob_col->l;
-// 	int w_size = prob_col->n;
-// 	int j, s, newton_iter=0, iter=0;
-// 	int max_newton_iter = 100;
-// 	int max_iter = 1000;
-// 	int max_num_linesearch = 20;
-// 	int active_size;
-// 	int QP_active_size;
+static void solve_l1r_lr(
+	const problem *prob_col, double *w, double eps,
+	double Cp, double Cn)
+{
+	int l = prob_col->l;
+	int w_size = prob_col->n;
+	int j, s, newton_iter=0, iter=0;
+	int max_newton_iter = 100;
+	int max_iter = 1000;
+	int max_num_linesearch = 20;
+	int active_size;
+	int QP_active_size;
 
-// 	double nu = 1e-12;
-// 	double inner_eps = 1;
-// 	double sigma = 0.01;
-// 	double w_norm, w_norm_new;
-// 	double z, G, H;
-// 	double Gnorm1_init = -1.0; // Gnorm1_init is initialized at the first iteration
-// 	double Gmax_old = INF;
-// 	double Gmax_new, Gnorm1_new;
-// 	double QP_Gmax_old = INF;
-// 	double QP_Gmax_new, QP_Gnorm1_new;
-// 	double delta, negsum_xTd, cond;
+	double nu = 1e-12;
+	double inner_eps = 1;
+	double sigma = 0.01;
+	double w_norm, w_norm_new;
+	double z, G, H;
+	double Gnorm1_init = -1.0; // Gnorm1_init is initialized at the first iteration
+	double Gmax_old = INF;
+	double Gmax_new, Gnorm1_new;
+	double QP_Gmax_old = INF;
+	double QP_Gmax_new, QP_Gnorm1_new;
+	double delta, negsum_xTd, cond;
 
-// 	int *index = new int[w_size];
-// 	schar *y = new schar[l];
-// 	double *Hdiag = new double[w_size];
-// 	double *Grad = new double[w_size];
-// 	double *wpd = new double[w_size];
-// 	double *xjneg_sum = new double[w_size];
-// 	double *xTd = new double[l];
-// 	double *exp_wTx = new double[l];
-// 	double *exp_wTx_new = new double[l];
-// 	double *tau = new double[l];
-// 	double *D = new double[l];
-// 	feature_node *x;
+	int *index = new int[w_size];
+	schar *y = new schar[l];
+	double *Hdiag = new double[w_size];
+	double *Grad = new double[w_size];
+	double *wpd = new double[w_size];
+	double *xjneg_sum = new double[w_size];
+	double *xTd = new double[l];
+	double *exp_wTx = new double[l];
+	double *exp_wTx_new = new double[l];
+	double *tau = new double[l];
+	double *D = new double[l];
+	feature_node *x;
 
-// 	double C[3] = {Cn,0,Cp};
+	double C[3] = {Cn,0,Cp};
 
-// 	// Initial w can be set here.
-// 	for(j=0; j<w_size; j++)
-// 		w[j] = 0;
+	// Initial w can be set here.
+	for(j=0; j<w_size; j++)
+		w[j] = 0;
 
-// 	for(j=0; j<l; j++)
-// 	{
-// 		if(prob_col->y[j] > 0)
-// 			y[j] = 1;
-// 		else
-// 			y[j] = -1;
+	for(j=0; j<l; j++)
+	{
+		if(prob_col->y[j] > 0)
+			y[j] = 1;
+		else
+			y[j] = -1;
 
-// 		exp_wTx[j] = 0;
-// 	}
+		exp_wTx[j] = 0;
+	}
 
-// 	w_norm = 0;
-// 	for(j=0; j<w_size; j++)
-// 	{
-// 		w_norm += fabs(w[j]);
-// 		wpd[j] = w[j];
-// 		index[j] = j;
-// 		xjneg_sum[j] = 0;
-// 		x = prob_col->x[j];
-// 		while(x->index != -1)
-// 		{
-// 			int ind = x->index-1;
-// 			double val = x->value;
-// 			exp_wTx[ind] += w[j]*val;
-// 			if(y[ind] == -1)
-// 				xjneg_sum[j] += C[GETI(ind)]*val;
-// 			x++;
-// 		}
-// 	}
-// 	for(j=0; j<l; j++)
-// 	{
-// 		exp_wTx[j] = exp(exp_wTx[j]);
-// 		double tau_tmp = 1/(1+exp_wTx[j]);
-// 		tau[j] = C[GETI(j)]*tau_tmp;
-// 		D[j] = C[GETI(j)]*exp_wTx[j]*tau_tmp*tau_tmp;
-// 	}
+	w_norm = 0;
+	for(j=0; j<w_size; j++)
+	{
+		w_norm += fabs(w[j]);
+		wpd[j] = w[j];
+		index[j] = j;
+		xjneg_sum[j] = 0;
+		x = prob_col->x[j];
+		while(x->index != -1)
+		{
+			int ind = x->index-1;
+			double val = x->value;
+			exp_wTx[ind] += w[j]*val;
+			if(y[ind] == -1)
+				xjneg_sum[j] += C[GETI(ind)]*val;
+			x++;
+		}
+	}
+	for(j=0; j<l; j++)
+	{
+		exp_wTx[j] = exp(exp_wTx[j]);
+		double tau_tmp = 1/(1+exp_wTx[j]);
+		tau[j] = C[GETI(j)]*tau_tmp;
+		D[j] = C[GETI(j)]*exp_wTx[j]*tau_tmp*tau_tmp;
+	}
 
-// 	while(newton_iter < max_newton_iter)
-// 	{
-// 		Gmax_new = 0;
-// 		Gnorm1_new = 0;
-// 		active_size = w_size;
+	while(newton_iter < max_newton_iter)
+	{
+		Gmax_new = 0;
+		Gnorm1_new = 0;
+		active_size = w_size;
 
-// 		for(s=0; s<active_size; s++)
-// 		{
-// 			j = index[s];
-// 			Hdiag[j] = nu;
-// 			Grad[j] = 0;
+		for(s=0; s<active_size; s++)
+		{
+			j = index[s];
+			Hdiag[j] = nu;
+			Grad[j] = 0;
 
-// 			double tmp = 0;
-// 			x = prob_col->x[j];
-// 			while(x->index != -1)
-// 			{
-// 				int ind = x->index-1;
-// 				Hdiag[j] += x->value*x->value*D[ind];
-// 				tmp += x->value*tau[ind];
-// 				x++;
-// 			}
-// 			Grad[j] = -tmp + xjneg_sum[j];
+			double tmp = 0;
+			x = prob_col->x[j];
+			while(x->index != -1)
+			{
+				int ind = x->index-1;
+				Hdiag[j] += x->value*x->value*D[ind];
+				tmp += x->value*tau[ind];
+				x++;
+			}
+			Grad[j] = -tmp + xjneg_sum[j];
 
-// 			double Gp = Grad[j]+1;
-// 			double Gn = Grad[j]-1;
-// 			double violation = 0;
-// 			if(w[j] == 0)
-// 			{
-// 				if(Gp < 0)
-// 					violation = -Gp;
-// 				else if(Gn > 0)
-// 					violation = Gn;
-// 				//outer-level shrinking
-// 				else if(Gp>Gmax_old/l && Gn<-Gmax_old/l)
-// 				{
-// 					active_size--;
-// 					swap(index[s], index[active_size]);
-// 					s--;
-// 					continue;
-// 				}
-// 			}
-// 			else if(w[j] > 0)
-// 				violation = fabs(Gp);
-// 			else
-// 				violation = fabs(Gn);
+			double Gp = Grad[j]+1;
+			double Gn = Grad[j]-1;
+			double violation = 0;
+			if(w[j] == 0)
+			{
+				if(Gp < 0)
+					violation = -Gp;
+				else if(Gn > 0)
+					violation = Gn;
+				//outer-level shrinking
+				else if(Gp>Gmax_old/l && Gn<-Gmax_old/l)
+				{
+					active_size--;
+					swap(index[s], index[active_size]);
+					s--;
+					continue;
+				}
+			}
+			else if(w[j] > 0)
+				violation = fabs(Gp);
+			else
+				violation = fabs(Gn);
 
-// 			Gmax_new = max(Gmax_new, violation);
-// 			Gnorm1_new += violation;
-// 		}
+			Gmax_new = max(Gmax_new, violation);
+			Gnorm1_new += violation;
+		}
 
-// 		if(newton_iter == 0)
-// 			Gnorm1_init = Gnorm1_new;
+		if(newton_iter == 0)
+			Gnorm1_init = Gnorm1_new;
 
-// 		if(Gnorm1_new <= eps*Gnorm1_init)
-// 			break;
+		if(Gnorm1_new <= eps*Gnorm1_init)
+			break;
 
-// 		iter = 0;
-// 		QP_Gmax_old = INF;
-// 		QP_active_size = active_size;
+		iter = 0;
+		QP_Gmax_old = INF;
+		QP_active_size = active_size;
 
-// 		for(int i=0; i<l; i++)
-// 			xTd[i] = 0;
+		for(int i=0; i<l; i++)
+			xTd[i] = 0;
 
-// 		// optimize QP over wpd
-// 		while(iter < max_iter)
-// 		{
-// 			QP_Gmax_new = 0;
-// 			QP_Gnorm1_new = 0;
+		// optimize QP over wpd
+		while(iter < max_iter)
+		{
+			QP_Gmax_new = 0;
+			QP_Gnorm1_new = 0;
 
-// 			for(j=0; j<QP_active_size; j++)
-// 			{
-// 				int i = j+rand()%(QP_active_size-j);
-// 				swap(index[i], index[j]);
-// 			}
+			for(j=0; j<QP_active_size; j++)
+			{
+				int i = j+rand()%(QP_active_size-j);
+				swap(index[i], index[j]);
+			}
 
-// 			for(s=0; s<QP_active_size; s++)
-// 			{
-// 				j = index[s];
-// 				H = Hdiag[j];
+			for(s=0; s<QP_active_size; s++)
+			{
+				j = index[s];
+				H = Hdiag[j];
 
-// 				x = prob_col->x[j];
-// 				G = Grad[j] + (wpd[j]-w[j])*nu;
-// 				while(x->index != -1)
-// 				{
-// 					int ind = x->index-1;
-// 					G += x->value*D[ind]*xTd[ind];
-// 					x++;
-// 				}
+				x = prob_col->x[j];
+				G = Grad[j] + (wpd[j]-w[j])*nu;
+				while(x->index != -1)
+				{
+					int ind = x->index-1;
+					G += x->value*D[ind]*xTd[ind];
+					x++;
+				}
 
-// 				double Gp = G+1;
-// 				double Gn = G-1;
-// 				double violation = 0;
-// 				if(wpd[j] == 0)
-// 				{
-// 					if(Gp < 0)
-// 						violation = -Gp;
-// 					else if(Gn > 0)
-// 						violation = Gn;
-// 					//inner-level shrinking
-// 					else if(Gp>QP_Gmax_old/l && Gn<-QP_Gmax_old/l)
-// 					{
-// 						QP_active_size--;
-// 						swap(index[s], index[QP_active_size]);
-// 						s--;
-// 						continue;
-// 					}
-// 				}
-// 				else if(wpd[j] > 0)
-// 					violation = fabs(Gp);
-// 				else
-// 					violation = fabs(Gn);
+				double Gp = G+1;
+				double Gn = G-1;
+				double violation = 0;
+				if(wpd[j] == 0)
+				{
+					if(Gp < 0)
+						violation = -Gp;
+					else if(Gn > 0)
+						violation = Gn;
+					//inner-level shrinking
+					else if(Gp>QP_Gmax_old/l && Gn<-QP_Gmax_old/l)
+					{
+						QP_active_size--;
+						swap(index[s], index[QP_active_size]);
+						s--;
+						continue;
+					}
+				}
+				else if(wpd[j] > 0)
+					violation = fabs(Gp);
+				else
+					violation = fabs(Gn);
 
-// 				QP_Gmax_new = max(QP_Gmax_new, violation);
-// 				QP_Gnorm1_new += violation;
+				QP_Gmax_new = max(QP_Gmax_new, violation);
+				QP_Gnorm1_new += violation;
 
-// 				// obtain solution of one-variable problem
-// 				if(Gp < H*wpd[j])
-// 					z = -Gp/H;
-// 				else if(Gn > H*wpd[j])
-// 					z = -Gn/H;
-// 				else
-// 					z = -wpd[j];
+				// obtain solution of one-variable problem
+				if(Gp < H*wpd[j])
+					z = -Gp/H;
+				else if(Gn > H*wpd[j])
+					z = -Gn/H;
+				else
+					z = -wpd[j];
 
-// 				if(fabs(z) < 1.0e-12)
-// 					continue;
-// 				z = min(max(z,-10.0),10.0);
+				if(fabs(z) < 1.0e-12)
+					continue;
+				z = min(max(z,-10.0),10.0);
 
-// 				wpd[j] += z;
+				wpd[j] += z;
 
-// 				x = prob_col->x[j];
-// 				sparse_operator::axpy(z, x, xTd);
-// 			}
+				x = prob_col->x[j];
+				sparse_operator::axpy(z, x, xTd);
+			}
 
-// 			iter++;
+			iter++;
 
-// 			if(QP_Gnorm1_new <= inner_eps*Gnorm1_init)
-// 			{
-// 				//inner stopping
-// 				if(QP_active_size == active_size)
-// 					break;
-// 				//active set reactivation
-// 				else
-// 				{
-// 					QP_active_size = active_size;
-// 					QP_Gmax_old = INF;
-// 					continue;
-// 				}
-// 			}
+			if(QP_Gnorm1_new <= inner_eps*Gnorm1_init)
+			{
+				//inner stopping
+				if(QP_active_size == active_size)
+					break;
+				//active set reactivation
+				else
+				{
+					QP_active_size = active_size;
+					QP_Gmax_old = INF;
+					continue;
+				}
+			}
 
-// 			QP_Gmax_old = QP_Gmax_new;
-// 		}
+			QP_Gmax_old = QP_Gmax_new;
+		}
 
-// 		if(iter >= max_iter)
-// 			info("WARNING: reaching max number of inner iterations\n");
+		if(iter >= max_iter)
+			info("WARNING: reaching max number of inner iterations\n");
 
-// 		delta = 0;
-// 		w_norm_new = 0;
-// 		for(j=0; j<w_size; j++)
-// 		{
-// 			delta += Grad[j]*(wpd[j]-w[j]);
-// 			if(wpd[j] != 0)
-// 				w_norm_new += fabs(wpd[j]);
-// 		}
-// 		delta += (w_norm_new-w_norm);
+		delta = 0;
+		w_norm_new = 0;
+		for(j=0; j<w_size; j++)
+		{
+			delta += Grad[j]*(wpd[j]-w[j]);
+			if(wpd[j] != 0)
+				w_norm_new += fabs(wpd[j]);
+		}
+		delta += (w_norm_new-w_norm);
 
-// 		negsum_xTd = 0;
-// 		for(int i=0; i<l; i++)
-// 			if(y[i] == -1)
-// 				negsum_xTd += C[GETI(i)]*xTd[i];
+		negsum_xTd = 0;
+		for(int i=0; i<l; i++)
+			if(y[i] == -1)
+				negsum_xTd += C[GETI(i)]*xTd[i];
 
-// 		int num_linesearch;
-// 		for(num_linesearch=0; num_linesearch < max_num_linesearch; num_linesearch++)
-// 		{
-// 			cond = w_norm_new - w_norm + negsum_xTd - sigma*delta;
+		int num_linesearch;
+		for(num_linesearch=0; num_linesearch < max_num_linesearch; num_linesearch++)
+		{
+			cond = w_norm_new - w_norm + negsum_xTd - sigma*delta;
 
-// 			for(int i=0; i<l; i++)
-// 			{
-// 				double exp_xTd = exp(xTd[i]);
-// 				exp_wTx_new[i] = exp_wTx[i]*exp_xTd;
-// 				cond += C[GETI(i)]*log((1+exp_wTx_new[i])/(exp_xTd+exp_wTx_new[i]));
-// 			}
+			for(int i=0; i<l; i++)
+			{
+				double exp_xTd = exp(xTd[i]);
+				exp_wTx_new[i] = exp_wTx[i]*exp_xTd;
+				cond += C[GETI(i)]*log((1+exp_wTx_new[i])/(exp_xTd+exp_wTx_new[i]));
+			}
 
-// 			if(cond <= 0)
-// 			{
-// 				w_norm = w_norm_new;
-// 				for(j=0; j<w_size; j++)
-// 					w[j] = wpd[j];
-// 				for(int i=0; i<l; i++)
-// 				{
-// 					exp_wTx[i] = exp_wTx_new[i];
-// 					double tau_tmp = 1/(1+exp_wTx[i]);
-// 					tau[i] = C[GETI(i)]*tau_tmp;
-// 					D[i] = C[GETI(i)]*exp_wTx[i]*tau_tmp*tau_tmp;
-// 				}
-// 				break;
-// 			}
-// 			else
-// 			{
-// 				w_norm_new = 0;
-// 				for(j=0; j<w_size; j++)
-// 				{
-// 					wpd[j] = (w[j]+wpd[j])*0.5;
-// 					if(wpd[j] != 0)
-// 						w_norm_new += fabs(wpd[j]);
-// 				}
-// 				delta *= 0.5;
-// 				negsum_xTd *= 0.5;
-// 				for(int i=0; i<l; i++)
-// 					xTd[i] *= 0.5;
-// 			}
-// 		}
+			if(cond <= 0)
+			{
+				w_norm = w_norm_new;
+				for(j=0; j<w_size; j++)
+					w[j] = wpd[j];
+				for(int i=0; i<l; i++)
+				{
+					exp_wTx[i] = exp_wTx_new[i];
+					double tau_tmp = 1/(1+exp_wTx[i]);
+					tau[i] = C[GETI(i)]*tau_tmp;
+					D[i] = C[GETI(i)]*exp_wTx[i]*tau_tmp*tau_tmp;
+				}
+				break;
+			}
+			else
+			{
+				w_norm_new = 0;
+				for(j=0; j<w_size; j++)
+				{
+					wpd[j] = (w[j]+wpd[j])*0.5;
+					if(wpd[j] != 0)
+						w_norm_new += fabs(wpd[j]);
+				}
+				delta *= 0.5;
+				negsum_xTd *= 0.5;
+				for(int i=0; i<l; i++)
+					xTd[i] *= 0.5;
+			}
+		}
 
-// 		// Recompute some info due to too many line search steps
-// 		if(num_linesearch >= max_num_linesearch)
-// 		{
-// 			for(int i=0; i<l; i++)
-// 				exp_wTx[i] = 0;
+		// Recompute some info due to too many line search steps
+		if(num_linesearch >= max_num_linesearch)
+		{
+			for(int i=0; i<l; i++)
+				exp_wTx[i] = 0;
 
-// 			for(int i=0; i<w_size; i++)
-// 			{
-// 				if(w[i]==0) continue;
-// 				x = prob_col->x[i];
-// 				sparse_operator::axpy(w[i], x, exp_wTx);
-// 			}
+			for(int i=0; i<w_size; i++)
+			{
+				if(w[i]==0) continue;
+				x = prob_col->x[i];
+				sparse_operator::axpy(w[i], x, exp_wTx);
+			}
 
-// 			for(int i=0; i<l; i++)
-// 				exp_wTx[i] = exp(exp_wTx[i]);
-// 		}
+			for(int i=0; i<l; i++)
+				exp_wTx[i] = exp(exp_wTx[i]);
+		}
 
-// 		if(iter == 1)
-// 			inner_eps *= 0.25;
+		if(iter == 1)
+			inner_eps *= 0.25;
 
-// 		newton_iter++;
-// 		Gmax_old = Gmax_new;
+		newton_iter++;
+		Gmax_old = Gmax_new;
 
-// 		info("iter %3d  #CD cycles %d\n", newton_iter, iter);
-// 	}
+		info("iter %3d  #CD cycles %d\n", newton_iter, iter);
+	}
 
-// 	info("=========================\n");
-// 	info("optimization finished, #iter = %d\n", newton_iter);
-// 	if(newton_iter >= max_newton_iter)
-// 		info("WARNING: reaching max number of iterations\n");
+	info("=========================\n");
+	info("optimization finished, #iter = %d\n", newton_iter);
+	if(newton_iter >= max_newton_iter)
+		info("WARNING: reaching max number of iterations\n");
 
-// 	// calculate objective value
+	// calculate objective value
 
-// 	double v = 0;
-// 	int nnz = 0;
-// 	for(j=0; j<w_size; j++)
-// 		if(w[j] != 0)
-// 		{
-// 			v += fabs(w[j]);
-// 			nnz++;
-// 		}
-// 	for(j=0; j<l; j++)
-// 		if(y[j] == 1)
-// 			v += C[GETI(j)]*log(1+1/exp_wTx[j]);
-// 		else
-// 			v += C[GETI(j)]*log(1+exp_wTx[j]);
+	double v = 0;
+	int nnz = 0;
+	for(j=0; j<w_size; j++)
+		if(w[j] != 0)
+		{
+			v += fabs(w[j]);
+			nnz++;
+		}
+	for(j=0; j<l; j++)
+		if(y[j] == 1)
+			v += C[GETI(j)]*log(1+1/exp_wTx[j]);
+		else
+			v += C[GETI(j)]*log(1+exp_wTx[j]);
 
-// 	info("Objective value = %lf\n", v);
-// 	info("#nonzeros/#features = %d/%d\n", nnz, w_size);
+	info("Objective value = %lf\n", v);
+	info("#nonzeros/#features = %d/%d\n", nnz, w_size);
 
-// 	delete [] index;
-// 	delete [] y;
-// 	delete [] Hdiag;
-// 	delete [] Grad;
-// 	delete [] wpd;
-// 	delete [] xjneg_sum;
-// 	delete [] xTd;
-// 	delete [] exp_wTx;
-// 	delete [] exp_wTx_new;
-// 	delete [] tau;
-// 	delete [] D;
-// }
+	delete [] index;
+	delete [] y;
+	delete [] Hdiag;
+	delete [] Grad;
+	delete [] wpd;
+	delete [] xjneg_sum;
+	delete [] xTd;
+	delete [] exp_wTx;
+	delete [] exp_wTx_new;
+	delete [] tau;
+	delete [] D;
+}
 
-// // transpose matrix X from row format to column format
-// static void transpose(const problem *prob, feature_node **x_space_ret, problem *prob_col)
-// {
-// 	int i;
-// 	int l = prob->l;
-// 	int n = prob->n;
-// 	size_t nnz = 0;
-// 	size_t *col_ptr = new size_t [n+1];
-// 	feature_node *x_space;
-// 	prob_col->l = l;
-// 	prob_col->n = n;
-// 	prob_col->y = new double[l];
-// 	prob_col->x = new feature_node*[n];
+// transpose matrix X from row format to column format
+static void transpose(const problem *prob, feature_node **x_space_ret, problem *prob_col)
+{
+	int i;
+	int l = prob->l;
+	int n = prob->n;
+	size_t nnz = 0;
+	size_t *col_ptr = new size_t [n+1];
+	feature_node *x_space;
+	prob_col->l = l;
+	prob_col->n = n;
+	prob_col->y = new double[l];
+	prob_col->x = new feature_node*[n];
 
-// 	for(i=0; i<l; i++)
-// 		prob_col->y[i] = prob->y[i];
+	for(i=0; i<l; i++)
+		prob_col->y[i] = prob->y[i];
 
-// 	for(i=0; i<n+1; i++)
-// 		col_ptr[i] = 0;
-// 	for(i=0; i<l; i++)
-// 	{
-// 		feature_node *x = prob->x[i];
-// 		while(x->index != -1)
-// 		{
-// 			nnz++;
-// 			col_ptr[x->index]++;
-// 			x++;
-// 		}
-// 	}
-// 	for(i=1; i<n+1; i++)
-// 		col_ptr[i] += col_ptr[i-1] + 1;
+	for(i=0; i<n+1; i++)
+		col_ptr[i] = 0;
+	for(i=0; i<l; i++)
+	{
+		feature_node *x = prob->x[i];
+		while(x->index != -1)
+		{
+			nnz++;
+			col_ptr[x->index]++;
+			x++;
+		}
+	}
+	for(i=1; i<n+1; i++)
+		col_ptr[i] += col_ptr[i-1] + 1;
 
-// 	x_space = new feature_node[nnz+n];
-// 	for(i=0; i<n; i++)
-// 		prob_col->x[i] = &x_space[col_ptr[i]];
+	x_space = new feature_node[nnz+n];
+	for(i=0; i<n; i++)
+		prob_col->x[i] = &x_space[col_ptr[i]];
 
-// 	for(i=0; i<l; i++)
-// 	{
-// 		feature_node *x = prob->x[i];
-// 		while(x->index != -1)
-// 		{
-// 			int ind = x->index-1;
-// 			x_space[col_ptr[ind]].index = i+1; // starts from 1
-// 			x_space[col_ptr[ind]].value = x->value;
-// 			col_ptr[ind]++;
-// 			x++;
-// 		}
-// 	}
-// 	for(i=0; i<n; i++)
-// 		x_space[col_ptr[i]].index = -1;
+	for(i=0; i<l; i++)
+	{
+		feature_node *x = prob->x[i];
+		while(x->index != -1)
+		{
+			int ind = x->index-1;
+			x_space[col_ptr[ind]].index = i+1; // starts from 1
+			x_space[col_ptr[ind]].value = x->value;
+			col_ptr[ind]++;
+			x++;
+		}
+	}
+	for(i=0; i<n; i++)
+		x_space[col_ptr[i]].index = -1;
 
-// 	*x_space_ret = x_space;
+	*x_space_ret = x_space;
 
-// 	delete [] col_ptr;
-// }
+	delete [] col_ptr;
+}
 
 // label: label name, start: begin of each class, count: #data of classes, perm: indices to the original data
 // perm, length l, must be allocated before calling this subroutine
@@ -2191,19 +2180,98 @@ static void train_one(const problem *prob, const parameter *param, double *w, do
 		if(prob->y[i] > 0)
 			pos++;
 	neg = prob->l - pos;
-	// double primal_solver_tol = eps*max(min(pos,neg), 1)/prob->l;
+	double primal_solver_tol = eps*max(min(pos,neg), 1)/prob->l;
 
-	// function *fun_obj=NULL;
+	function *fun_obj=NULL;
 	switch(param->solver_type)
 	{
+		case L2R_LR:
+		{
+			double *C = new double[prob->l];
+			for(int i = 0; i < prob->l; i++)
+			{
+				if(prob->y[i] > 0)
+					C[i] = Cp;
+				else
+					C[i] = Cn;
+			}
+			fun_obj=new l2r_lr_fun(prob, C);
+			TRON tron_obj(fun_obj, primal_solver_tol, eps_cg);
+			tron_obj.set_print_string(liblinear_print_string);
+			tron_obj.tron(w);
+			delete fun_obj;
+			delete[] C;
+			break;
+		}
+		case L2R_L2LOSS_SVC:
+		{
+			double *C = new double[prob->l];
+			for(int i = 0; i < prob->l; i++)
+			{
+				if(prob->y[i] > 0)
+					C[i] = Cp;
+				else
+					C[i] = Cn;
+			}
+			fun_obj=new l2r_l2_svc_fun(prob, C);
+			TRON tron_obj(fun_obj, primal_solver_tol, eps_cg);
+			tron_obj.set_print_string(liblinear_print_string);
+			tron_obj.tron(w);
+			delete fun_obj;
+			delete[] C;
+			break;
+		}
 		case L2R_L2LOSS_SVC_DUAL:
 			solve_l2r_l1l2_svc(prob, w, eps, Cp, Cn, L2R_L2LOSS_SVC_DUAL, alpha);
 			break;
 		case L2R_L1LOSS_SVC_DUAL:
 			solve_l2r_l1l2_svc(prob, w, eps, Cp, Cn, L2R_L1LOSS_SVC_DUAL, alpha);
 			break;
+		case L1R_L2LOSS_SVC:
+		{
+			problem prob_col;
+			feature_node *x_space = NULL;
+			transpose(prob, &x_space ,&prob_col);
+			solve_l1r_l2_svc(&prob_col, w, primal_solver_tol, Cp, Cn);
+			delete [] prob_col.y;
+			delete [] prob_col.x;
+			delete [] x_space;
+			break;
+		}
+		case L1R_LR:
+		{
+			problem prob_col;
+			feature_node *x_space = NULL;
+			transpose(prob, &x_space ,&prob_col);
+			solve_l1r_lr(&prob_col, w, primal_solver_tol, Cp, Cn);
+			delete [] prob_col.y;
+			delete [] prob_col.x;
+			delete [] x_space;
+			break;
+		}
 		case L2R_LR_DUAL:
 			solve_l2r_lr_dual(prob, w, eps, Cp, Cn, alpha);  // alpha values are in here
+			break;
+		case L2R_L2LOSS_SVR:
+		{
+			double *C = new double[prob->l];
+			for(int i = 0; i < prob->l; i++)
+				C[i] = param->C;
+
+			fun_obj=new l2r_l2_svr_fun(prob, C, param->p);
+			TRON tron_obj(fun_obj, param->eps);
+			tron_obj.set_print_string(liblinear_print_string);
+			tron_obj.tron(w);
+			delete fun_obj;
+			delete[] C;
+			break;
+
+		}
+		case L2R_L1LOSS_SVR_DUAL:
+			solve_l2r_l1l2_svr(prob, w, param, L2R_L1LOSS_SVR_DUAL);
+			break;
+		case L2R_L2LOSS_SVR_DUAL:
+			solve_l2r_l1l2_svr(prob, w, param, L2R_L2LOSS_SVR_DUAL);
 			break;
 		default:
 			fprintf(stderr, "ERROR: unknown solver_type\n");
