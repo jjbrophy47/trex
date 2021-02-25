@@ -23,9 +23,9 @@ def configuration(parent_package='', top_path=None):
                                 os.path.join('src', 'tron.h')],
                        # Force C++ linking in case gcc is picked up instead
                        # of g++ under windows with some versions of MinGW
-                       extra_link_args=['-lstdc++'],
+                       # extra_link_args=['-lstdc++'],
                        # Use C++11 to use the random number generator fix
-                       extra_compiler_args=['-std=c++11'],
+                       # extra_compiler_args=['-std=c++11'],
                        )
 
     liblinear_sources = ['_liblinear.pyx']
