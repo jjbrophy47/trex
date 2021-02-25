@@ -1,15 +1,3 @@
-cdef extern from "_cython_blas_helpers.h":
-    ctypedef double(*dot_func)(int, double*, int, double*, int)
-    ctypedef void(*axpy_func)(int, double, double*, int, double*, int)
-    ctypedef void(*scal_func)(int, double, double*, int)
-    ctypedef double(*nrm2_func)(int, double*, int)
-    cdef struct BlasFunctions:
-        dot_func dot
-        axpy_func axpy
-        scal_func scal
-        nrm2_func nrm2
-
-
 cdef extern from "linear.h":
     cdef struct feature_node
     cdef struct problem
