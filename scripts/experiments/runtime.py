@@ -71,7 +71,7 @@ def trex_method(args, model, test_ndx, X_train, y_train, X_test,
 
     # compute influential training instances on the test instance
     start = time.time()
-    surrogate.explain(X_test[test_ndx].reshape(1, -1))
+    surrogate.compute_attributions(X_test[test_ndx].reshape(1, -1))
     test_time = time.time() - start
 
     # result object

@@ -8,10 +8,9 @@ import scipy
 import numpy as np
 from sklearn.preprocessing import OneHotEncoder
 
-from .models import tree_model
-from .util.common import assert_import, record_import_error
-
-# from memory_profiler import profile
+from .util import assert_import
+from .util import record_import_error
+from .util import tree_model
 
 try:
     import lightgbm
@@ -48,35 +47,31 @@ class TreeExtractor:
         self.model = model
         self.tree_kernel = tree_kernel
         self.sparse = sparse
-        self._validate()
+        self.validate(self.tree_kernel, self.model)
 
     def fit_transform(self, X):
         """
         Outputs a feature representation for each x in X.
 
-        Parameters
-        ----------
         X: 2d array-like
             Each row in X is a separate instance.
 
-        Returns
-        -------
-        Feature representation of X with the same number of rows as X.
+        Returns a transformation of X with the same number of rows as X.
         If encoding='leaf_path', also returns the fitted one_hot_encoder.
         """
         assert X.ndim == 2, 'X is not 2d!'
 
         if self.tree_kernel == 'leaf_path':
-            X_feature, self.path_enc_ = self._leaf_path_encoding(X)
+            X_feature, self.path_enc_ = self.leaf_path(X)
 
         elif self.tree_kernel == 'tree_output':
-            X_feature = self._tree_output_encoding(X)
+            X_feature = self.tree_output(X)
 
         elif self.tree_kernel == 'leaf_output':
-            X_feature = self._leaf_output_encoding(X)
+            X_feature = self.leaf_output(X)
 
         elif self.tree_kernel == 'feature_path':
-            X_feature = self._feature_path_encoding(X)
+            X_feature = self.feature_path(X)
 
         return X_feature
 
@@ -84,40 +79,37 @@ class TreeExtractor:
         """
         Outputs a feature representation for each x in X.
 
-        Parameters
-        ----------
         X: 2d array-like
             Each row in X is a separate instance.
 
-        Returns
-        -------
-        Feature representation of X with the same number of rows as X.
+        Returns a transformation of X with the same number of rows as X.
         """
         assert X.ndim == 2, 'X is not 2d!'
 
         if self.tree_kernel == 'leaf_path':
             assert self.path_enc_ is not None, 'path_enc_ is not fitted!'
-            X_feature, _ = self._leaf_path_encoding(X, one_hot_enc=self.path_enc_)
+            X_feature, _ = self.leaf_path(X, one_hot_enc=self.path_enc_)
 
         elif self.tree_kernel == 'tree_output':
-            X_feature = self._tree_output_encoding(X)
+            X_feature = self.tree_output(X)
 
         elif self.tree_kernel == 'leaf_output':
-            X_feature = self._leaf_output_encoding(X)
+            X_feature = self.leaf_output(X)
 
         elif self.tree_kernel == 'feature_path':
-            X_feature = self._feature_path_encoding(X)
+            X_feature = self.feature_path(X)
 
         return X_feature
 
-    def _leaf_output_encoding(self, X, timeit=False):
+    # private
+    def leaf_output(self, X, timeit=False):
         """
-        Encodes each x in X as a concatenation of one-hot encodings, one for each tree.
-        Each one-hot encoding represents the class or output at the leaf x traversed to.
-        All one-hot encodings are concatenated, to get a vector of size n_trees * n_leaf_nodes.
-        Returns
-        -------
-        2D array of shape (n_samples, n_leaf_nodes).
+        Transforms each x in X as follows:
+            -A concatenation of one-hot vectors, one for each tree.
+            -For each vector, a 1 in position i represents instance traversed to leaf i.
+            -Replace the 1 in each vector with the actual leaf value.
+
+        Returns 2D array of shape (no. samples, no. leaves in the ensemble).
         """
         assert X.ndim == 2, 'X is not 2d!'
 
@@ -209,11 +201,13 @@ class TreeExtractor:
 
         return encoding
 
-    def _leaf_path_encoding(self, X, one_hot_enc=None):
+    def leaf_path(self, X, one_hot_enc=None):
         """
-        Encodes each x in X as a binary vector whose length is equal to the number of
-        leaves or nodes in the ensemble, with 1's representing the instance ending at that leaf,
-        0 otherwise.
+        Transforms each x in X as follows:
+            -A binary vector whose length is equal to the number of leaves
+             in the ensemble. A 1 represents the instance ending at that leaf, 0 otherwise.
+
+        Returns 2D array of shape (no. samples, no. leaves in the ensemble).
         """
         assert X.ndim == 2, 'X is not 2d!'
 
@@ -254,14 +248,14 @@ class TreeExtractor:
 
         return encoding, one_hot_enc
 
-    def _feature_path_encoding(self, X, one_hot_enc=None, timeit=False):
+    def feature_path(self, X, one_hot_enc=None, timeit=False):
         """
-        Encodes each x in X as a binary vector whose length is equal to the number of
-        nodes in the ensemble, with 1's representing the instance traversed through that node,
-        0 otherwise.
-        Returns
-        -------
-        2D array of shape (n_samples, n_nodes) where n_nodes is the number of total nodes across all trees.
+        Transforms each x in X as follows:
+            1) A binary vector whose length is equal to the number of
+               nodes in the ensemble A 1 represents the instance
+               traversed through that node, 0 otherwise.
+
+        Returns a 2D array of shape (no. samples, no. nodes in ensemble).
         """
         assert X.ndim == 2, 'X is not 2d!'
 
@@ -292,14 +286,12 @@ class TreeExtractor:
 
         return encoding
 
-    def _tree_output_encoding(self, X, timeit=False):
+    def tree_output(self, X, timeit=False):
         """
-        Encodes each x in X as a concatenation of one-hot encodings, one for each tree.
-        Each one-hot encoding represents the class or output at the leaf x traversed to.
-        All one-hot encodings are concatenated, to get a vector of size n_trees * n_classes.
-        Returns
-        -------
-        2D array of shape (n_samples, n_trees) where n_trees is multiplied by n_classes if multiclass.
+        Transforms each x in X as follows:
+            -A vector of Concatenated probability distributions, one for each tree.
+
+        Returns 2D array of shape (no. samples, no. trees * no. classes).
         """
         assert X.ndim == 2, 'X is not 2d!'
 
@@ -357,22 +349,21 @@ class TreeExtractor:
 
         return encoding
 
-    def _validate(self):
+    def validate(self, tree_kernel, model):
         """
         Validate model inputs.
         """
+
+        # check tre kernel
         tree_kernels = ['leaf_path', 'tree_output', 'leaf_output', 'feature_path']
         assert self.tree_kernel in tree_kernels, '{} not supported!'.format(self.tree_kernel)
 
-        if 'RandomForestClassifier' in str(self.model):
-            self.model_type_ = 'RandomForestClassifier'
-        elif 'GradientBoostingClassifier' in str(self.model):
-            self.model_type_ = 'GradientBoostingClassifier'
-        elif 'LGBMClassifier' in str(self.model):
-            self.model_type_ = 'LGBMClassifier'
-        elif 'CatBoostClassifier' in str(self.model):
-            self.model_type_ = 'CatBoostClassifier'
-        elif 'XGBClassifier' in str(self.model):
-            self.model_type_ = 'XGBClassifier'
-        else:
-            exit('{} not currently supported!'.format(str(self.model)))
+        # check model
+        model_types = ['RandomForestClassifier', 'GradientBoostingClassifier',
+                       'LGBMClassifier', 'CatBoostClassifier', 'XGBClassifier']
+        valid = False
+        for model_type in model_types:
+            if model_type in str(self.model):
+                self.model_type_ = model_type
+                valid = True
+        assert valid, '{} not currently supported!'.format(str(self.model))

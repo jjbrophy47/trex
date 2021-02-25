@@ -202,8 +202,7 @@ def trex_method(args, model_noisy, y_train_noisy,
 
     # sort by absolute value of instance weights
     else:
-        train_weight = surrogate.get_weight()[0]
-        train_indices = np.argsort(np.abs(train_weight))[::-1]
+        train_indices = np.argsort(np.abs(surrogate.alpha_))[::-1]
 
     # fix noisy instances
     result = fix_noisy_instances(train_indices, noisy_indices, n_check, n_checkpoint,

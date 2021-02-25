@@ -21,10 +21,9 @@ save*
 **temp*
 
 # TREX
-trex/models/liblinear/blas
-trex/models/liblinear/*.o
-trex/models/liblinear/train
-trex/models/liblinear/predict
+trex/models/*.o
+trex/models/*.html
+trex/models/build/
 
 # data
 data/*/raw

@@ -1,3 +1,6 @@
+# cython extensions
+cython==0.29.22
+
 # tree ensembles
 catboost==0.24.4
 lightgbm==2.2.3

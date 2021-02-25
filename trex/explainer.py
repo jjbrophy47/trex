@@ -1,13 +1,17 @@
 """
 Instance-based explainer for a tree ensemble using an SVM or KLR.
-Currently supports: sklearn's RandomForestClassifier and GBMClassifier,
-    lightgbm, xgboost, and catboost.
-    Is also only compatible with dense dataset inputs.
-"""
-import os
-import uuid
 
-# import pickle
+Currently supported tree-ensembles:
+    -Sklearn's RandomForestClassifier and GradientBoostingClassifier,
+    -LightGBMClassifier,
+    -XGBClassifier,
+    -CatBoostClassifier.
+
+NOTE: Binary classification only.
+NOTE: Dense input only.
+"""
+import time
+
 import numpy as np
 from sklearn.utils.validation import check_X_y
 
@@ -28,15 +32,15 @@ class TreeExplainer:
                  metric='pearson',
                  pred_size=1000,
                  random_state=None,
-                 logger=None,
-                 temp_dir='.trex'):
+                 logger=None):
         """
         Trains an svm on feature representations from a learned tree ensemble.
 
         Parameters
         ----------
         model : object
-            Learned tree ensemble. Supported: RandomForestClassifier, GBM, LightGBM, CatBoost, XGBoost.
+            Learned tree ensemble.
+            Supported: RandomForestClassifier, GradientBoostingClassifier, LightGBM, CatBoost, XGBoost.
         X_train : 2d array-like
             Train instances in original feature space.
         y_train : 1d array-like (default=None)
@@ -52,13 +56,11 @@ class TreeExplainer:
         metric : str (default='mse')
             Metric to use for scoring during tuning.
         pred_size : int (default=1000)
-            Break predictions up into chunks of pred_size.
+            Break predictions up into chunks to avoid memory explosion.
         random_state : int (default=None)
             Random state to promote reproducibility.
         logger : obj (default=None)
             Logging object; if not None, shows progress during tuning.
-        temp_dir : str (default='.trex')
-            Directory to store liblinear metadata.
         """
         self.model = model
         self.kernel_model = kernel_model
@@ -68,13 +70,17 @@ class TreeExplainer:
         self.pred_size = pred_size
         self.random_state = random_state
         self.logger = logger
-        self.temp_dir = os.path.join(temp_dir, str(uuid.uuid4()))
 
         # extract feature representations from the tree ensemble
         self.feature_extractor_ = TreeExtractor(self.model, tree_kernel=self.tree_kernel)
 
         # transform train data
+        start = time.time()
         self.X_train_alt_ = self.feature_extractor_.fit_transform(X_train)
+        if logger:
+            logger.info('\ntransforming features...{:.3f}s'.format(time.time() - start))
+
+        # train on predicted labels from the tree-ensemble
         self.y_train_ = self.model.predict(X_train)
 
         # train surrogate model
@@ -87,8 +93,7 @@ class TreeExplainer:
                                           val_frac=val_frac,
                                           metric=self.metric,
                                           seed=self.random_state,
-                                          logger=self.logger,
-                                          temp_dir=self.temp_dir)
+                                          logger=self.logger)
 
         # validation checks
         self.validate()
@@ -96,48 +101,16 @@ class TreeExplainer:
         # record no. original features
         self.n_features_ = X_train.shape[1]
 
-    # def __del__(self):
-    #     """
-    #     Clean up any temporary directories.
-    #     """
-    #     shutil.rmtree(self.temp_dir)
-
-    # def __str__(self):
-    #     s = '\nTree Explainer:'
-    #     s += '\nextractor: {}'.format(self.feature_extractor_)
-    #     s += '\ntrain_: {}'.format(self.X_train_alt_)
-    #     s += '\nkernel model: {}'.format(self.kernel_model_)
-    #     s += '\nn_samples: {}'.format(self.n_samples_)
-    #     s += '\nn_feats: {}'.format(self.n_feats_)
-    #     s += '\nn_classes: {}'.format(self.n_classes_)
-    #     s += '\n'
-    #     return s
-
-    # def save(self, fn):
-    #     """
-    #     Stores the model for later use.
-    #     """
-    #     with open(fn, 'wb') as f:
-    #         f.write(pickle.dumps(self))
-
-    # def load(fn):
-    #     """
-    #     Loads a previously saved model.
-    #     """
-    #     assert os.path.exists(fn)
-    #     with open(fn, 'rb') as f:
-    #         return pickle.loads(f.read())
-
     def decision_function(self, X):
         """
         Computes the decision values for X using the SVM.
 
         Parameters
         ----------
-        X : 2d array-like
+        X : 2D numpy array
             Instances to make predictions on.
 
-        Returns a 1d array of decision vaues.
+        Returns a 1d array of decision vaues of shape=(X.shape[0],).
         """
         assert self.kernel_model == 'svm', 'decision_function only supports svm!'
         assert X.ndim == 2
@@ -154,10 +127,10 @@ class TreeExplainer:
 
         Parameters
         ----------
-        X : 2d array-like
+        X : 2D numpy array
             Instances to make predictions on.
 
-        Returns a 2d array of probabilities of shape (len(X), n_classes).
+        Returns a 2d array of probabilities of shape=(X.shape[0], no. classes).
         """
         probas = []
         for i in range(0, len(X), self.pred_size):
@@ -171,10 +144,10 @@ class TreeExplainer:
 
         Parameters
         ----------
-        X : 2d array-like
+        X : 2D numpy array
             Instances to make predictions on.
 
-        Return 1 1d array of predicted labels.
+        Return 1 1d array of predicted labels of shape=(X.shape[0],).
         """
         predictions = []
         for i in range(0, len(X), self.pred_size):
@@ -182,20 +155,16 @@ class TreeExplainer:
             predictions.append(self.surrogate_.predict(X_sub))
         return np.concatenate(predictions)
 
-    # Note: If len(X) is large and the number of training instances is large,
-    #       the resulting matrix may be huge.
-    def similarity(self, X, train_indices=None):
+    def similarity(self, X):
         """
         Computes the similarity between the instances in X and the training data.
 
         Parameters
         ----------
-        X : 2d array-like
+        X : 2D numpy array
             Instances to compute the similarity to.
-        train_indices : 1d array-like (default=None)
-            If not None, compute similarities to only these train instances.
 
-        Returns an array of shape (len(X), n_train_samples).
+        Returns an array of shape=(X.shape[0], no. train samples).
         """
         similarities = []
         for i in range(0, len(X), self.pred_size):
@@ -203,22 +172,15 @@ class TreeExplainer:
             similarities.append(self.surrogate_.similarity(X_sub))
         return np.vstack(similarities)
 
-    def get_weight(self):
+    def get_alpha(self):
         """
-        Return an array of training instance weights.
-            If binary, returns an array of shape (1, n_train_samples).
-            If multiclass, returns an array of shape (n_classes, n_train_samples).
+        Return a 1D array of training instance weights of shape=(no. train samples,).
         """
-        weight = self.surrogate_.get_weight()
-
-        if self.n_classes_ == 2:
-            assert weight.shape == (1, self.n_samples_)
-        else:
-            assert weight.shape == (self.n_classes_, self.n_samples_)
-
+        weight = self.surrogate_.alpha_
+        assert weight.shape == (1, self.n_samples_)
         return weight
 
-    def explain(self, X, y=None):
+    def compute_attributions(self, X):
         """
         Computes the contribution of the training instances on X. A positive number means
         the training instance contributed to the predicted label, and a negative number
@@ -227,24 +189,23 @@ class TreeExplainer:
         Parameters
         ----------
         X: 2d array-like
-            Instances to explain.
+            Instances to compute training instance attributions for.
         y: 1d array-like (default=None)
             Ground-truth labels of instances being explained; impact scores now represent
             the contribution towards the ground-truth label, instead of the predicted label.
             Must have the same length as X.
 
-        Returns a 2d array of contributions of shape (len(X), n_train_samples).
+        Returns a 2d array of contributions of shape (X.shape[0], no. train samples).
         """
-        contributions_list = []
+        attributions_list = []
         for i in range(0, len(X), self.pred_size):
             X_sub = self.transform(X[i: i + self.pred_size])
-            y_sub = y[i: i + self.pred_size] if y is not None else None
-            contributions_list.append(self.surrogate_.explain(X_sub, y=y_sub))
+            attributions_list.append(self.surrogate_.compute_attributions(X_sub))
 
-        contributions = np.vstack(contributions_list)
-        assert contributions.shape == (len(X), self.n_samples_)
+        attributions = np.vstack(attributions_list)
+        assert attributions.shape == (len(X), self.n_samples_)
 
-        return contributions
+        return attributions
 
     def transform(self, X):
         """
@@ -255,28 +216,28 @@ class TreeExplainer:
         X : 2d array-like
             Instances to transform.
 
-        Returns an array of shape (len(X), n_tree_features).
+        Returns an array of shape=(X.shape[0[, no. alt. features).
         """
         assert X.ndim == 2, 'X is not 2d!'
         assert X.shape[1] == self.n_features_, 'no. features do not match!'
 
-        X_feature = self.feature_extractor_.transform(X)
-        assert X_feature.shape[1] == self.X_train_alt_.shape[1], 'no. features do not match!'
+        X_alt = self.feature_extractor_.transform(X)
+        assert X_alt.shape[1] == self.X_train_alt_.shape[1], 'no. features do not match!'
 
-        return X_feature
+        return X_alt
 
     def get_params(self, deep=False):
         """
         Returns the parameter of this model as a dictionary.
         """
         d = {}
-        d['tree_kernel'] = self.tree_kernel
-        # d['tree_type'] = str(self.tree)
+        d['model'] = str(self.model)
         d['kernel_model'] = self.kernel_model
-        # d['C'] = self.C
-        # d['true_label'] = self.true_label
+        d['tree_kernel'] = self.tree_kernel
+        d['param_grid'] = self.param_grid
+        d['metric'] = self.metric
+        d['pred_size'] = self.pred_size
         d['random_state'] = self.random_state
-        # d['train_shape'] = self.X_train.shape
         return d
 
     def set_params(self, **params):

@@ -11,6 +11,7 @@ from datetime import datetime
 warnings.simplefilter(action='ignore', category=UserWarning)  # lgb compiler warning
 
 import numpy as np
+import matplotlib.pyplot as plt
 from sklearn.metrics import mean_squared_error
 from scipy.stats import pearsonr
 from scipy.stats import spearmanr
@@ -52,14 +53,12 @@ def experiment(args, out_dir, logger):
     logger.info('max depth: {}'.format(args.max_depth))
 
     # train a tree ensemble
-    logger.info('\nfitting tree ensemble...')
+    start = time.time()
     model = model.fit(X_train, y_train)
+    logger.info('\nfitting tree ensemble...{:.3f}s'.format(time.time() - start))
 
     # make predictions
     model_proba = model.predict_proba(X_test)[:, 1]
-
-    # record train time
-    start = time.time()
 
     # train and predict with using a surrogate model
     if args.surrogate in ['klr', 'svm']:
@@ -75,7 +74,7 @@ def experiment(args, out_dir, logger):
                                        random_state=args.rs,
                                        logger=logger)
         train_time = time.time() - start
-        logger.info('train time...{:.3f}s'.format(train_time))
+        logger.info('fitting surrgoate model...{:.3f}s'.format(train_time))
 
         # make predictions
         start = time.time()
@@ -97,8 +96,8 @@ def experiment(args, out_dir, logger):
         # transform the test data using the tree extractor
         start = time.time()
         X_test_alt = feature_extractor.transform(X_test)
-        logger.info('transforming test data using {} kernel...{:.3f}s'.format(args.tree_kernel, end))
         end = time.time() - start
+        logger.info('transforming test data using {} kernel...{:.3f}s'.format(args.tree_kernel, end))
 
         # train surrogate model
         start = time.time()
@@ -139,9 +138,16 @@ def experiment(args, out_dir, logger):
     result['spearman'] = spearmanr(model_proba, surrogate_proba)[0]
     result['mse'] = mean_squared_error(model_proba, surrogate_proba)
     np.save(os.path.join(out_dir, 'results.npy'), result)
-
     logger.info('\nresults:\n{}'.format(result))
-    logger.info('saving results to {}...'.format(os.path.join(out_dir, 'results.npy')))
+
+    # save scatter
+    fig, ax = plt.subplots()
+    ax.scatter(result['surrogate_proba'], result['model_proba'])
+    ax.set_xlabel('Surrogate prob.')
+    ax.set_ylabel('Tree-ensemble prob.')
+    plt.savefig(os.path.join(out_dir, 'scatter.pdf'))
+
+    logger.info('\nsaving results to {}...'.format(os.path.join(out_dir)))
 
 
 def main(args):
@@ -180,14 +186,14 @@ if __name__ == '__main__':
     # Tree-ensemble settings
     parser.add_argument('--model', type=str, default='cb', help='tree-ensemble model to use.')
     parser.add_argument('--n_estimators', type=int, default=100, help='number of trees in tree ensemble.')
-    parser.add_argument('--max_depth', type=int, default=None, help='maximum depth in tree ensemble.')
+    parser.add_argument('--max_depth', type=int, default=5, help='maximum depth in tree ensemble.')
 
     # Surrogate settings
     parser.add_argument('--surrogate', type=str, default='klr', help='klr, svm, or knn.')
     parser.add_argument('--kernel_model', type=str, default='klr', help='klr or svm.')
     parser.add_argument('--tree_kernel', type=str, default='leaf_output', help='type of tree feature extraction.')
     parser.add_argument('--tune_frac', type=float, default=0.1, help='fraction of training data to use for tuning.')
-    parser.add_argument('--metric', type=str, default='pearson', help='pearson, spearman, or mse.')
+    parser.add_argument('--metric', type=str, default='mse', help='pearson, spearman, or mse.')
 
     # Experiment settings
     parser.add_argument('--n_test', type=int, default=1000, help='no. test samples to test fidelity.')

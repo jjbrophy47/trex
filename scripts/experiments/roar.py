@@ -141,14 +141,11 @@ def trex_method(args, model, X_train, y_train, X_test, logger=None,
 
     # sort instances with highest positive influence first
     start = time.time()
-    contributions_sum = np.zeros(X_train.shape[0])
-    train_weight = surrogate.get_weight()[0]
+    attributions_sum = np.zeros(X_train.shape[0])
 
     # compute impact of each training sample on the test set
     for i in range(X_test.shape[0]):
-        train_sim = surrogate.similarity(X_test[[i]])[0]
-        contributions = train_weight * train_sim
-        contributions_sum += contributions
+        attributions_sum += surrogate.compute_attributions(X_test[[i]])[0]
 
         # display progress
         if logger and i % int(X_test.shape[0] * frac_progress_update) == 0:
@@ -156,7 +153,7 @@ def trex_method(args, model, X_train, y_train, X_test, logger=None,
             logger.info('finished {:.1f}% test instances...{:.3f}s'.format((i / X_test.shape[0]) * 100, elapsed))
 
     # sort instances by their contributions
-    train_indices = np.argsort(contributions_sum)[::-1]
+    train_indices = np.argsort(attributions_sum)[::-1]
 
     return train_indices
 
