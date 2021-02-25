@@ -21,11 +21,10 @@ def configuration(parent_package='', top_path=None):
                                 os.path.join('src', 'tron.cpp')],
                        depends=[os.path.join('src', 'linear.h'),
                                 os.path.join('src', 'tron.h')],
+                       language='c++',
                        # Force C++ linking in case gcc is picked up instead
                        # of g++ under windows with some versions of MinGW
-                       # extra_link_args=['-lstdc++'],
-                       # Use C++11 to use the random number generator fix
-                       # extra_compiler_args=['-std=c++11'],
+                       extra_link_args=['-lstdc++'],
                        )
 
     liblinear_sources = ['_liblinear.pyx']
@@ -38,7 +37,6 @@ def configuration(parent_package='', top_path=None):
                          include_dirs=[os.path.join('.', 'src'),
                                        numpy.get_include()],
                          depends=liblinear_depends,
-                         # extra_compile_args=['-O0 -fno-inline'],
                          )
 
     config.ext_modules = cythonize(
