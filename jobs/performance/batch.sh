@@ -13,6 +13,14 @@
 # ./jobs/performance/primer_single.sh 'amazon' 'knn' 'standard' 0.25 10 1440 'short'
 
 # RF
+./jobs/performance/primer_single.sh 'churn' 'cb' 'standard' 1.0 2 1440 'short'
+./jobs/performance/primer_single.sh 'surgical' 'cb' 'standard' 1.0 2 1440 'short'
+./jobs/performance/primer_single.sh 'vaccine' 'cb' 'standard' 1.0 2 1440 'short'
+./jobs/performance/primer_single.sh 'amazon' 'cb' 'standard' 1.0 10 1440 'short'
+./jobs/performance/primer_single.sh 'bank_marketing' 'cb' 'standard' 1.0 2 1440 'short'
+./jobs/performance/primer_single.sh 'adult' 'cb' 'standard' 1.0 2 1440 'short'
+./jobs/performance/primer_single.sh 'census' 'cb' 'standard' 1.0 7 1440 'short'
+
 ./jobs/performance/primer_single.sh 'churn' 'rf' 'standard' 1.0 2 1440 'short'
 ./jobs/performance/primer_single.sh 'surgical' 'rf' 'standard' 1.0 2 1440 'short'
 ./jobs/performance/primer_single.sh 'vaccine' 'rf' 'standard' 1.0 2 1440 'short'
@@ -20,12 +28,3 @@
 ./jobs/performance/primer_single.sh 'bank_marketing' 'rf' 'standard' 1.0 2 1440 'short'
 ./jobs/performance/primer_single.sh 'adult' 'rf' 'standard' 1.0 2 1440 'short'
 ./jobs/performance/primer_single.sh 'census' 'rf' 'standard' 1.0 7 1440 'short'
-
-# test ordinal categorical features for CatBoost
-# ./jobs/performance/primer_single.sh 'churn' 'cb' 'categorical' 1.0 2 1440 'short'
-# ./jobs/performance/primer_single.sh 'surgical' 'cb' 'categorical' 1.0 2 1440 'short'
-# ./jobs/performance/primer_single.sh 'vaccine' 'cb' 'categorical' 1.0 2 1440 'short'
-# ./jobs/performance/primer_single.sh 'amazon' 'cb' 'categorical' 1.0 7 1440 'short'
-# ./jobs/performance/primer_single.sh 'bank_marketing' 'cb' 'categorical' 1.0 2 1440 'short'
-# ./jobs/performance/primer_single.sh 'adult' 'cb' 'categorical' 1.0 2 1440 'short'
-# ./jobs/performance/primer_single.sh 'census' 'cb' 'categorical' 1.0 7 1440 'short'
