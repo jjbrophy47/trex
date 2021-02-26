@@ -27,9 +27,7 @@ from sklearn.base import clone
 here = os.path.abspath(os.path.dirname(__file__))
 sys.path.insert(0, here + '/../')  # for utility
 sys.path.insert(0, here + '/../../')  # for libliner
-from utility import model_util
-from utility import data_util
-from utility import print_util
+import util
 
 
 def get_model(args, cat_indices=None):
@@ -37,11 +35,11 @@ def get_model(args, cat_indices=None):
     Return the appropriate classifier.
     """
     if args.model in ['cb', 'lgb', 'xgb', 'rf']:
-        clf = model_util.get_model(args.model,
-                                   n_estimators=args.n_estimators,
-                                   max_depth=args.max_depth,
-                                   random_state=args.rs,
-                                   cat_indices=cat_indices)
+        clf = util.get_model(args.model,
+                             n_estimators=args.n_estimators,
+                             max_depth=args.max_depth,
+                             random_state=args.rs,
+                             cat_indices=cat_indices)
         params = {'n_estimators': [10, 25, 50, 100, 250], 'max_depth': [3, 5, 7]}
 
     elif args.model == 'dt':
@@ -89,9 +87,9 @@ def experiment(args, logger, out_dir, seed):
     begin = time.time()
 
     # get data
-    data = data_util.get_data(args.dataset,
-                              data_dir=args.data_dir,
-                              processing_dir=args.processing_dir)
+    data = util.get_data(args.dataset,
+                         data_dir=args.data_dir,
+                         preprocessing=args.preprocessing)
     X_train, X_test, y_train, y_test, feature, cat_indices = data
 
     logger.info('no. train: {:,}'.format(X_train.shape[0]))
@@ -115,7 +113,7 @@ def experiment(args, logger, out_dir, seed):
         X_train_sub, y_train_sub = X_train, y_train
 
     # get model
-    model, param_grid = get_model(args, cat_indices=None)
+    model, param_grid = get_model(args, cat_indices=cat_indices)
     logger.info('\nmodel: {}, param_grid: {}'.format(args.model, param_grid))
 
     # tune the model
@@ -145,7 +143,7 @@ def experiment(args, logger, out_dir, seed):
     logger.info('train time: {:.3f}s'.format(train_time))
 
     # evaluate
-    auc, acc, ap, ll = model_util.performance(model, X_test, y_test, logger, name=args.model)
+    auc, acc, ap, ll = util.performance(model, X_test, y_test, logger, name=args.model)
 
     # save results
     result = {}
@@ -175,26 +173,26 @@ def main(args):
     out_dir = os.path.join(args.out_dir,
                            args.dataset,
                            args.model,
-                           args.processing_dir,
+                           args.preprocessing,
                            'rs_{}'.format(args.rs))
 
     # create outut directory and clear any previous contents
     os.makedirs(out_dir, exist_ok=True)
-    print_util.clear_dir(out_dir)
+    util.clear_dir(out_dir)
 
     # create logger
-    logger = print_util.get_logger(os.path.join(out_dir, 'log.txt'))
+    logger = util.get_logger(os.path.join(out_dir, 'log.txt'))
     logger.info(args)
     logger.info('\ntimestamp: {}'.format(datetime.now()))
 
     # write everything printed to stdout to this log file
-    logfile, stdout, stderr = print_util.stdout_stderr_to_log(os.path.join(out_dir, 'log+.txt'))
+    logfile, stdout, stderr = util.stdout_stderr_to_log(os.path.join(out_dir, 'log+.txt'))
 
     # run experiment
     experiment(args, logger, out_dir, seed=args.rs)
 
     # restore original stdout and stderr settings
-    print_util.reset_stdout_stderr(logfile, stdout, stderr)
+    util.reset_stdout_stderr(logfile, stdout, stderr)
 
 
 if __name__ == '__main__':
@@ -203,7 +201,7 @@ if __name__ == '__main__':
     # I/O settings
     parser.add_argument('--dataset', type=str, default='churn', help='dataset to explain.')
     parser.add_argument('--data_dir', type=str, default='data', help='data directory.')
-    parser.add_argument('--processing_dir', type=str, default='standard', help='processing directory.')
+    parser.add_argument('--preprocessing', type=str, default='standard', help='preprocessing directory.')
     parser.add_argument('--out_dir', type=str, default='output/performance/', help='output directory.')
 
     # Experiment settings
