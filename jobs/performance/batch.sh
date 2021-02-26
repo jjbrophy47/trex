@@ -1,16 +1,16 @@
 # all models
-# ./jobs/performance/primer.sh 'churn' 2 1440 'short'
-# ./jobs/performance/primer.sh 'surgical' 2 1440 'short'
-# ./jobs/performance/primer.sh 'vaccine' 2 1440 'short'
-# ./jobs/performance/primer.sh 'amazon' 20 1440 'short'
-# ./jobs/performance/primer.sh 'bank_marketing' 2 1440 'short'
-# ./jobs/performance/primer.sh 'adult' 2 1440 'short'
-# ./jobs/performance/primer.sh 'census' 7 1440 'short'
+./jobs/performance/primer.sh 'churn' 2 1440 'short'
+./jobs/performance/primer.sh 'surgical' 2 1440 'short'
+./jobs/performance/primer.sh 'vaccine' 2 1440 'short'
+./jobs/performance/primer.sh 'amazon' 20 1440 'short'
+./jobs/performance/primer.sh 'bank_marketing' 2 1440 'short'
+./jobs/performance/primer.sh 'adult' 2 1440 'short'
+./jobs/performance/primer.sh 'census' 7 1440 'short'
 
 # models that use a smaller validation set
-# ./jobs/performance/primer_single.sh 'census' 'svm_rbf' 'standard' 0.25 20 1440 'short'
-# ./jobs/performance/primer_single.sh 'amazon' 'svm_rbf' 'standard' 0.25 20 1440 'short'
-# ./jobs/performance/primer_single.sh 'amazon' 'knn' 'standard' 0.25 10 1440 'short'
+./jobs/performance/primer_single.sh 'census' 'svm_rbf' 'standard' 0.25 20 1440 'short'
+./jobs/performance/primer_single.sh 'amazon' 'svm_rbf' 'standard' 0.25 20 1440 'short'
+./jobs/performance/primer_single.sh 'amazon' 'knn' 'standard' 0.25 10 1440 'short'
 
 # RF
 ./jobs/performance/primer_single.sh 'churn' 'cb' 'categorical' 1.0 2 1440 'short'

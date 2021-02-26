@@ -14,7 +14,7 @@ from tqdm import tqdm
 
 here = os.path.abspath(os.path.dirname(__file__))
 sys.path.insert(0, here + '/../')
-from utility import print_util
+import util
 
 
 def get_result(template, in_dir):
@@ -151,7 +151,7 @@ def main(args):
 
     # create logger
     os.makedirs(out_dir, exist_ok=True)
-    logger = print_util.get_logger(os.path.join(out_dir, 'log.txt'))
+    logger = util.get_logger(os.path.join(out_dir, 'log.txt'))
     logger.info(args)
     logger.info(datetime.now())
 
@@ -172,7 +172,7 @@ if __name__ == '__main__':
     parser.add_argument('--model', type=int, nargs='+', help='model to extract the results for.',
                         default=['cb', 'dt', 'lr', 'svm_linear', 'svm_rbf', 'knn'])
     parser.add_argument('--processing', type=int, nargs='+', default=['standard', 'categorical'], help='processing.')
-    parser.add_argument('--rs', type=int, nargs='+', default=[1, 2, 3, 4, 5], help='random state.')
+    parser.add_argument('--rs', type=int, nargs='+', default=list(range(1, 11)), help='random state.')
 
     args = parser.parse_args()
     main(args)

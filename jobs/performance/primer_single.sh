@@ -6,7 +6,7 @@ mem=$5
 time=$6
 partition=$7
 
-rs_list=(1 2 3 4 5)
+rs_list=(1 2 3 4 5 6 7 8 9 10)
 
 for rs in ${rs_list[@]}; do
     job_name="P_${dataset}_${model}"
