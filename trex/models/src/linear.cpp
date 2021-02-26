@@ -2181,19 +2181,7 @@ static void train_one(const problem *prob, const parameter *param, double *w, do
 {
 	//inner and outer tolerances for TRON
 	double eps = param->eps;
-	double eps_cg = 0.1;
-	if(param->init_sol != NULL)
-		eps_cg = 0.5;
 
-	int pos = 0;
-	int neg = 0;
-	for(int i=0;i<prob->l;i++)
-		if(prob->y[i] > 0)
-			pos++;
-	neg = prob->l - pos;
-	// double primal_solver_tol = eps*max(min(pos,neg), 1)/prob->l;
-
-	// function *fun_obj=NULL;
 	switch(param->solver_type)
 	{
 		case L2R_L2LOSS_SVC_DUAL:
