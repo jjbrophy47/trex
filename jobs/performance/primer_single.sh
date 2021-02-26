@@ -1,6 +1,6 @@
 dataset=$1
 model=$2
-processing=$3
+preprocessing=$3
 tune_frac=$4
 mem=$5
 time=$6
@@ -17,5 +17,5 @@ for rs in ${rs_list[@]}; do
            --job-name=$job_name \
            --output=jobs/logs/performance/$job_name \
            --error=jobs/errors/performance/$job_name \
-           jobs/performance/runner.sh $dataset $model $rs $processing $tune_frac
+           jobs/performance/runner.sh $dataset $model $rs $preprocessing $tune_frac
 done

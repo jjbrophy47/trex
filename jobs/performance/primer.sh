@@ -4,7 +4,7 @@ time=$3
 partition=$4
 
 tune_frac=1.0
-processing='standard'
+preprocessing='standard'
 rs_list=(1 2 3 4 5 6 7 8 9 10)
 model_list=('cb' 'dt' 'lr' 'svm_linear' 'svm_rbf' 'knn')
 
@@ -18,6 +18,6 @@ for model in ${model_list[@]}; do
                --job-name=$job_name \
                --output=jobs/logs/performance/$job_name \
                --error=jobs/errors/performance/$job_name \
-               jobs/performance/runner.sh $dataset $model $rs $processing $tune_frac
+               jobs/performance/runner.sh $dataset $model $rs $preprocessing $tune_frac
     done
 done
