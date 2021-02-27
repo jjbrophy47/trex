@@ -5,11 +5,10 @@ partition=$4
 
 tune_frac=1.0
 preprocessing='standard'
-rs_list=(1 2 3 4 5 6 7 8 9 10)
 model_list=('cb' 'dt' 'lr' 'svm_linear' 'svm_rbf' 'knn')
 
 for model in ${model_list[@]}; do
-    for rs in ${rs_list[@]}; do
+    for rs in {1..20}; do
         job_name="P_${dataset}_${model}"
 
         sbatch --mem=${mem}G \
