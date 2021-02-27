@@ -264,11 +264,29 @@ class Tree:
         return root, n_nodes
 
     def _get_cb_node(self, split_dict):
-        feature = int(split_dict['float_feature_index'])
-        threshold = float(split_dict['border'])
-        decision_type = self._get_operator('>')
-        node = Node(node_type='split', feature=feature, threshold=threshold, decision_type=decision_type)
-        return node
+
+        # float feature
+        if 'float_feature_index' in split_dict:
+            feature = int(split_dict['float_feature_index'])
+            threshold = float(split_dict['border'])
+            decision_type = self._get_operator('>')
+
+        # cat. feature
+        elif 'cat_feature_index' in split_dict:
+            feature = int(split_dict['cat_feature_index'])
+            threshold = float(split_dict['value'])
+            decision_type = self._get_operator('=')
+
+        # online cat. feature
+        elif 'ctr_target_border_idx' in split_dict:
+            feature = int(split_dict['ctr_target_border_idx'])
+            threshold = float(split_dict['border'])
+            decision_type = self._get_operator('>')
+
+        else:
+            raise ValueError('unknown split!')
+
+        return Node(node_type='split', feature=feature, threshold=threshold, decision_type=decision_type)
 
     # XGBoost
     def _parse_xgb_tree(self, tree_str):
@@ -319,6 +337,8 @@ class Tree:
             result = operator.gt
         elif decision_type == '<=':
             result = operator.le
+        elif decision_type == '=':
+            result = operator.eq
         else:
             exit('unknown decision_type: {}'.format(decision_type))
 

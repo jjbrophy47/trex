@@ -18,19 +18,17 @@ from scipy.stats import spearmanr
 
 here = os.path.abspath(os.path.dirname(__file__))
 sys.path.insert(0, here + '/../')  # for utility
-sys.path.insert(0, here + '/../../')  # for libliner
+sys.path.insert(0, here + '/../../')  # for TREX
 import trex
-from utility import print_util
-from utility import data_util
-from utility import model_util
+import util
 
 
 def experiment(args, out_dir, logger):
 
     # get data
-    data = data_util.get_data(args.dataset,
-                              data_dir=args.data_dir,
-                              processing_dir=args.processing_dir)
+    data = util.get_data(args.dataset,
+                         data_dir=args.data_dir,
+                         preprocessing=args.preprocessing)
     X_train, X_test, y_train, y_test, feature, cat_indices = data
 
     # randomly select a subset of test instances to evaluate with
@@ -43,11 +41,11 @@ def experiment(args, out_dir, logger):
     logger.info('no. features: {:,}'.format(X_train.shape[1]))
 
     # get tree-ensemble
-    model = model_util.get_model(args.model,
-                                 n_estimators=args.n_estimators,
-                                 max_depth=args.max_depth,
-                                 random_state=args.rs,
-                                 cat_indices=cat_indices)
+    model = util.get_model(args.model,
+                           n_estimators=args.n_estimators,
+                           max_depth=args.max_depth,
+                           random_state=args.rs,
+                           cat_indices=cat_indices)
 
     logger.info('\nno. trees: {:,}'.format(args.n_estimators))
     logger.info('max depth: {}'.format(args.max_depth))
@@ -98,6 +96,7 @@ def experiment(args, out_dir, logger):
         X_test_alt = feature_extractor.transform(X_test)
         end = time.time() - start
         logger.info('transforming test data using {} kernel...{:.3f}s'.format(args.tree_kernel, end))
+        logger.info('no. features after transformation: {:,}'.format(X_train_alt.shape[1]))
 
         # train surrogate model
         start = time.time()
@@ -147,7 +146,7 @@ def experiment(args, out_dir, logger):
     ax.set_ylabel('Tree-ensemble prob.')
     plt.savefig(os.path.join(out_dir, 'scatter.pdf'))
 
-    logger.info('\nsaving results to {}...'.format(os.path.join(out_dir)))
+    logger.info('\nsaving results to {}/...'.format(os.path.join(out_dir)))
 
 
 def main(args):
@@ -156,16 +155,18 @@ def main(args):
     out_dir = os.path.join(args.out_dir,
                            args.dataset,
                            args.model,
+                           args.preprocessing,
                            args.surrogate,
                            args.tree_kernel,
+                           args.metric,
                            'rs_{}'.format(args.rs))
 
     # create output directory and clear any previous contents
     os.makedirs(out_dir, exist_ok=True)
-    print_util.clear_dir(out_dir)
+    util.clear_dir(out_dir)
 
     # create logger
-    logger = print_util.get_logger(os.path.join(out_dir, 'log.txt'))
+    logger = util.get_logger(os.path.join(out_dir, 'log.txt'))
     logger.info(args)
     logger.info('\ntimestamp: {}'.format(datetime.now()))
 
@@ -180,7 +181,7 @@ if __name__ == '__main__':
     # I/O settings
     parser.add_argument('--dataset', type=str, default='churn', help='dataset to explain.')
     parser.add_argument('--data_dir', type=str, default='data', help='data directory.')
-    parser.add_argument('--processing_dir', type=str, default='standard', help='processing type.')
+    parser.add_argument('--preprocessing', type=str, default='categorical', help='preprocessing directory.')
     parser.add_argument('--out_dir', type=str, default='output/fidelity/', help='output directory.')
 
     # Tree-ensemble settings
@@ -198,7 +199,6 @@ if __name__ == '__main__':
     # Experiment settings
     parser.add_argument('--n_test', type=int, default=1000, help='no. test samples to test fidelity.')
     parser.add_argument('--rs', type=int, default=1, help='random state.')
-    parser.add_argument('--verbose', type=int, default=0, help='Verbosity level.')
 
     args = parser.parse_args()
     main(args)

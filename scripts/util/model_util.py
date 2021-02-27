@@ -42,7 +42,15 @@ class CatBoostClassifierWrapper(CatBoostClassifier):
     def predict_proba(self, X):
         return super().predict_proba(self.numpy_to_cat(X))
 
-    # private
+    # public
+    def get_cat_indices(self):
+        """
+        Returns cat features if present, otherwise returns None.
+        """
+        params = self._init_params.copy()
+        return params['cat_features'] if 'cat_features' in params else None
+
+    # public
     def numpy_to_cat(self, X):
         """
         Convert numpy array of one dtype to a Pandas dataframe

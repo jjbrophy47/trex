@@ -79,6 +79,7 @@ class TreeExplainer:
         self.X_train_alt_ = self.feature_extractor_.fit_transform(X_train)
         if logger:
             logger.info('\ntransforming features...{:.3f}s'.format(time.time() - start))
+            logger.info('no. features after transformation: {:,}'.format(self.X_train_alt_.shape[1]))
 
         # train on predicted labels from the tree-ensemble
         self.y_train_ = self.model.predict(X_train)
