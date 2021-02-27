@@ -172,7 +172,7 @@ if __name__ == '__main__':
     parser.add_argument('--model', type=int, nargs='+', help='model to extract the results for.',
                         default=['cb', 'dt', 'lr', 'svm_linear', 'svm_rbf', 'knn'])
     parser.add_argument('--processing', type=int, nargs='+', default=['standard', 'categorical'], help='processing.')
-    parser.add_argument('--rs', type=int, nargs='+', default=list(range(1, 11)), help='random state.')
+    parser.add_argument('--rs', type=int, nargs='+', default=list(range(1, 21)), help='random state.')
 
     args = parser.parse_args()
     main(args)

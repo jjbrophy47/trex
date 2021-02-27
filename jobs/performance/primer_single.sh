@@ -6,7 +6,7 @@ mem=$5
 time=$6
 partition=$7
 
-for rs in {1..20}; do
+for rs in {1..40}; do
     job_name="P_${dataset}_${model}"
 
     sbatch --mem=${mem}G \

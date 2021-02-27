@@ -10,7 +10,7 @@
 # models that use a smaller validation set, need to cancel some from above
 scancel --name=P_census_svm_rbf
 scancel --name=P_amazon_svm_rbf
-sacncel --name=P_amazon_knn
+scancel --name=P_amazon_knn
 ./jobs/performance/primer_single.sh 'census' 'svm_rbf' 'standard' 0.25 20 1440 'short'
 ./jobs/performance/primer_single.sh 'amazon' 'svm_rbf' 'standard' 0.25 20 1440 'short'
 ./jobs/performance/primer_single.sh 'amazon' 'knn' 'standard' 0.25 10 1440 'short'

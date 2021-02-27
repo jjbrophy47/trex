@@ -8,7 +8,7 @@ preprocessing='standard'
 model_list=('cb' 'dt' 'lr' 'svm_linear' 'svm_rbf' 'knn')
 
 for model in ${model_list[@]}; do
-    for rs in {1..20}; do
+    for rs in {1..40}; do
         job_name="P_${dataset}_${model}"
 
         sbatch --mem=${mem}G \
