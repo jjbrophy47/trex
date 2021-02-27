@@ -10,8 +10,10 @@ import warnings
 from datetime import datetime
 warnings.simplefilter(action='ignore', category=UserWarning)  # lgb compiler warning
 
-import numpy as np
+import matplotlib
+matplotlib.use('Agg')  # allows plots when running with no display
 import matplotlib.pyplot as plt
+import numpy as np
 from sklearn.metrics import mean_squared_error
 from scipy.stats import pearsonr
 from scipy.stats import spearmanr
