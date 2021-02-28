@@ -91,7 +91,7 @@ def get_model(model,
         os.makedirs(train_dir, exist_ok=True)
         clf = CatBoostClassifierWrapper(random_state=random_state,
                                         n_estimators=n_estimators,
-                                        max_depth=max_depth,
+                                        max_depth=max_depth - 1,  # CB doesn't count root node in depth
                                         verbose=False,
                                         train_dir=train_dir,
                                         cat_features=cat_indices)

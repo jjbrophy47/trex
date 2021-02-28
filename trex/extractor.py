@@ -4,76 +4,29 @@ Feature representation extractor for different tree ensemble models.
 import os
 import json
 
-import scipy
 import numpy as np
-from sklearn.preprocessing import OneHotEncoder
+import catboost
 
-from .util import assert_import
-from .util import record_import_error
 from .util import tree_model
-
-try:
-    import lightgbm
-except ImportError as e:
-    record_import_error("lightgbm", "LightGBM could not be imported!", e)
-
-try:
-    import xgboost
-except ImportError as e:
-    record_import_error("xgboost", "XGBoost could not be imported!", e)
-
-try:
-    import catboost
-except ImportError as e:
-    record_import_error("catboost", "CatBoost could not be imported!", e)
 
 
 class TreeExtractor:
 
-    def __init__(self, model, tree_kernel='leaf_output', sparse=False):
+    def __init__(self, model, tree_kernel='leaf_output'):
         """
         Extracts model-specific feature representations for data instances from a trained tree ensemble.
 
         Parameters
         ----------
         model: object
-            Trained tree ensemble. Supported: RandomForestClassifier, GradientBoostingClassifier,
-            LightGBM, XGBoost, CatBoost.
-        tree_kernel: str, {'leaf_path', 'feature_path', 'leaf_output'}, (default='leaf_path')
+            Learned tree ensemble; models currently supported: RandomForestClassifier and CatBoost.
+        tree_kernel: str, {'feature_path', 'feature_output', 'leaf_path', 'leaf_output', 'tree_output'}.
+                     (default='leaf_path')
             Type of feature representation to extract from the tree ensemble.
-        sparse: bool (default=False)
-            If True, feature representations are returned in a sparse format if possible.
         """
         self.model = model
         self.tree_kernel = tree_kernel
-        self.sparse = sparse
         self.validate(self.tree_kernel, self.model)
-
-    def fit_transform(self, X):
-        """
-        Outputs a feature representation for each x in X.
-
-        X: 2d array-like
-            Each row in X is a separate instance.
-
-        Returns a transformation of X with the same number of rows as X.
-        If encoding='leaf_path', also returns the fitted one_hot_encoder.
-        """
-        assert X.ndim == 2, 'X is not 2d!'
-
-        if self.tree_kernel == 'leaf_path':
-            X_feature, self.path_enc_ = self.leaf_path(X)
-
-        elif self.tree_kernel == 'tree_output':
-            X_feature = self.tree_output(X)
-
-        elif self.tree_kernel == 'leaf_output':
-            X_feature = self.leaf_output(X)
-
-        elif self.tree_kernel == 'feature_path':
-            X_feature = self.feature_path(X)
-
-        return X_feature
 
     def transform(self, X):
         """
@@ -86,23 +39,28 @@ class TreeExtractor:
         """
         assert X.ndim == 2, 'X is not 2d!'
 
-        if self.tree_kernel == 'leaf_path':
-            assert self.path_enc_ is not None, 'path_enc_ is not fitted!'
-            X_feature, _ = self.leaf_path(X, one_hot_enc=self.path_enc_)
+        if self.tree_kernel == 'feature_path':
+            X_feature = self.feature_path(X)
 
-        elif self.tree_kernel == 'tree_output':
-            X_feature = self.tree_output(X)
+        elif self.tree_kernel == 'feature_output':
+            X_feature = self.feature_output(X)
+
+        elif self.tree_kernel == 'leaf_path':
+            X_feature = self.leaf_path(X)
 
         elif self.tree_kernel == 'leaf_output':
             X_feature = self.leaf_output(X)
 
-        elif self.tree_kernel == 'feature_path':
-            X_feature = self.feature_path(X)
+        elif self.tree_kernel == 'tree_output':
+            X_feature = self.tree_output(X)
+
+        else:
+            raise ValueError('tree_kernel {} unknown!'.format(self.tree_kernel))
 
         return X_feature
 
     # private
-    def feature_path(self, X, one_hot_enc=None, timeit=False):
+    def feature_path(self, X):
         """
         Transforms each x in X as follows:
             -A concatenation of one-hot vectors.
@@ -112,34 +70,39 @@ class TreeExtractor:
         """
         assert X.ndim == 2, 'X is not 2d!'
 
-        # get the leaf ids and num leaves or nodes of each tree for all instances
+        # RF
         if self.model_type_ == 'RandomForestClassifier':
-            encoding = self.model.decision_path(X)[0].todense().astype(np.float32)
+            encoding = self.model.decision_path(X)[0].todense()
 
+        # CatBoost
+        # WARNING: Should only be used if NOT using cat. features.
+        #          CatBoost transforms categorical features to numeric internally,
+        #          but does not provide any APIs that do this transformation;
+        #          thus, the raw JSON representation cannot be used with cat.
+        #          features since it assumes transformed cat. features.
         elif self.model_type_ == 'CatBoostClassifier':
-            assert_import('catboost')
-            self.model.save_model('.cb.json', format='json')
-            cb_dump = json.load(open('.cb.json', 'r'))
-            cb_model = tree_model.CBModel(cb_dump)
-            encoding = cb_model.decision_path(X, sparse=self.sparse)
-            os.system('rm .cb.json')
+            cb_model = self.get_cb_model(self.model)
+            encoding, _, _ = cb_model.decision_path(X)
+            self.cleanup_cb_model()
 
+        # GBM
         elif self.model_type_ == 'GradientBoostingClassifier':
-            encoding = scipy.sparse.hstack([t.decision_path(X) for est in self.model.estimators_ for t in est])
+            exit('{} not currently supported!'.format(str(self.model)))
 
+        # LightGBM
         elif self.model_type_ == 'LGBMClassifier':
-            assert_import('lightgbm')
-            lgb_model = tree_model.LGBModel(self.model.booster_.dump_model())
-            encoding = lgb_model.decision_path(X, sparse=self.sparse)
+            exit('{} not currently supported!'.format(str(self.model)))
 
+        # XGBoost
         elif self.model_type_ == 'XGBClassifier':
-            assert_import('xgboost')
-            xgb_model = tree_model.XGBModel(self.model._Booster.get_dump())
-            encoding = xgb_model.decision_path(X, sparse=self.sparse)
+            exit('{} not currently supported!'.format(str(self.model)))
+
+        # convert to np.float32
+        encoding = encoding.astype(np.float32)
 
         return encoding
 
-    def feature_output(self, X, one_hot_enc=None, timeit=False):
+    def feature_output(self, X):
         """
         Transforms each x in X as follows:
             -A concatenation of one-hot vectors.
@@ -150,11 +113,15 @@ class TreeExtractor:
         """
         assert X.ndim == 2, 'X is not 2d!'
 
-        # get the leaf ids and num leaves or nodes of each tree for all instances
+        # RF
         if self.model_type_ == 'RandomForestClassifier':
-            encoding = self.model.decision_path(X)[0].todense().astype(np.float32)  # (no. samples, no. total nodes)
-            leaf_indices = self.model.apply(X)  # (no. samples, no. trees), same as `leaf_vals`
-            leaf_values = np.hstack([t.predict_proba[:, 1].reshape(-1, 1) for t in self.model.estimators_])
+
+            # FeaturePath encoding
+            encoding = self.feature_path(X)
+
+            # extract leaf indices traversed to and all leaf value
+            leaf_indices = self.model.apply(X)  # in terms of all nodes in each tree, (no. samples, no. trees)
+            leaf_values = np.hstack([t.predict_proba(X)[:, 1].reshape(-1, 1) for t in self.model.estimators_])
 
             # substitute leaf value into the feature path encoding
             for i in range(leaf_indices.shape[0]):  # per instance
@@ -162,17 +129,39 @@ class TreeExtractor:
 
                 for j in range(leaf_indices.shape[1]):  # per tree
                     encoding[i, n_prev_nodes + leaf_indices[i, j]] = leaf_values[i, j]
-                    n_prev_nodes += self.model.estimators_[j].tree_.node_count_
+                    n_prev_nodes += self.model.estimators_[j].tree_.node_count
 
-        # TODO
+        # CatBoost
+        # WARNING: Should only be used if NOT using cat. features.
+        #          CatBoost transforms categorical features to numeric internally,
+        #          but does not provide any APIs that do this transformation;
+        #          thus, the raw JSON representation cannot be used with cat.
+        #          features since it assumes transformed cat. features.
         elif self.model_type_ == 'CatBoostClassifier':
-            exit(0)
-            assert_import('catboost')
-            self.model.save_model('.cb.json', format='json')
-            cb_dump = json.load(open('.cb.json', 'r'))
-            cb_model = tree_model.CBModel(cb_dump)
-            encoding = cb_model.decision_path(X, sparse=self.sparse)
-            os.system('rm .cb.json')
+            cb_model = self.get_cb_model(self.model)
+
+            # extract FeaturePath encoding, and node indices traversed to, and no. nodes per tree
+            encoding, leaf_indices, node_counts = cb_model.decision_path(X)
+
+            # extract leaf indices traversed to, all leaf values, and no. leaves per tree
+            leaf_value_indices = self.model.calc_leaf_indexes(X)  # in terms of only leaf nodes in each tree
+            leaf_values = self.model.get_leaf_values()
+            leaf_counts = self.model.get_tree_leaf_counts()
+
+            # substitute leaf value into the feature path encoding
+            for i in range(leaf_indices.shape[0]):  # per instance
+                n_prev_nodes = 0  # reset no. nodes
+                n_prev_leaves = 0  # reset no. leaves
+
+                for j in range(leaf_indices.shape[1]):  # per tree
+                    leaf_val = leaf_values[n_prev_leaves + leaf_value_indices[i, j]]
+                    encoding[i, n_prev_nodes + leaf_indices[i, j]] = leaf_val
+
+                    # update trackers
+                    n_prev_nodes += node_counts[j]
+                    n_prev_leaves += leaf_counts[j]
+
+            self.cleanup_cb_model()
 
         elif self.model_type_ == 'GradientBoostingClassifier':
             exit('{} not currently supported!'.format(str(self.model)))
@@ -183,9 +172,12 @@ class TreeExtractor:
         elif self.model_type_ == 'XGBClassifier':
             exit('{} not currently supported!'.format(str(self.model)))
 
+        # convert to np.float32
+        encoding = encoding.astype(np.float32)
+
         return encoding
 
-    def leaf_path(self, X, one_hot_enc=None):
+    def leaf_path(self, X):
         """
         Transforms each x in X as follows:
             -A concatenation of one-hot vectors.
@@ -195,45 +187,58 @@ class TreeExtractor:
         """
         assert X.ndim == 2, 'X is not 2d!'
 
-        # get the leaf ids and no. leaves or nodes of each tree for all instances
-        if self.model_type_ == 'RandomForestClassifier':  # valid, just uses redundant features, 2x features
-            leaves = self.model.apply(X)
-            leaves_per_tree = np.array([tree.tree_.node_count for tree in self.model.estimators_])  # actually nodes
+        # RF
+        # NOTE: Shape=(no. samples, no. nodes in the ensemble), still valid though, uses 2x redundant features
+        if self.model_type_ == 'RandomForestClassifier':
+            leaf_indices = self.model.apply(X)  # in terms of all nodes in each tree
+            node_counts = np.array([tree.tree_.node_count for tree in self.model.estimators_])
 
+            # construct encoding
+            encoding = np.zeros((X.shape[0], node_counts.sum()))
+
+            # substitute leaves traversed to with a 1
+            for i in range(encoding.shape[0]):  # per instance
+                n_prev_nodes = 0
+
+                for j in range(leaf_indices.shape[1]):  # per tree
+                    encoding[i][n_prev_nodes + leaf_indices[i][j]] = 1
+                    n_prev_nodes += node_counts[j]
+
+        # CatBoost
         elif self.model_type_ == 'CatBoostClassifier':
-            assert_import('catboost')
+
+            # extract leaf indices traversed to and no. leaves per tree
             X_pool = catboost.Pool(self.model.numpy_to_cat(X), cat_features=self.model.get_cat_indices())
-            leaves = self.model.calc_leaf_indexes(X_pool)
-            leaves_per_tree = self.model.get_tree_leaf_counts()
+            leaf_indices = self.model.calc_leaf_indexes(X_pool)  # in terms of only leaf nodes in each tree
+            leaf_counts = self.model.get_tree_leaf_counts()
 
+            # construct encoding
+            encoding = np.zeros((X.shape[0], leaf_counts.sum()))
+
+            # replace leaves traversed to with a 1
+            for i in range(encoding.shape[0]):  # per instance
+                n_prev_leaves = 0
+
+                for j in range(leaf_indices.shape[1]):  # per tree
+                    encoding[i][n_prev_leaves + leaf_indices[i][j]] = 1
+                    n_prev_leaves += leaf_counts[j]
+
+        # GBM
         elif self.model_type_ == 'GradientBoostingClassifier':
-            leaves = self.model.apply(X)
-            leaves = leaves.reshape(leaves.shape[0], leaves.shape[1] * leaves.shape[2])  # (n_samples, n_est * n_class)
-            leaves_per_tree = np.array([t.tree_.node_count for est in self.model.estimators_ for t in est])  # nodes
+            exit('{} not currently supported!'.format(str(self.model)))
 
+        # LightGBM
         elif self.model_type_ == 'LGBMClassifier':
-            assert_import('lightgbm')
-            leaves = self.model.predict_proba(X, pred_leaf=True)
-            leaves_per_tree = np.array([tree['num_leaves'] for tree in self.model.booster_.dump_model()['tree_info']])
+            exit('{} not currently supported!'.format(str(self.model)))
 
+        # XGBoost
         elif self.model_type_ == 'XGBClassifier':
-            assert_import('xgboost')
-            leaves = self.model.apply(X)
-            leaves_per_tree = [len(t.strip().replace('\t', '').split('\n')) for t in self.model._Booster.get_dump()]
+            exit('{} not currently supported!'.format(str(self.model)))
 
-        self.num_trees_ = len(leaves_per_tree)
+        # convert to np.float32
+        encoding = encoding.astype(np.float32)
 
-        # encode leaf positions
-        if one_hot_enc is None:
-            categories = [np.arange(n_leaves) for n_leaves in leaves_per_tree]
-            one_hot_enc = OneHotEncoder(categories=categories).fit(leaves)
-        encoding = one_hot_enc.transform(leaves)
-
-        # convert from sparse to dense
-        if not self.sparse:
-            encoding = np.array(encoding.todense())
-
-        return encoding, one_hot_enc
+        return encoding
 
     def leaf_output(self, X, timeit=False):
         """
@@ -246,96 +251,66 @@ class TreeExtractor:
         """
         assert X.ndim == 2, 'X is not 2d!'
 
+        # RF
         if self.model_type_ == 'RandomForestClassifier':
 
-            # get leaf ids per prediction and number of leaves per tree
-            leaves = self.model.apply(X)
-            leaves_per_tree = np.array([tree.tree_.node_count for tree in self.model.estimators_])  # actually nodes
-
-            # create leaf_path encoding
-            categories = [np.arange(n_leaves) for n_leaves in leaves_per_tree]
-            one_hot_enc = OneHotEncoder(categories=categories).fit(leaves)
-            encoding = np.array(one_hot_enc.transform(leaves).todense())
+            # LeafPath encoding
+            encoding = self.leaf_path(X)
 
             # get leaf value of each tree for each sample
-            tree_preds = np.hstack([tree.predict_proba(X)[:, 1].reshape(-1, 1) for tree in self.model.estimators_])
+            probas = np.hstack([tree.predict_proba(X)[:, 1].reshape(-1, 1) for tree in self.model.estimators_])
 
             # replace leaf positions with leaf values
-            for i in range(encoding.shape[0]):
-                tree_cnt = 0
-                for j in range(encoding.shape[1]):
+            for i in range(encoding.shape[0]):  # per instance
+                tree_cnt = 0  # reset tree count
+
+                for j in range(encoding.shape[1]):  # per tree
                     if encoding[i][j] == 1:
-                        encoding[i][j] *= tree_preds[i][tree_cnt]
+                        encoding[i][j] *= probas[i][tree_cnt]
                         tree_cnt += 1
 
-            self.num_trees_ = tree_preds.shape[1]
+        # CatBoost
+        elif self.model_type_ == 'CatBoostClassifier':
 
+            # extract leaf indices traversed to, all leaf values, and no. leaves per tree
+            X_pool = catboost.Pool(self.model.numpy_to_cat(X), cat_features=self.model.get_cat_indices())
+            leaf_value_indices = self.model.calc_leaf_indexes(X_pool)  # 2d, in terms of only leaf nodes in each tree
+            leaf_values = self.model.get_leaf_values()  # 1d, leaf values for all trees in a 1d array
+            leaf_counts = self.model.get_tree_leaf_counts()  # 1d, leaf counts for each tree
+
+            # construct result
+            encoding = np.zeros((X.shape[0], leaf_counts.sum()))
+
+            # substitute leaf value in the LeafPath encoding
+            for i in range(X.shape[0]):  # per instance
+                n_prev_leaves = 0  # reset no. leaves
+
+                for j in range(leaf_value_indices.shape[1]):  # per tree
+                    ndx = n_prev_leaves + leaf_value_indices[i][j]
+                    encoding[i][ndx] = leaf_values[ndx]
+                    n_prev_leaves += leaf_counts[j]
+
+        # GBM
         elif self.model_type_ == 'GradientBoostingClassifier':
             exit('{} not currently supported!'.format(str(self.model)))
 
-            one_hot_preds = [tree.predict(X) for est in self.model.estimators_ for tree in est]
-            encoding = np.vstack(one_hot_preds).T
-            self.num_trees_ = len(one_hot_preds)
-
+        # LightGBM
         elif self.model_type_ == 'LGBMClassifier':
-            assert_import('lightgbm')
-
-            leaf_pos = self.model.predict_proba(X, pred_leaf=True)
-            self.num_trees = leaf_pos.shape[1]
-
-            tree_info = self.model.booster_.dump_model()['tree_info']
-            n_leaves_per_tree = [tree['num_leaves'] for tree in tree_info]
-            n_total_leaves = np.sum(n_leaves_per_tree)
-
-            encoding = np.zeros((X.shape[0], n_total_leaves))
-
-            for i in range(X.shape[0]):  # per instance
-                start = 0
-                for j, n_leaves in enumerate(n_leaves_per_tree):  # per tree
-                    encoding[i][start + leaf_pos[i][j]] = self.model.booster_.get_leaf_output(j, leaf_pos[i][j])
-                    start += n_leaves
-
-        elif self.model_type_ == 'CatBoostClassifier':
-            assert_import('catboost')
-
-            # for multiclass, leaf_values has n_classes times leaf_counts.sum() values, why is this?
-            # we only use the first segment of leaf_values: leaf_values[:leaf_counts.sum()]
-            X_pool = catboost.Pool(self.model.numpy_to_cat(X), cat_features=self.model.get_cat_indices())
-            leaf_pos = self.model.calc_leaf_indexes(X_pool)  # 2d (n_samples, n_trees)
-            leaf_values = self.model.get_leaf_values()  # leaf values for all trees in a 1d array
-            leaf_counts = self.model.get_tree_leaf_counts()  # 1d array of leaf counts for each tree
-
-            n_total_leaves = np.sum(leaf_counts)
-
-            encoding = np.zeros((X.shape[0], n_total_leaves))
-
-            for i in range(X.shape[0]):  # per instance
-                for j in range(leaf_pos.shape[1]):  # per tree
-                    ndx = leaf_counts[:j].sum() + leaf_pos[i][j]
-                    encoding[i][ndx] = leaf_values[ndx]
-
-        elif self.model_type_ == 'XGBClassifier':
             exit('{} not currently supported!'.format(str(self.model)))
 
-            assert_import('xgboost')
-            leaves = self.model.apply(X)
-            leaf_values = tree_model.parse_xgb(self.model, leaf_values=True)
-            self.num_trees_ = leaves.shape[1]
-
-            encoding = np.zeros(leaves.shape)
-            for i in range(leaves.shape[0]):  # per instance
-                for j in range(leaves.shape[1]):  # per tree
-                    encoding[i][j] = leaf_values[j][leaves[i][j]]
+        # XGBoost
+        elif self.model_type_ == 'XGBClassifier':
+            exit('{} not currently supported!'.format(str(self.model)))
 
         else:
             exit('leaf output encoding not supported for {}'.format(self.model_type_))
 
-        if self.model_type_ == 'RandomForestClassifier' and self.sparse:
-            encoding = scipy.sparse.csr_matrix(encoding)
+        # convert to np.float32
+        encoding = encoding.astype(np.float32)
 
         return encoding
 
-    def tree_output(self, X, timeit=False):
+    def tree_output(self, X):
         """
         Transforms each x in X as follows:
             -A vector of concatenated leaf values, one for each tree.
@@ -344,58 +319,46 @@ class TreeExtractor:
         """
         assert X.ndim == 2, 'X is not 2d!'
 
+        # RF
         if self.model_type_ == 'RandomForestClassifier':
-            probas = [tree.predict_proba(X)[:, 1].reshape(-1, 1) for tree in self.model.estimators_]
-            encoding = np.hstack(probas)
-            self.num_trees_ = len(probas)
+            encoding = np.hstack([tree.predict_proba(X)[:, 1].reshape(-1, 1) for tree in self.model.estimators_])
 
+        # CatBoost
         elif self.model_type_ == 'CatBoostClassifier':
-            assert_import('catboost')
 
-            # for multiclass, leaf_values has n_classes times leaf_counts.sum() values, why is this?
-            # we only use the first segment of leaf_values: leaf_values[:leaf_counts.sum()]
+            # extract leaf indices traversed to, all leaf values, and no. leaves per tree
             X_pool = catboost.Pool(self.model.numpy_to_cat(X), cat_features=self.model.get_cat_indices())
-            leaves = self.model.calc_leaf_indexes(X_pool)  # 2d (n_samples, n_trees)
+            leaf_value_indices = self.model.calc_leaf_indexes(X_pool)  # 2d (no. samples, no. trees)
             leaf_values = self.model.get_leaf_values()  # leaf values for all trees in a 1d array
             leaf_counts = self.model.get_tree_leaf_counts()  # 1d array of leaf counts for each tree
 
-            encoding = np.zeros(leaves.shape)
-            for i in range(leaves.shape[0]):  # per instance
-                for j in range(leaves.shape[1]):  # per tree
-                    leaf_ndx = leaf_counts[:j].sum() + leaves[i][j]
-                    encoding[i][j] = leaf_values[leaf_ndx]
+            # substitue leaf value for each leaf of each tree
+            encoding = np.zeros(leaf_value_indices.shape)
 
+            for i in range(encoding.shape[0]):  # per instance
+                n_prev_leaves = 0  # reset no. leaves
+
+                for j in range(encoding.shape[1]):  # per tree
+                    encoding[i][j] = leaf_values[n_prev_leaves + leaf_value_indices[i, j]]
+                    n_prev_leaves += leaf_counts[j]
+
+        # GBM
         elif self.model_type_ == 'GradientBoostingClassifier':
-            probas = [tree.predict(X) for est in self.model.estimators_ for tree in est]
-            encoding = np.vstack(probas).T
-            self.num_trees_ = len(probas)
+            exit('{} not currently supported!'.format(str(self.model)))
 
+        # LightGBM
         elif self.model_type_ == 'LGBMClassifier':
-            assert_import('lightgbm')
-            leaves = self.model.predict_proba(X, pred_leaf=True)
-            encoding = np.zeros(leaves.shape)
-            self.num_trees = leaves.shape[1]
+            exit('{} not currently supported!'.format(str(self.model)))
 
-            for i in range(leaves.shape[0]):  # per instance
-                for j in range(leaves.shape[1]):  # per tree
-                    encoding[i][j] = self.model.booster_.get_leaf_output(j, leaves[i][j])
-
+        # XGBoost
         elif self.model_type_ == 'XGBClassifier':
-            assert_import('xgboost')
-            leaves = self.model.apply(X)
-            leaf_values = tree_model.parse_xgb(self.model, leaf_values=True)
-            self.num_trees_ = leaves.shape[1]
-
-            encoding = np.zeros(leaves.shape)
-            for i in range(leaves.shape[0]):  # per instance
-                for j in range(leaves.shape[1]):  # per tree
-                    encoding[i][j] = leaf_values[j][leaves[i][j]]
+            exit('{} not currently supported!'.format(str(self.model)))
 
         else:
             exit('leaf output encoding not supported for {}'.format(self.model_type_))
 
-        if self.model_type_ == 'RandomForestClassifier' and self.sparse:
-            encoding = scipy.sparse.csr_matrix(encoding)
+        # convert to np.float32
+        encoding = encoding.astype(np.float32)
 
         return encoding
 
@@ -404,8 +367,8 @@ class TreeExtractor:
         Validate model inputs.
         """
 
-        # check tre kernel
-        tree_kernels = ['leaf_path', 'tree_output', 'leaf_output', 'feature_path']
+        # check tree kernel
+        tree_kernels = ['feature_path', 'feature_output', 'leaf_path', 'leaf_output', 'tree_output']
         assert self.tree_kernel in tree_kernels, '{} not supported!'.format(self.tree_kernel)
 
         # check model
@@ -417,3 +380,18 @@ class TreeExtractor:
                 self.model_type_ = model_type
                 valid = True
         assert valid, '{} not currently supported!'.format(str(self.model))
+
+    def get_cb_model(self, model, fn='.cb.json'):
+        """
+        Return custom representation of a CatBoost model.
+        """
+        self.model.save_model(fn, format='json')
+        cb_dump = json.load(open(fn, 'r'))
+        cb_model = tree_model.CBModel(cb_dump)
+        return cb_model
+
+    def cleanup_cb_model(self, fn='.cb.json'):
+        """
+        Remove CatBoost model JSON file.
+        """
+        os.remove(fn)

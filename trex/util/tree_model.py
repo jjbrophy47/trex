@@ -100,6 +100,10 @@ class CBModel:
             Input with shape (n_samples, n_features)
         sparse : bool (default=False)
             If True, returns a sparse matrix of the result.
+        get_leaf_indices : bool (default=False)
+            If True, returns the node indices each instance traversed
+            to for each tree; shape=(no. samples, no. nodes in the ensemble).
+
         Returns
         -------
         2d array-like of encoding paths of each instance through all trees
@@ -107,11 +111,29 @@ class CBModel:
         nodes in all trees.
         """
         assert X.ndim == 2, 'X is not 2d!'
-        tree_encodings = [tree.decision_path(X) for tree in self.trees_]
-        model_encoding = np.hstack(tree_encodings)
+
+        # result containers
+        feature_path_encoding_list = []
+        leaf_indices_list = []
+        node_count_list = []
+
+        # get decision path for each tree
+        for tree in self.trees_:
+            feature_path_encoding, leaf_indices = tree.decision_path(X, get_leaf_indices=True)
+            feature_path_encoding_list.append(feature_path_encoding)
+            leaf_indices_list.append(leaf_indices.reshape(-1, 1))
+            node_count_list.append(tree.n_nodes_)
+
+        # combine results from all trees
+        feature_path_encoding = np.hstack(feature_path_encoding_list)
+        leaf_indices = np.hstack(leaf_indices_list).astype(np.int32)
+        node_counts = np.array(node_count_list).astype(np.int32)
+
+        # convert to sparse if specified
         if sparse:
-            model_encoding = scipy.sparse.csr_matrix(model_encoding)
-        return model_encoding
+            feature_path_encoding = scipy.sparse.csr_matrix(feature_path_encoding)
+
+        return feature_path_encoding, leaf_indices, node_counts
 
 
 class Tree:
@@ -151,10 +173,11 @@ class Tree:
 
         return s
 
-    def decision_path(self, X):
+    def decision_path(self, X, get_leaf_indices=False):
         """
         X : 2d array-like
             Input with shape (n_samples, n_features)
+
         Returns
         -------
         2d array-like of encoding paths of each instance through the tree
@@ -162,8 +185,9 @@ class Tree:
         """
         assert X.ndim == 2, 'X is not 2d!'
         node_ndx = 0
-        encoding = np.zeros((len(X), self.n_nodes_))
+        encoding = np.zeros((X.shape[0], self.n_nodes_))
         encoding[:, node_ndx] = 1  # all instances go through the root node
+        leaf_indices = np.zeros(X.shape[0])  # encodes which node index each instance ended at
 
         if self.root_.node_type == 'leaf':
             return encoding
@@ -171,12 +195,14 @@ class Tree:
         left_indices, right_indices = self._node_indices(X, self.root_)
         traverse = [(self.root_.right, right_indices), (self.root_.left, left_indices)]
 
+        # pre-order traversal
         while len(traverse) > 0:
             node_ndx += 1
             node, indices = traverse.pop()
             encoding[indices, node_ndx] = 1
 
             if node.node_type == 'leaf':
+                leaf_indices[indices] = node_ndx
                 continue
 
             # split indices based on threshold, could be more efficient if X were indexed
@@ -186,7 +212,13 @@ class Tree:
             traverse.append((node.right, right_indices))
             traverse.append((node.left, left_indices))
 
-        return encoding
+        result = encoding
+
+        # return leaf indices if specified
+        if get_leaf_indices:
+            result = (encoding, leaf_indices)
+
+        return result
 
     def _node_indices(self, X, node):
         indices = np.arange(len(X))
@@ -237,6 +269,12 @@ class Tree:
 
     # CatBoost
     def _parse_cb_tree(self, tree_dict):
+
+        # root is a leaf
+        if tree_dict.get('splits') is None:
+            return Node(node_type='leaf')
+
+        # exract decision nodes
         splits = [self._get_cb_node(split_dict) for split_dict in tree_dict['splits']][::-1]
         root = splits[0]
         n_nodes = 2 ** (len(splits) + 1) - 1
@@ -266,19 +304,21 @@ class Tree:
     def _get_cb_node(self, split_dict):
 
         # float feature
-        if 'float_feature_index' in split_dict:
+        if split_dict['split_type'] == 'FloatFeature':
             feature = int(split_dict['float_feature_index'])
             threshold = float(split_dict['border'])
             decision_type = self._get_operator('>')
 
         # cat. feature
-        elif 'cat_feature_index' in split_dict:
+        elif split_dict['split_type'] == 'OneHotFeature':
             feature = int(split_dict['cat_feature_index'])
-            threshold = float(split_dict['value'])
+            threshold = 1
             decision_type = self._get_operator('=')
 
         # online cat. feature
-        elif 'ctr_target_border_idx' in split_dict:
+        # WARNING: Internal transformation of cat. feature value to numeric
+        #          value is done inside the CatBoost model, this likely does not work.
+        elif split_dict['split_type'] == 'OnlineCtr':
             feature = int(split_dict['ctr_target_border_idx'])
             threshold = float(split_dict['border'])
             decision_type = self._get_operator('>')
