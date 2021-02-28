@@ -214,7 +214,7 @@ if __name__ == '__main__':
 
     # tree hyperparameters
     parser.add_argument('--n_estimators', type=int, default=100, help='Number of trees.')
-    parser.add_argument('--max_depth', type=int, default=None, help='Maximum depth in tree ensemble.')
+    parser.add_argument('--max_depth', type=int, default=3, help='Maximum depth in tree ensemble.')
 
     # LR and SVM hyperparameters
     parser.add_argument('--penalty', type=str, default='l2', help='linear model penalty type.')
