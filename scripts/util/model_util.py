@@ -3,6 +3,7 @@ Utility methods to make life easier.
 """
 import os
 import uuid
+import shutil
 import warnings
 warnings.simplefilter(action='ignore', category=UserWarning)  # lgb compiler warning
 
@@ -28,6 +29,14 @@ class CatBoostClassifierWrapper(CatBoostClassifier):
     converts numpy arrays into Pandas dataframes and changes
     the categorical to have an np.int64 dtype.
     """
+
+    def __del__(self):
+        """
+        Remove any temporary directories set.
+        """
+        params = self._init_params.copy()
+        if 'train_dir' in params and os.path.exists(params['train_dir']):
+            shutil.rmtree(params['train_dir'])
 
     # override
     def fit(self, X, y):
@@ -87,7 +96,7 @@ def get_model(model,
                                       max_depth=max_depth)
     # CatBoost
     elif model == 'cb':
-        train_dir = os.path.join('.catboost_info', 'rs_{}'.format(random_state), str(uuid.uuid4()))
+        train_dir = os.path.join('.catboost_info', str(uuid.uuid4()))
         os.makedirs(train_dir, exist_ok=True)
         clf = CatBoostClassifierWrapper(random_state=random_state,
                                         n_estimators=n_estimators,

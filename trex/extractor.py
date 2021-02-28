@@ -3,6 +3,8 @@ Feature representation extractor for different tree ensemble models.
 """
 import os
 import json
+import uuid
+import shutil
 
 import numpy as np
 import catboost
@@ -81,9 +83,9 @@ class TreeExtractor:
         #          thus, the raw JSON representation cannot be used with cat.
         #          features since it assumes transformed cat. features.
         elif self.model_type_ == 'CatBoostClassifier':
-            cb_model = self.get_cb_model(self.model)
+            cb_model, temp_dir = self.get_cb_model(self.model)
             encoding, _, _ = cb_model.decision_path(X)
-            self.cleanup_cb_model()
+            self.cleanup_cb_model(temp_dir)
 
         # GBM
         elif self.model_type_ == 'GradientBoostingClassifier':
@@ -138,7 +140,7 @@ class TreeExtractor:
         #          thus, the raw JSON representation cannot be used with cat.
         #          features since it assumes transformed cat. features.
         elif self.model_type_ == 'CatBoostClassifier':
-            cb_model = self.get_cb_model(self.model)
+            cb_model, temp_dir = self.get_cb_model(self.model)
 
             # extract FeaturePath encoding, and node indices traversed to, and no. nodes per tree
             encoding, leaf_indices, node_counts = cb_model.decision_path(X)
@@ -162,7 +164,7 @@ class TreeExtractor:
                     n_prev_nodes += node_counts[j]
                     n_prev_leaves += leaf_counts[j]
 
-            self.cleanup_cb_model()
+            self.cleanup_cb_model(temp_dir)
 
         elif self.model_type_ == 'GradientBoostingClassifier':
             exit('{} not currently supported!'.format(str(self.model)))
@@ -382,17 +384,25 @@ class TreeExtractor:
                 valid = True
         assert valid, '{} not currently supported!'.format(str(self.model))
 
-    def get_cb_model(self, model, fn='.cb.json'):
+    def get_cb_model(self, model, fn='.cb.json', out_dir='.catboost_info'):
         """
         Return custom representation of a CatBoost model.
         """
-        self.model.save_model(fn, format='json')
-        cb_dump = json.load(open(fn, 'r'))
-        cb_model = tree_model.CBModel(cb_dump)
-        return cb_model
 
-    def cleanup_cb_model(self, fn='.cb.json'):
+        # create temporary directory
+        out_dir = os.path.join('.catboost_info', str(uuid.uuid4()))
+        os.makedirs(out_dir, exist_ok=True)
+
+        # save JSON model reprsentation to temporary directory
+        fp = os.path.join(out_dir, fn)
+        self.model.save_model(fp, format='json')
+        cb_dump = json.load(open(fp, 'r'))
+        cb_model = tree_model.CBModel(cb_dump)
+
+        return cb_model, out_dir
+
+    def cleanup_cb_model(self, in_dir):
         """
-        Remove CatBoost model JSON file.
+        Remove CatBoost temporary model directory.
         """
-        os.remove(fn)
+        shutil.rmtree(in_dir)
