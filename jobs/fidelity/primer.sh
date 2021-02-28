@@ -17,7 +17,7 @@ for surrogate in ${surrogate_list[@]}; do
         for metric in ${metric_list[@]}; do
             for rs in ${rs_list[@]}; do
 
-                if [ $tree_kernel = 'feauture_path' ] || [ $tree_kernel = 'feature_output' ]; then
+                if [ $tree_kernel = 'feature_path' ] || [ $tree_kernel = 'feature_output' ]; then
                     preprocessing='standard'
                 else
                     preprocessing=$3
