@@ -76,7 +76,7 @@ class TreeExplainer:
 
         # transform train data
         start = time.time()
-        self.X_train_alt_ = self.feature_extractor_.fit_transform(X_train)
+        self.X_train_alt_ = self.feature_extractor_.transform(X_train)
         if logger:
             logger.info('\ntransforming features...{:.3f}s'.format(time.time() - start))
             logger.info('no. features after transformation: {:,}'.format(self.X_train_alt_.shape[1]))
@@ -101,6 +101,7 @@ class TreeExplainer:
 
         # record no. original features
         self.n_features_ = X_train.shape[1]
+        self.n_features_alt_ = self.X_train_alt_.shape[1]
 
     def decision_function(self, X):
         """

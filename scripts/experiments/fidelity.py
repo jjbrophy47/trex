@@ -81,6 +81,9 @@ def experiment(args, out_dir, logger):
         surrogate_proba = surrogate.predict_proba(X_test)[:, 1]
         logger.info('prediction time...{:.3f}s'.format(time.time() - start))
 
+        # get no. features in the tree kernel space
+        n_features_alt = surrogate.n_features_alt_
+
     # KNN operating on a transformed feature space
     elif args.surrogate == 'knn':
 
@@ -89,7 +92,7 @@ def experiment(args, out_dir, logger):
 
         # transform the training data using the tree extractor
         start = time.time()
-        X_train_alt = feature_extractor.fit_transform(X_train)
+        X_train_alt = feature_extractor.transform(X_train)
         end = time.time() - start
         logger.info('transforming train data using {} kernel...{:.3f}s'.format(args.tree_kernel, end))
 
@@ -120,6 +123,9 @@ def experiment(args, out_dir, logger):
         surrogate_proba = surrogate.predict_proba(X_test_alt)[:, 1]
         logger.info('prediction time...{:.3f}s'.format(time.time() - start))
 
+        # get no. features in the alternate tree kernel space
+        n_features_alt = X_train_alt.shape[1]
+
     else:
         raise ValueError('surrogate {} unknown!'.format(args.surrogate))
 
@@ -138,6 +144,7 @@ def experiment(args, out_dir, logger):
     result['pearson'] = pearsonr(model_proba, surrogate_proba)[0]
     result['spearman'] = spearmanr(model_proba, surrogate_proba)[0]
     result['mse'] = mean_squared_error(model_proba, surrogate_proba)
+    result['n_features_alt'] = n_features_alt
     np.save(os.path.join(out_dir, 'results.npy'), result)
     logger.info('\nresults:\n{}'.format(result))
 

@@ -14,4 +14,3 @@
 # ./jobs/fidelity/primer_single.sh 'census' 'cb' 'categorical' 250 5 'klr' 'leaf_path' 'mse' 30 1440 'short'
 # ./jobs/fidelity/primer_single.sh 'census' 'cb' 'categorical' 250 5 'svm' 'leaf_path' 'mse' 30 1440 'short'
 # ./jobs/fidelity/primer_single.sh 'census' 'cb' 'categorical' 250 5 'knn' 'leaf_path' 'mse' 30 1440 'short'
-
