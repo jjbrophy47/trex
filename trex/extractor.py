@@ -144,7 +144,8 @@ class TreeExtractor:
             encoding, leaf_indices, node_counts = cb_model.decision_path(X)
 
             # extract leaf indices traversed to, all leaf values, and no. leaves per tree
-            leaf_value_indices = self.model.calc_leaf_indexes(X)  # in terms of only leaf nodes in each tree
+            X_pool = catboost.Pool(self.model.numpy_to_cat(X), cat_features=self.model.get_cat_indices())
+            leaf_value_indices = self.model.calc_leaf_indexes(X_pool)  # in terms of only leaf nodes in each tree
             leaf_values = self.model.get_leaf_values()
             leaf_counts = self.model.get_tree_leaf_counts()
 
