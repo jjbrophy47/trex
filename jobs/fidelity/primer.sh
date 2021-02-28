@@ -19,6 +19,8 @@ for surrogate in ${surrogate_list[@]}; do
 
                 if [ $tree_kernel = 'feauture_path' ] || [ $tree_kernel = 'feature_output' ]; then
                     preprocessing='standard'
+                else
+                    preprocessing=$3
                 fi
 
                 job_name="F_${dataset}_${model}_${surrogate}_${tree_kernel}"
