@@ -8,7 +8,7 @@ time=$7
 partition=$8
 
 surrogate_list=('klr' 'svm' 'knn')
-tree_kernel_list=('leaf_output' 'tree_output' 'leaf_path' 'feature_path')
+tree_kernel_list=('feature_path' 'feature_output' 'leaf_path' 'leaf_output' 'tree_output')
 metric_list=('spearman' 'mse')
 rs_list=(1 2 3 4 5)
 
@@ -16,6 +16,10 @@ for surrogate in ${surrogate_list[@]}; do
     for tree_kernel in ${tree_kernel_list[@]}; do
         for metric in ${metric_list[@]}; do
             for rs in ${rs_list[@]}; do
+
+                # if [ $tree_kernel = 'feauture_path' ] || [ $tree_kernl = 'feature_output' ]; then
+                #     preprocessing='standard'
+
                 job_name="F_${dataset}_${model}_${surrogate}_${tree_kernel}"
 
                 sbatch --mem=${mem}G \
