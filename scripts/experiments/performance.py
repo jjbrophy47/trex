@@ -34,13 +34,20 @@ def get_model(args, cat_indices=None):
     """
     Return the appropriate classifier.
     """
-    if args.model in ['cb', 'lgb', 'xgb', 'rf']:
+    if args.model in ['cb', 'lgb', 'xgb']:
         clf = util.get_model(args.model,
                              n_estimators=args.n_estimators,
                              max_depth=args.max_depth,
                              random_state=args.rs,
                              cat_indices=cat_indices)
         params = {'n_estimators': [10, 25, 50, 100, 250], 'max_depth': [3, 5, 7]}
+
+    elif args.model == 'rf':
+        clf = util.get_model(args.model,
+                             n_estimators=args.n_estimators,
+                             max_depth=args.max_depth,
+                             random_state=args.rs)
+        params = {'n_estimators': [10, 25, 50, 100, 250], 'max_depth': [3, 5, 7, 9]}
 
     elif args.model == 'dt':
         clf = DecisionTreeClassifier(random_state=args.rs)
