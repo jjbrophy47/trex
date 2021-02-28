@@ -14,7 +14,7 @@ from tqdm import tqdm
 
 here = os.path.abspath(os.path.dirname(__file__))
 sys.path.insert(0, here + '/../')
-from utility import print_util
+import util
 
 
 def get_result(template, in_dir):
@@ -40,7 +40,7 @@ def process_results(df):
     Averages utility results over different random states.
     """
 
-    groups = ['dataset', 'model', 'surrogate', 'tree_kernel']
+    groups = ['dataset', 'model', 'preprocessing', 'surrogate', 'tree_kernel', 'metric']
 
     main_result_list = []
 
@@ -48,14 +48,14 @@ def process_results(df):
         main_result = {k: v for k, v in zip(groups, tup)}
         main_result['num_runs'] = len(gf)
         main_result['max_rss'] = gf['max_rss'].mean()
-        main_result['pearson_mean'] = gf['pearson'].mean()
-        main_result['pearson_sem'] = sem(gf['pearson'])
+        main_result['n_features_alt'] = gf['n_features_alt'].mean()
+        # main_result['pearson_mean'] = gf['pearson'].mean()
+        # main_result['pearson_sem'] = sem(gf['pearson'])
         main_result['spearman_mean'] = gf['spearman'].mean()
         main_result['spearman_sem'] = sem(gf['spearman'])
         main_result['mse_mean'] = gf['mse'].mean()
         main_result['mse_sem'] = sem(gf['mse'])
         main_result['train_time_mean'] = gf['train_time'].mean()
-        main_result['train_time_std'] = gf['train_time'].std()
         main_result_list.append(main_result)
 
     main_df = pd.DataFrame(main_result_list)
@@ -70,24 +70,33 @@ def create_csv(args, out_dir, logger):
     # experiment variabless
     experiment_settings = list(product(*[args.dataset,
                                          args.model,
+                                         args.preprocessing,
                                          args.surrogate,
                                          args.tree_kernel,
+                                         args.metric,
                                          args.rs]))
 
     # organize results
     results = []
-    for dataset, model, surrogate, tree_kernel, rs in tqdm(experiment_settings):
+    for dataset, model, preprocessing, surrogate, tree_kernel, metric, rs in tqdm(experiment_settings):
 
         # create result
-        template = {'dataset': dataset, 'model': model, 'surrogate': surrogate,
-                    'tree_kernel': tree_kernel, 'rs': rs}
+        template = {'dataset': dataset,
+                    'model': model,
+                    'preprocessing': preprocessing,
+                    'surrogate': surrogate,
+                    'tree_kernel': tree_kernel,
+                    'metric': metric,
+                    'rs': rs}
 
         # get results directory
         experiment_dir = os.path.join(args.in_dir,
                                       dataset,
                                       model,
+                                      preprocessing,
                                       surrogate,
                                       tree_kernel,
+                                      metric,
                                       'rs_{}'.format(rs))
 
         # skip empty experiments
@@ -122,7 +131,7 @@ def main(args):
     os.makedirs(out_dir, exist_ok=True)
 
     # create logger
-    logger = print_util.get_logger(os.path.join(out_dir, 'log.txt'))
+    logger = util.get_logger(os.path.join(out_dir, 'log.txt'))
     logger.info(args)
     logger.info(datetime.now())
 
@@ -140,10 +149,13 @@ if __name__ == '__main__':
     # experiment settings
     parser.add_argument('--dataset', type=str, nargs='+', help='dataset.',
                         default=['churn', 'surgical', 'vaccine', 'amazon', 'bank_marketing', 'adult', 'census'])
-    parser.add_argument('--model', type=int, nargs='+', default=['cb'], help='model to extract the results for.')
+    parser.add_argument('--model', type=int, nargs='+', default=['cb', 'rf'], help='model to extract the results for.')
+    parser.add_argument('--preprocessing', type=str, nargs='+', default=['categorical', 'standard'],
+                        help='preprocessing directory.')
     parser.add_argument('--surrogate', type=int, nargs='+', default=['klr', 'svm', 'knn'], help='surrogate model.')
     parser.add_argument('--tree_kernel', type=int, nargs='+', help='tree kernel.',
-                        default=['tree_output', 'leaf_output', 'leaf_path', 'feature_path'])
+                        default=['feature_path', 'feature_output', 'leaf_path', 'leaf_output', 'tree_output'])
+    parser.add_argument('--metric', type=str, nargs='+', default=['mse', 'spearman'], help='tuning metric.')
     parser.add_argument('--rs', type=int, nargs='+', default=[1, 2, 3, 4, 5], help='random state.')
 
     args = parser.parse_args()

@@ -275,7 +275,7 @@ class TreeExplainer:
         assert valid, '{} not currently supported!'.format(str(self.model))
 
         # check tree kernel
-        tree_types = ['leaf_path', 'tree_output', 'leaf_output', 'feature_path']
+        tree_types = ['feature_path', 'feature_output', 'leaf_path', 'leaf_output', 'tree_output']
         assert self.tree_kernel in tree_types, '{} unsupported!'.format(self.tree_kernel)
 
         # check kernel model

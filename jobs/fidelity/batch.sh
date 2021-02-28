@@ -1,4 +1,4 @@
-# all surrogates, metrics, and tree kernels
+# all surrogates, tree kernels, and metrics
 ./jobs/fidelity/primer.sh 'churn' 'cb' 'categorical' 100 3 2 1440 'short'
 ./jobs/fidelity/primer.sh 'surgical' 'cb' 'categorical' 250 5 2 1440 'short'
 ./jobs/fidelity/primer.sh 'vaccine' 'cb' 'categorical' 250 5 2 1440 'short'
