@@ -107,7 +107,6 @@ def get_model(model,
 
     # Random Forest
     elif model == 'rf':
-        max_depth = None if max_depth == 0 else max_depth
         clf = RandomForestClassifier(random_state=random_state,
                                      n_estimators=n_estimators,
                                      max_depth=max_depth)

@@ -95,7 +95,7 @@ def process_results(df):
         main_result.update(process_utility(gf))
         main_result['num_runs'] = len(gf)
         main_result['max_rss'] = gf['max_rss'].mean()
-        if 'cb' == gf.iloc[0]['model']:
+        if gf.iloc[0]['model'] in ['cb', 'rf']:
             main_result['n_estimators'] = gf['n_estimators'].mode()[0]
             main_result['max_depth'] = gf['max_depth'].mode()[0]
         main_result_list.append(main_result)
@@ -170,7 +170,7 @@ if __name__ == '__main__':
                         default=['churn', 'surgical', 'vaccine', 'amazon', 'bank_marketing', 'adult', 'census'],
                         help='dataset.')
     parser.add_argument('--model', type=int, nargs='+', help='model to extract the results for.',
-                        default=['cb', 'dt', 'lr', 'svm_linear', 'svm_rbf', 'knn'])
+                        default=['cb', 'rf', 'dt', 'lr', 'svm_linear', 'svm_rbf', 'knn'])
     parser.add_argument('--processing', type=int, nargs='+', default=['standard', 'categorical'], help='processing.')
     parser.add_argument('--rs', type=int, nargs='+', default=list(range(1, 41)), help='random state.')
 

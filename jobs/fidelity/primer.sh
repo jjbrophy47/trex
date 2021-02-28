@@ -17,8 +17,8 @@ for surrogate in ${surrogate_list[@]}; do
         for metric in ${metric_list[@]}; do
             for rs in ${rs_list[@]}; do
 
-                # if [ $tree_kernel = 'feauture_path' ] || [ $tree_kernl = 'feature_output' ]; then
-                #     preprocessing='standard'
+                if [ $tree_kernel = 'feauture_path' ] || [ $tree_kernl = 'feature_output' ]; then
+                    preprocessing='standard'
 
                 job_name="F_${dataset}_${model}_${surrogate}_${tree_kernel}"
 

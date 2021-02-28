@@ -156,7 +156,7 @@ def experiment(args, logger, out_dir, seed):
     result['train_time'] = train_time
     result['max_rss'] = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
     result['tune_frac'] = args.tune_frac
-    if args.model == 'cb':
+    if args.model in ['cb', 'rf']:
         result['n_estimators'] = gs.best_params_['n_estimators']
         result['max_depth'] = gs.best_params_['max_depth']
     np.save(os.path.join(out_dir, 'results.npy'), result)
