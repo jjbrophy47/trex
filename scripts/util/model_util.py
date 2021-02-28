@@ -79,7 +79,7 @@ class CatBoostClassifierWrapper(CatBoostClassifier):
 # public
 def get_model(model,
               n_estimators=20,
-              max_depth=None,
+              max_depth=5,
               learning_rate=0.03,
               random_state=1,
               cat_indices=None):
