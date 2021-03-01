@@ -178,9 +178,7 @@ class TreeExplainer:
         """
         Return a 1D array of training instance weights of shape=(no. train samples,).
         """
-        weight = self.surrogate_.alpha_
-        assert weight.shape == (1, self.n_samples_)
-        return weight
+        return self.surrogate_.alpha_
 
     def compute_attributions(self, X):
         """

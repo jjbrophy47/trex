@@ -17,7 +17,7 @@ method_list=('random' \
 
 for method in ${method_list[@]}; do
     for rs in ${rs_list[@]}; do
-        job_name="C_${dataset}_${method}"
+        job_name="C_${dataset}_${model}_${method}"
 
         sbatch --mem=${mem}G \
                --time=$time \

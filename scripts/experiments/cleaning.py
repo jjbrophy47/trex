@@ -26,10 +26,7 @@ here = os.path.abspath(os.path.dirname(__file__))
 sys.path.insert(0, here + '/../../')  # for influence_boosting
 sys.path.insert(0, here + '/../')  # for utility
 import trex
-from utility import model_util
-from utility import data_util
-from utility import exp_util
-from utility import print_util
+import util
 from baselines.influence_boosting.influence.leaf_influence import CBLeafInfluenceEnsemble
 from baselines.maple.MAPLE import MAPLE
 from baselines.mmd_critic import mmd
@@ -197,12 +194,12 @@ def trex_method(args, model_noisy, y_train_noisy,
     # sort by instance log loss using the surrogate model
     if 'loss' in args.method:
         y_train_proba = surrogate.predict_proba(X_train)[:, 1]
-        y_train_loss = exp_util.instance_log_loss(y_train, y_train_proba)  # negative log-likelihood
+        y_train_loss = util.instance_log_loss(y_train, y_train_proba)  # negative log-likelihood
         train_indices = np.argsort(y_train_loss)  # ascending, largest log loss first
 
     # sort by absolute value of instance weights
     else:
-        train_indices = np.argsort(np.abs(surrogate.alpha_))[::-1]
+        train_indices = np.argsort(np.abs(surrogate.get_alpha()))[::-1]
 
     # fix noisy instances
     result = fix_noisy_instances(train_indices, noisy_indices, n_check, n_checkpoint,
@@ -219,7 +216,7 @@ def tree_loss_method(model_noisy,
     Orders training instances by largest loss.
     """
     y_train_proba = model_noisy.predict_proba(X_train)[:, 1]
-    y_train_loss = exp_util.instance_log_loss(y_train, y_train_proba)  # negative log-likelihood
+    y_train_loss = util.instance_log_loss(y_train, y_train_proba)  # negative log-likelihood
     train_indices = np.argsort(y_train_loss)  # ascending, largest log loss first
     result = fix_noisy_instances(train_indices, noisy_indices, n_check, n_checkpoint,
                                  clf, X_train, y_train, X_test, y_test,
@@ -367,7 +364,7 @@ def teknn_method(model_noisy, y_train_noisy,
             logger.info('\ncomputing KNN loss...')
 
         y_train_proba = surrogate.predict_proba(X_train_alt)[:, 1]
-        y_train_loss = exp_util.instance_log_loss(y_train, y_train_proba)  # negative log-likelihood
+        y_train_loss = util.instance_log_loss(y_train, y_train_proba)  # negative log-likelihood
         train_indices = np.argsort(y_train_loss)  # ascending, largest log loss first
 
     # sort by absolute value of instance weights
@@ -518,17 +515,17 @@ def experiment(args, logger, out_dir):
     begin = time.time()
 
     # get data
-    data = data_util.get_data(args.dataset,
-                              data_dir=args.data_dir,
-                              processing_dir=args.processing_dir)
+    data = util.get_data(args.dataset,
+                         data_dir=args.data_dir,
+                         preprocessing=args.preprocessing)
     X_train, X_test, y_train, y_test, feature, cat_indices = data
 
     # get tree-ensemble
-    clf = model_util.get_model(args.model,
-                               n_estimators=args.n_estimators,
-                               max_depth=args.max_depth,
-                               random_state=args.rs,
-                               cat_indices=cat_indices)
+    clf = util.get_model(args.model,
+                         n_estimators=args.n_estimators,
+                         max_depth=args.max_depth,
+                         random_state=args.rs,
+                         cat_indices=cat_indices)
 
     # use a subset of the training data
     if args.train_frac < 1.0 and args.train_frac > 0.0:
@@ -550,13 +547,13 @@ def experiment(args, logger, out_dir):
 
     # show model performance before and after noise
     logger.info('\nBefore noise:')
-    model_util.performance(model, X_train, y_train, logger=logger, name='Before, Train')
-    model_util.performance(model, X_test, y_test, logger=logger, name='Before, Test')
+    util.performance(model, X_train, y_train, logger=logger, name='Before, Train')
+    util.performance(model, X_test, y_test, logger=logger, name='Before, Test')
 
     logger.info('\nAfter noise:')
-    model_util.performance(model_noisy, X_train, y_train_noisy, logger=logger, name='After, Noisy Train')
-    model_util.performance(model_noisy, X_train, y_train, logger=logger, name='After, Clean Train')
-    model_util.performance(model_noisy, X_test, y_test, logger=logger, name='After, Test')
+    util.performance(model_noisy, X_train, y_train_noisy, logger=logger, name='After, Noisy Train')
+    util.performance(model_noisy, X_train, y_train, logger=logger, name='After, Clean Train')
+    util.performance(model_noisy, X_test, y_test, logger=logger, name='After, Test')
 
     # check predictive performance before and after noise
     acc_clean, auc_clean = score(model, X_test, y_test)
@@ -594,7 +591,7 @@ def experiment(args, logger, out_dir):
                                   acc_noisy, auc_noisy, seed=args.rs, logger=logger)
 
     # Leaf Influence
-    elif args.method == 'leaf_influence':
+    elif args.method == 'leaf_influence' and args.model == 'cb':
         result = leaf_influence_method(model_noisy, y_train_noisy,
                                        noisy_indices, n_check, n_checkpoint,
                                        clf, X_train, y_train, X_test, y_test,
@@ -652,19 +649,24 @@ def main(args):
     else:
         dataset = args.dataset
 
+    # change preprocessing if using `feature_path` or `feature_output` with `cb`
+    if args.model == 'cb' and ('feature_path' in args.method or 'feature_output' in args.method):
+        args.preprocessing = 'standard'
+
     # define output directory
     out_dir = os.path.join(args.out_dir,
                            dataset,
                            args.model,
+                           args.preprocessing,
                            args.method,
                            'rs_{}'.format(args.rs))
 
     # create output directory and clear any previous contents
     os.makedirs(out_dir, exist_ok=True)
-    print_util.clear_dir(out_dir)
+    util.clear_dir(out_dir)
 
     # create logger
-    logger = print_util.get_logger(os.path.join(out_dir, 'log.txt'))
+    logger = util.get_logger(os.path.join(out_dir, 'log.txt'))
     logger.info(args)
     logger.info('\ntimestamp: {}'.format(datetime.now()))
 
@@ -679,7 +681,7 @@ if __name__ == '__main__':
     # I/O settings
     parser.add_argument('--dataset', type=str, default='churn', help='dataset to explain.')
     parser.add_argument('--data_dir', type=str, default='data', help='data directory.')
-    parser.add_argument('--processing_dir', type=str, default='standard', help='processing type.')
+    parser.add_argument('--preprocessing', type=str, default='categorical', help='preprocessing directory.')
     parser.add_argument('--out_dir', type=str, default='output/cleaning/', help='output directory.')
 
     # Data settings
