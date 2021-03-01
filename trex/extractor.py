@@ -382,6 +382,7 @@ class TreeExtractor:
             if model_type in str(self.model):
                 self.model_type_ = model_type
                 valid = True
+                break
         assert valid, '{} not currently supported!'.format(str(self.model))
 
     def get_cb_model(self, model, fn='.cb.json', out_dir='.catboost_info'):

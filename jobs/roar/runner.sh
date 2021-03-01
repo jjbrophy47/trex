@@ -6,16 +6,18 @@ module load python3/3.7.5
 
 dataset=$1
 model=$2
-n_estimators=$3
-max_depth=$4
-method=$5
-train_frac_to_remove=$6
-n_checkpoints=$7
-rs=$8
+preprocessing=$3
+n_estimators=$4
+max_depth=$5
+method=$6
+train_frac_to_remove=$7
+n_checkpoints=$8
+rs=$9
 
 python3 scripts/experiments/roar.py \
   --dataset $dataset \
   --model $model \
+  --preprocessing $preprocessing \
   --n_estimators $n_estimators \
   --max_depth $max_depth \
   --method $method \

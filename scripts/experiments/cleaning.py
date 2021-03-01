@@ -421,35 +421,45 @@ def tree_prototype_method(model_noisy, y_train_noisy,
     X_train_alt = extractor.transform(X_train)
 
     # obtain weight of each tree: note, this code is specific to CatBoost
-    temp_fp = '.{}_cb.json'.format(str(uuid.uuid4()))
-    model_noisy.save_model(temp_fp, format='json')
-    cb_dump = json.load(open(temp_fp, 'r'))
+    if 'CatBoostClassifier' in str(model_noisy):
+        temp_dir = os.path.join('.catboost_info', 'leaf_influence_{}'.format(str(uuid.uuid4())))
+        temp_fp = os.path.join(temp_dir, 'cb.json')
+        os.makedirs(temp_dir, exist_ok=True)
+        model_noisy.save_model(temp_fp, format='json')
+        cb_dump = json.load(open(temp_fp, 'r'))
 
-    # obtain weight of each tree: learning_rate^2 * var(predictions)
-    tree_weights = []
-    for tree in cb_dump['oblivious_trees']:
-        predictions = []
+        # obtain weight of each tree: learning_rate^2 * var(predictions)
+        tree_weights = []
+        for tree in cb_dump['oblivious_trees']:
+            predictions = []
 
-        for val, weight in zip(tree['leaf_values'], tree['leaf_weights']):
-            predictions += [val] * weight
+            for val, weight in zip(tree['leaf_values'], tree['leaf_weights']):
+                predictions += [val] * weight
 
-        tree_weights.append(np.var(predictions) * (model_noisy.learning_rate_ ** 2))
+            tree_weights.append(np.var(predictions) * (model_noisy.learning_rate_ ** 2))
 
-    # weight leaf path feature representation by the tree weights
-    for i in range(X_train_alt.shape[0]):
+        # weight leaf path feature representation by the tree weights
+        for i in range(X_train_alt.shape[0]):
 
-        weight_cnt = 0
-        for j in range(X_train_alt.shape[1]):
+            weight_cnt = 0
+            for j in range(X_train_alt.shape[1]):
 
-            if X_train_alt[i][j] == 1:
-                X_train_alt[i][j] *= tree_weights[weight_cnt]
-                weight_cnt += 1
+                if X_train_alt[i][j] == 1:
+                    X_train_alt[i][j] *= tree_weights[weight_cnt]
+                    weight_cnt += 1
 
-        assert weight_cnt == len(tree_weights)
+            assert weight_cnt == len(tree_weights)
+
+        # clean up
+        shutil.rmtree(temp_dir)
 
     # build a KNN using this proximity measure using k
     knn = KNeighborsClassifier(n_neighbors=k)
     knn = knn.fit(X_train_alt, y_train_noisy)
+
+    # display progress
+    if logger:
+        logger.info('\ncomputing similarity density...')
 
     # compute proportion of neighbors that share the same label
     start = time.time()
@@ -468,9 +478,6 @@ def tree_prototype_method(model_noisy, y_train_noisy,
     result = fix_noisy_instances(train_indices, noisy_indices, n_check, n_checkpoint,
                                  clf, X_train, y_train, X_test, y_test,
                                  acc_noisy, auc_noisy, logger=logger)
-
-    # clean up
-    os.system('rm {}'.format(temp_fp))
 
     return result
 

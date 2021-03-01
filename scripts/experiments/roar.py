@@ -13,6 +13,7 @@ import os
 import sys
 import time
 import uuid
+import shutil
 import resource
 import argparse
 import warnings
@@ -29,9 +30,7 @@ here = os.path.abspath(os.path.dirname(__file__))
 sys.path.insert(0, here + '/../../')  # for influence_boosting
 sys.path.insert(0, here + '/../')  # for utility
 import trex
-from utility import model_util
-from utility import data_util
-from utility import print_util
+import util
 from baselines.influence_boosting.influence.leaf_influence import CBLeafInfluenceEnsemble
 from baselines.maple.MAPLE import MAPLE
 
@@ -76,11 +75,11 @@ def measure_performance(train_indices, n_checkpoint, n_checkpoints,
     # result containers
     start = time.time()
     s = '[Checkpoint] removed: {:.1f}%; Acc.: {:.3f}; AUC: {:.3f}'
-    s += '; Proba. delta: {:.3f} (avg.), {:.3f} (median); cum. time: {:.3f}s'
+    s += '; Prob. delta, avg.: {:.3f}, median: {:.3f}; cum. time: {:.3f}s'
 
     # display status
     if logger:
-        logger.info('\nremoving and re-evaluting...')
+        logger.info('\nremoving and re-evaluting at different levels of data removal...')
 
     # remove percentages of training samples and retrain
     for i in range(n_checkpoints):
@@ -157,7 +156,7 @@ def trex_method(args, model, X_train, y_train, X_test, logger=None,
         attributions_sum += surrogate.compute_attributions(X_test[[i]])[0]
 
         # display progress
-        if logger and i % int(X_test.shape[0] * frac_progress_update) == 0:
+        if X_test.shape[0] > 1 and logger and i % int(X_test.shape[0] * frac_progress_update) == 0:
             elapsed = time.time() - start
             logger.info('finished {:.1f}% test instances...{:.3f}s'.format((i / X_test.shape[0]) * 100, elapsed))
 
@@ -214,7 +213,9 @@ def influence_method(args, model, X_train, y_train, X_test, y_test, logger=None,
     assert args.model == 'cb', 'tree-ensemble is not a CatBoost model!'
 
     # save CatBoost model
-    temp_fp = '.{}_cb.json'.format(str(uuid.uuid4()))
+    temp_dir = os.path.join('.catboost_info', 'leaf_influence_{}'.format(str(uuid.uuid4())))
+    temp_fp = os.path.join(temp_dir, 'cb.json')
+    os.makedirs(temp_dir, exist_ok=True)
     model.save_model(temp_fp, format='json')
 
     # initialize Leaf Influence
@@ -255,7 +256,7 @@ def influence_method(args, model, X_train, y_train, X_test, y_test, logger=None,
     train_indices = np.argsort(contributions_sum)[::-1]
 
     # clean up
-    os.system('rm {}'.format(temp_fp))
+    shutil.rmtree(temp_dir)
 
     return train_indices
 
@@ -359,17 +360,17 @@ def experiment(args, logger, out_dir):
     rng = np.random.default_rng(args.rs)
 
     # get data
-    data = data_util.get_data(args.dataset,
-                              data_dir=args.data_dir,
-                              processing_dir=args.processing_dir)
+    data = util.get_data(args.dataset,
+                         data_dir=args.data_dir,
+                         preprocessing=args.preprocessing)
     X_train, X_test, y_train, y_test, feature, cat_indices = data
 
     # get tree-ensemble
-    clf = model_util.get_model(args.model,
-                               n_estimators=args.n_estimators,
-                               max_depth=args.max_depth,
-                               random_state=args.rs,
-                               cat_indices=cat_indices)
+    clf = util.get_model(args.model,
+                         n_estimators=args.n_estimators,
+                         max_depth=args.max_depth,
+                         random_state=args.rs,
+                         cat_indices=cat_indices)
 
     # use a fraction of the train data
     if args.train_frac < 1.0 and args.train_frac > 0.0:
@@ -394,14 +395,16 @@ def experiment(args, logger, out_dir):
 
     # train a tree ensemble
     model = clone(clf).fit(X_train, y_train)
-    model_util.performance(model, X_train, y_train, logger=logger, name='Train')
-    model_util.performance(model, X_test_sub, y_test_sub, logger=logger, name='Test')
+    util.performance(model, X_train, y_train, logger=logger, name='Train')
+    util.performance(model, X_test_sub, y_test_sub, logger=logger, name='Test')
 
     # compute how many samples to remove before a checkpoint
     if args.train_frac_to_remove >= 1.0:
         n_checkpoint = int(args.train_frac_to_remove)
+
     elif args.train_frac_to_remove > 0:
-        n_checkpoint = int(args.train_frac_to_remove * X_train.shape[0])
+        n_checkpoint = int(args.train_frac_to_remove * X_train.shape[0] / args.n_checkpoints)
+
     else:
         raise ValueError('invalid train_frac_to_remove: {}'.format(args.train_frac_to_remove))
 
@@ -425,16 +428,16 @@ def main(args):
     out_dir = os.path.join(args.out_dir,
                            args.dataset,
                            args.model,
+                           args.preprocessing,
                            args.method,
-                           args.scoring,
                            'rs_{}'.format(args.rs))
 
     # create output directory
     os.makedirs(out_dir, exist_ok=True)
-    print_util.clear_dir(out_dir)
+    util.clear_dir(out_dir)
 
     # create logger
-    logger = print_util.get_logger(os.path.join(out_dir, 'log.txt'))
+    logger = util.get_logger(os.path.join(out_dir, 'log.txt'))
     logger.info(args)
     logger.info('\ntimestamp: {}'.format(datetime.now()))
 
@@ -443,18 +446,18 @@ def main(args):
 
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='Feature representation extractions for tree ensembles',
-                                     formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    parser = argparse.ArgumentParser()
+
     # I/O settings
     parser.add_argument('--dataset', type=str, default='adult', help='dataset to explain.')
     parser.add_argument('--data_dir', type=str, default='data', help='data directory.')
-    parser.add_argument('--processing_dir', type=str, default='standard', help='preprocessing directory.')
+    parser.add_argument('--preprocessing', type=str, default='categorical', help='preprocessing directory.')
     parser.add_argument('--out_dir', type=str, default='output/roar/', help='directory to save results.')
 
     # Data settings
-    parser.add_argument('--train_frac', type=float, default=1.0, help='fraction of train data to evaluate.')
+    parser.add_argument('--train_frac', type=float, default=0.5, help='fraction of train data to evaluate.')
     parser.add_argument('--tune_frac', type=float, default=0.1, help='amount of data for validation.')
-    parser.add_argument('--scoring', type=str, default='accuracy', help='metric for tuning.')
+    parser.add_argument('--scoring', type=str, default='accuracy', help='metric for tuning the tree-ensemble.')
 
     # Tree-ensemble settings
     parser.add_argument('--model', type=str, default='cb', help='model to use.')
@@ -468,7 +471,7 @@ if __name__ == '__main__':
     # Experiment settings
     parser.add_argument('--rs', type=int, default=1, help='random state.')
     parser.add_argument('--n_test', type=int, default=50, help='no. of test instances.')
-    parser.add_argument('--train_frac_to_remove', type=float, default=1.0, help='fraction of train data to remove.')
+    parser.add_argument('--train_frac_to_remove', type=float, default=0.5, help='fraction of train data to remove.')
     parser.add_argument('--n_checkpoints', type=int, default=10, help='no. checkpoints to perform retraining.')
 
     # Additional settings
