@@ -8,6 +8,7 @@ import sys
 import time
 import uuid
 import json
+import shutil
 import resource
 import argparse
 import warnings
@@ -242,7 +243,9 @@ def leaf_influence_method(model_noisy, y_train_noisy,
     assert args.model == 'cb', 'tree-ensemble is not a CatBoost model!'
 
     # save CatBoost model
-    temp_fp = '.{}_cb.json'.format(str(uuid.uuid4()))
+    temp_dir = os.path.join('.catboost_info', 'leaf_influence_{}'.format(str(uuid.uuid4())))
+    temp_fp = os.path.join(temp_dir, 'cb.json')
+    os.makedirs(temp_dir, exist_ok=True)
     model_noisy.save_model(temp_fp, format='json')
 
     # initialize explainer
@@ -283,7 +286,7 @@ def leaf_influence_method(model_noisy, y_train_noisy,
                                  acc_noisy, auc_noisy, logger=logger)
 
     # clean up
-    os.system('rm {}'.format(temp_fp))
+    shutil.rmtree(temp_dir)
 
     return result
 
