@@ -341,7 +341,7 @@ def teknn_method(model_noisy, y_train_noisy,
     # transform the data
     tree_kernel = args.method.split('-')[-1]
     extractor = trex.TreeExtractor(model_noisy, tree_kernel=tree_kernel)
-    X_train_alt = extractor.fit_transform(X_train)
+    X_train_alt = extractor.transform(X_train)
 
     # train surrogate model
     param_grid = {'n_neighbors': [3, 5, 7, 9, 11, 13, 15, 31, 45, 61]}
@@ -413,7 +413,7 @@ def tree_prototype_method(model_noisy, y_train_noisy,
 
     # get feature extractor
     extractor = trex.TreeExtractor(model_noisy, tree_kernel='leaf_path')
-    X_train_alt = extractor.fit_transform(X_train)
+    X_train_alt = extractor.transform(X_train)
 
     # obtain weight of each tree: note, this code is specific to CatBoost
     temp_fp = '.{}_cb.json'.format(str(uuid.uuid4()))
