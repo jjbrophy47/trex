@@ -294,7 +294,6 @@ def leaf_influence_method(model_noisy, y_train_noisy,
     return result
 
 
-# def maple_method(explainer, X_train, noisy_ndx, interval, to_check=1):
 def maple_method(model_noisy,
                  noisy_indices, n_check, n_checkpoint,
                  clf, X_train, y_train, X_test, y_test,
@@ -304,15 +303,17 @@ def maple_method(model_noisy,
     Orders instances by tree kernel similarity density.
     """
 
-    # display progress
-    if logger:
-        logger.info('\ncomputing similarity density...')
-        start = time.time()
-
     # train explainer
+    start = time.time()
     train_label = model_noisy.predict(X_train)
     explainer = MAPLE(X_train, train_label, X_train, train_label,
                       verbose=args.verbose, dstump=False)
+
+    # display progress
+    if logger:
+        logger.info('\ntraining MAPLE explainer...{:.3f}s'.format(time.time() - start))
+        logger.info('computing similarity density...')
+        start = time.time()
 
     # compute similarity density per training instance
     train_weight = np.zeros(X_train.shape[0])
@@ -333,7 +334,6 @@ def maple_method(model_noisy,
     return result
 
 
-# def knn_method(knn_clf, X_train, noisy_ndx, interval, to_check=1):
 def teknn_method(model_noisy, y_train_noisy,
                  noisy_indices, n_check, n_checkpoint,
                  clf, X_train, y_train, X_test, y_test,
@@ -402,7 +402,6 @@ def teknn_method(model_noisy, y_train_noisy,
     return result
 
 
-# def proto_method(model, X_train, y_train, noisy_ndx, interval, n_check):
 def tree_prototype_method(model_noisy, y_train_noisy,
                           noisy_indices, n_check, n_checkpoint,
                           clf, X_train, y_train, X_test, y_test,
