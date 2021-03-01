@@ -14,7 +14,7 @@ from tqdm import tqdm
 
 here = os.path.abspath(os.path.dirname(__file__))
 sys.path.insert(0, here + '/../')
-from utility import print_util
+import util
 
 
 def get_result(template, in_dir):
@@ -85,16 +85,18 @@ def create_csv(args, out_dir, logger):
     # experiment variabless
     experiment_settings = list(product(*[args.dataset,
                                          args.model,
+                                         args.preprocessing,
                                          args.method,
                                          args.rs]))
 
     # organize results
     results = []
-    for dataset, model, method, rs in tqdm(experiment_settings):
+    for dataset, model, preprocessing, method, rs in tqdm(experiment_settings):
 
         # create result
         template = {'dataset': dataset,
                     'model': model,
+                    'preprocessing': preprocessing,
                     'method': method,
                     'rs': rs}
 
@@ -102,6 +104,7 @@ def create_csv(args, out_dir, logger):
         experiment_dir = os.path.join(args.in_dir,
                                       dataset,
                                       model,
+                                      preprocessing,
                                       method,
                                       'rs_{}'.format(rs))
 
@@ -137,7 +140,7 @@ def main(args):
     os.makedirs(out_dir, exist_ok=True)
 
     # create logger
-    logger = print_util.get_logger(os.path.join(out_dir, 'log.txt'))
+    logger = util.get_logger(os.path.join(out_dir, 'log.txt'))
     logger.info(args)
     logger.info(datetime.now())
 
@@ -156,7 +159,9 @@ if __name__ == '__main__':
     parser.add_argument('--dataset', type=str, nargs='+', help='dataset.',
                         default=['churn', 'surgical', 'vaccine', 'amazon',
                                  'bank_marketing', 'adult', 'census', 'census_0p1'])
-    parser.add_argument('--model', type=int, nargs='+', default=['cb'], help='model to extract the results for.')
+    parser.add_argument('--model', type=int, nargs='+', default=['cb', 'rf'], help='model to extract the results for.')
+    parser.add_argument('--preprocessing', type=str, nargs='+', default=['categorical', 'standard'],
+                        help='preprocessing directory.')
     parser.add_argument('--method', type=int, nargs='+',
                         default=['random', 'klr-leaf_output', 'svm-leaf_output',
                                  'klr_loss-leaf_output', 'svm_loss-leaf_output',

@@ -55,6 +55,7 @@ def main(args):
 
     # result containers
     lines = []
+    labels = []
 
     # plot each method
     fig, ax = plt.subplots()
@@ -82,6 +83,7 @@ def main(args):
         line = ax.errorbar(checked_pcts, metric_mean, yerr=metric_sem,
                            marker=marker, color=color, zorder=zorder)
         lines.append(line)
+        labels.append(label)
 
         # add metric-specific results
         if args.metric in ['acc', 'auc']:
@@ -97,7 +99,7 @@ def main(args):
         ax.tick_params(axis='both', which='major')
 
     # adjust plot
-    fig.legend(tuple(lines), tuple(label_list), loc='center', ncol=3, bbox_to_anchor=(0.5, 0.125))
+    fig.legend(tuple(lines), tuple(labels), loc='center', ncol=3, bbox_to_anchor=(0.5, 0.125))
     plt.tight_layout()
     fig.subplots_adjust(bottom=0.425, wspace=0.275)
 

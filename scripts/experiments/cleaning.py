@@ -1,7 +1,10 @@
 """
-Experiment: dataset cleaning from noisy labels,
-            specifically a percentage of flipped labels
-            in the train data. Only for binary classification datasets.
+Dataset cleaning experiment:
+  1) Train a tree ensemble.
+  2) Flip a percentage of train labels.
+  3) Prioritize train instances to be checked using various methods.
+  4) Check and correct any flipped train labels.
+  5) Compute how effective each method is at cleaning the data.
 """
 import os
 import sys
@@ -146,7 +149,7 @@ def fix_noisy_instances(train_indices, noisy_indices, n_check, n_checkpoint,
             result['accs'].append(acc_semi_noisy)
             result['aucs'].append(auc_semi_noisy)
             result['checked_pcts'].append(float(n_checked / y_train.shape[0]) * 100)
-            result['fixed_pcts'].append(float(len(indices_to_fix) / y_train.shape[0]) * 100)
+            result['fixed_pcts'].append(float(len(indices_to_fix) / noisy_indices.shape[0]) * 100)
 
             # display progress
             if logger:
