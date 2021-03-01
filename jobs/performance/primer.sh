@@ -3,6 +3,7 @@ mem=$2
 time=$3
 partition=$4
 
+scoring='accuracy'
 tune_frac=1.0
 preprocessing='standard'
 model_list=('cb' 'dt' 'lr' 'svm_linear' 'svm_rbf' 'knn')
@@ -17,6 +18,6 @@ for model in ${model_list[@]}; do
                --job-name=$job_name \
                --output=jobs/logs/performance/$job_name \
                --error=jobs/errors/performance/$job_name \
-               jobs/performance/runner.sh $dataset $model $rs $preprocessing $tune_frac
+               jobs/performance/runner.sh $dataset $model $rs $preprocessing $scoring $tune_frac
     done
 done

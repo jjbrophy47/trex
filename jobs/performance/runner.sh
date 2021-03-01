@@ -8,11 +8,13 @@ dataset=$1
 model=$2
 rs=$3
 preprocessing=$4
-tune_frac=$5
+scoring=$5
+tune_frac=$6
 
 python3 scripts/experiments/performance.py \
   --dataset $dataset \
   --model $model \
   --rs $rs \
   --preprocessing $preprocessing \
+  --scoring $scoring \
   --tune_frac $tune_frac
