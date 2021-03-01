@@ -653,6 +653,10 @@ def main(args):
     if args.model == 'cb' and ('feature_path' in args.method or 'feature_output' in args.method):
         args.preprocessing = 'standard'
 
+    # Leaf Influence cannot handle cat. features...
+    elif args.method == 'leaf_influence':
+        args.preprocessing = 'standard'
+
     # define output directory
     out_dir = os.path.join(args.out_dir,
                            dataset,
