@@ -104,7 +104,7 @@ def main(args):
     fig.subplots_adjust(bottom=0.425, wspace=0.275)
 
     # create output diretory
-    out_dir = os.path.join(args.out_dir, args.metric)
+    out_dir = os.path.join(args.out_dir, args.model, args.metric)
     os.makedirs(out_dir, exist_ok=True)
 
     # save plot

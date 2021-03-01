@@ -149,7 +149,7 @@ if __name__ == '__main__':
     # experiment settings
     parser.add_argument('--dataset', type=str, nargs='+', help='dataset.',
                         default=['churn', 'surgical', 'vaccine', 'amazon', 'bank_marketing', 'adult', 'census'])
-    parser.add_argument('--model', type=int, nargs='+', default=['cb', 'rf'], help='model to extract the results for.')
+    parser.add_argument('--model', type=str, nargs='+', default=['cb', 'rf'], help='model to extract the results for.')
     parser.add_argument('--preprocessing', type=str, nargs='+', default=['categorical', 'standard'],
                         help='preprocessing directory.')
     parser.add_argument('--surrogate', type=int, nargs='+', default=['klr', 'svm', 'knn'], help='surrogate model.')
