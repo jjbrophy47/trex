@@ -2,12 +2,12 @@
 Experiment:
     1) Generate an instance-attribution explanation for a set of test instances.
     2) Sort training instances by influence on the selected test instnces.
-    3) Remove a fixed number of most influential training instances.
-    4) Retrain a new tree ensemble on the remaining dataset.
-    5) Evaluate predictive performance on the test set.
+    3) Create new datasets by removing increasing fractions of the sorted training instances.
+    4) Train new tree ensembles for each level of data removal.
+    5) Evaluate predictive performance on the test set using each model.
 
-If the instances removed are highly influential, than performance should decrease,
-or the average change in test prediction should be significant.
+If the instances removed are highly influential, than performance should decrease sharply,
+and / or the average change in test prediction should be significant.
 """
 import os
 import sys
@@ -74,7 +74,7 @@ def measure_performance(train_indices, n_checkpoint, n_checkpoints,
 
     # result containers
     start = time.time()
-    s = '[Checkpoint] removed: {:.1f}%; Acc.: {:.3f}; AUC: {:.3f}'
+    s = '[Checkpoint {:,}] removed: {:.1f}%; Acc.: {:.3f}; AUC: {:.3f}'
     s += '; Prob. delta, avg.: {:.3f}, median: {:.3f}; cum. time: {:.3f}s'
 
     # display status
@@ -94,7 +94,9 @@ def measure_performance(train_indices, n_checkpoint, n_checkpoints,
 
         # only samples from one class remain
         if len(np.unique(new_y_train)) == 1:
-            raise ValueError('Only samples from one class remain!')
+            logger.info('Only samples from one class remain!')
+            break
+            # raise ValueError('Only samples from one class remain!')
 
         # remeasure test instance predictive performance
         new_model = clone(clf).fit(new_X_train, new_y_train)
@@ -110,7 +112,7 @@ def measure_performance(train_indices, n_checkpoint, n_checkpoints,
 
         # display progress
         if logger:
-            logger.info(s.format(result['removed_pcts'][-1], result['accs'][-1], result['aucs'][-1],
+            logger.info(s.format(i + 1, result['removed_pcts'][-1], result['accs'][-1], result['aucs'][-1],
                                  result['avg_proba_deltas'][-1], result['median_proba_deltas'][-1],
                                  time.time() - start))
 
