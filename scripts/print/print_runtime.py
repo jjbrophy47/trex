@@ -1,5 +1,8 @@
 """
 This script prints the runtime results.
+
+Grouped boxplots is possible using the raw data.
+https://stackoverflow.com/questions/16592222/matplotlib-group-boxplots
 """
 import os
 import sys

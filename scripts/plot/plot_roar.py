@@ -9,18 +9,20 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 
-def set_size(width, fraction=1, subplots=(1, 1)):
+def get_height(width, subplots=(1, 1)):
     """
     Set figure dimensions to avoid scaling in LaTeX.
     """
     golden_ratio = 1.618
     height = (width / golden_ratio) * (subplots[0] / subplots[1])
-    return width, height
+    return height
 
 
 def main(args):
     print(args)
 
+    # settings
+    dataset_list = ['surgical', 'vaccine', 'amazon', 'bank_marketing', 'adult', 'census']
     method_list = ['random', 'klr-leaf_output', 'maple', 'knn-leaf_output']
     color_list = ['red', 'blue', 'orange', 'purple']
     label_list = ['Random', 'TREX-KLR', 'MAPLE', 'TEKNN']
@@ -30,155 +32,107 @@ def main(args):
     df = pd.read_csv(os.path.join(args.in_dir, 'results.csv'))
 
     # filter results
-    df = df[df['dataset'] == args.dataset]
     df = df[df['model'] == args.model]
 
-    # result containers
+    # plot settings
+    plt.rc('xtick', labelsize=13)
+    plt.rc('ytick', labelsize=13)
+    plt.rc('axes', labelsize=13)
+    plt.rc('axes', titlesize=13)
+    plt.rc('legend', fontsize=13)
+    # plt.rc('legend', title_fontsize=11)
+    # plt.rc('lines', linewidth=1)
+    # plt.rc('lines', markersize=3)
+
+    # inches
+    width = 4.8  # Machine Learning journal
+    height = get_height(width=width, subplots=(2, 3))
+    fig, axs = plt.subplots(2, 3, figsize=(width * 1.75, height * 2.35))
+
+    # legend containers
     lines = []
+    labels = []
 
-    # plot each method
-    fig, ax = plt.subplots()
-    methods = list(zip(method_list, label_list, color_list, marker_list))
+    # dataset incrementer
+    k = 0
 
-    for method, label, color, marker in methods:
+    # plot datasets
+    for i in range(axs.shape[0]):
+        for j in range(axs.shape[1]):
 
-        # get method results
-        temp_df = df[df['method'] == method]
+            # extract dataset results
+            ax = axs[i][j]
+            dataset = dataset_list[k]
+            temp_df1 = df[df['dataset'] == dataset]
 
-        if len(temp_df) == 0:
-            continue
+            # add y-axis
+            if j == 0:
+                if args.metric in ['acc', 'auc']:
+                    label = 'accuracy' if args.metric == 'acc' else 'AUC'
+                    ax.set_ylabel('Test {}'.format(label))
 
-        # extract performance results
-        temp_df = temp_df.iloc[0]
-        metric_mean = temp_df['{}s_mean'.format(args.metric)]
-        metric_sem = temp_df['{}s_sem'.format(args.metric)]
-        removed_pcts = temp_df['removed_pcts']
+                elif args.metric == 'avg_proba_delta':
+                    ax.set_ylabel(r'Avg. test prob. $\Delta$')
 
-        # convert results from strings to arrays
-        metric_mean = np.fromstring(metric_mean[1: -1], dtype=np.float32, sep=' ')
-        metric_sem = np.fromstring(metric_sem[1: -1], dtype=np.float32, sep=' ')
-        removed_pcts = np.fromstring(removed_pcts[1: -1], dtype=np.float32, sep=' ')
+                elif args.metric == 'median_proba_delta':
+                    ax.set_ylabel(r'Median test prob. $\Delta$')
 
-        # plot
-        line = ax.errorbar(removed_pcts, metric_mean, yerr=metric_sem,
-                           marker=marker, color=color, label=label)
-        lines.append(line)
+            # add x-axis
+            if i == 1:
+                ax.set_xlabel('Train data removed (%)')
 
-        # add metric-specific info
-        if args.metric in ['acc', 'auc']:
-            label = 'Acc.' if args.metric == 'acc' else 'AUC'
-            ax.set_ylabel('Test {}'.format(label))
+            # add title
+            ax.set_title('Census (10%)' if dataset == 'census_0p1' else dataset.capitalize())
+            ax.tick_params(axis='both', which='major')
 
-        elif 'proba_delta' in args.metric:
-            ax.set_ylabel(r'Avg. test prob. $\Delta$')
+            # plot each method
+            methods = list(zip(method_list, label_list, color_list, marker_list))
+            for method, label, color, marker in methods:
 
-        else:
-            raise ValueError('unknown metric: {}'.format(args.metric))
+                # get method results
+                temp_df2 = temp_df1[temp_df1['method'] == method]
 
-    # adjust plot
-    ax.set_xlabel('Train data removed (%)')
-    ax.legend()
-    plt.tight_layout()
+                if len(temp_df2) == 0:
+                    continue
+
+                # extract performance results
+                temp_df2 = temp_df2.iloc[0]
+                metric_mean = temp_df2['{}s_mean'.format(args.metric)]
+                metric_sem = temp_df2['{}s_sem'.format(args.metric)]
+                removed_pcts = temp_df2['removed_pcts']
+
+                # convert results from strings to arrays
+                metric_mean = np.fromstring(metric_mean[1: -1], dtype=np.float32, sep=' ')
+                metric_sem = np.fromstring(metric_sem[1: -1], dtype=np.float32, sep=' ')
+                removed_pcts = np.fromstring(removed_pcts[1: -1], dtype=np.float32, sep=' ')
+
+                # plot
+                line = ax.errorbar(removed_pcts, metric_mean, yerr=metric_sem,
+                                   marker=marker, color=color, label=label)
+
+                # save for legend
+                if i == 0 and j == 0:
+                    lines.append(line)
+                    labels.append(label)
+
+            # increment dataset
+            k += 1
 
     # create output directory
-    out_dir = os.path.join(args.out_dir, args.metric)
+    out_dir = os.path.join(args.out_dir, args.model, args.metric)
     os.makedirs(out_dir, exist_ok=True)
 
-    # adjust and save plot
-    fp = os.path.join(out_dir, '{}.pdf'.format(args.dataset))
-    plt.savefig(fp, bbox_inches='tight')
+    # adjust legend
+    fig.legend(tuple(lines), tuple(labels), loc='center', ncol=6, bbox_to_anchor=(0.5, 0.04))
 
-    print('saving to {}...'.format(fp))
-
-    exit(0)
-
-
-
-
-
-
-    # matplotlib settings
-    plt.rc('font', family='serif')
-
-    if args.two_col:
-        plt.rc('xtick', labelsize=11)
-        plt.rc('ytick', labelsize=11)
-        plt.rc('axes', labelsize=11)
-        plt.rc('axes', titlesize=11)
-        plt.rc('legend', fontsize=11)
-        plt.rc('legend', title_fontsize=11)
-        plt.rc('lines', linewidth=1)
-        plt.rc('lines', markersize=3)
-
-        width = 3.25  # Two column style
-        width, height = set_size(width=width * 2, fraction=1, subplots=(2, 2))
-        fig, axs = plt.subplots(2, 2, figsize=(width, height * 1.15), sharex='col')
-
-    else:
-        plt.rc('xtick', labelsize=17)
-        plt.rc('ytick', labelsize=17)
-        plt.rc('axes', labelsize=22)
-        plt.rc('axes', titlesize=22)
-        plt.rc('legend', fontsize=20)
-        plt.rc('legend', title_fontsize=11)
-        plt.rc('lines', linewidth=2)
-        plt.rc('lines', markersize=8)
-
-        width = 5.5  # Neurips 2020
-        width, height = set_size(width=width * 3, fraction=1, subplots=(1, 3))
-        fig, axs = plt.subplots(1, max(2, len(args.dataset)),
-                                figsize=(width, height * 1.1), sharex=True)
-    axs = axs.flatten()
-
-    n_pts = 10
-
-    ylabel = 'Test {}'.format(metric_mapping[args.metric])
-    xlabel = '% train data removed'
-
-    lines = []
-    lines_ndx = []
-    for i, dataset in enumerate(args.dataset):
-        ax = axs[i]
-
-        for j, method in enumerate(method_list):
-            res = get_results(args, dataset, method)
-
-            if res is not None:
-                res_mean, res_sem, pcts = res
-                line = ax.errorbar(pcts[:n_pts], res_mean[:n_pts], yerr=res_sem[:n_pts],
-                                   marker=markers[j], color=colors[j], label=labels[j])
-
-                if i == 0:
-                    lines.append(line[0])
-                    lines_ndx.append(j)
-
-        if args.two_col:
-            if i % 2 == 0:
-                axs[i].set_ylabel(ylabel)
-            if i > 1:
-                axs[i].set_xlabel(xlabel)
-
-        else:
-
-            if i == 0:
-                ax.set_ylabel(ylabel)
-            ax.set_xlabel(xlabel)
-
-        if i == 1:
-            ax.legend(frameon=False)
-
-        ax.set_title(dataset.capitalize())
-        ax.tick_params(axis='both', which='major')
-
-    out_dir = os.path.join(args.out_dir, args.tree_kernel)
-    os.makedirs(out_dir, exist_ok=True)
-
+    # adjust figure
     plt.tight_layout()
+    fig.subplots_adjust(bottom=0.225, wspace=0.3)
 
-    if not args.two_col:
-        fig.subplots_adjust(wspace=0.25, hspace=0.05)
-
-    plt.savefig(os.path.join(out_dir, 'roar.{}'.format(args.ext)))
+    # save figure
+    fp = os.path.join(out_dir, 'all_datasets.pdf')
+    plt.savefig(fp)
+    print('saving to {}...'.format(fp))
 
 
 if __name__ == '__main__':
@@ -186,9 +140,8 @@ if __name__ == '__main__':
 
     parser.add_argument('--in_dir', type=str, default='output/roar/csv/', help='input directory.')
     parser.add_argument('--out_dir', type=str, default='output/plots/roar/', help='output directory.')
-    parser.add_argument('--dataset', type=str, default='churn', help='dataset to explain.')
-    parser.add_argument('--model', type=str, default='cb', help='tree type.')
-    parser.add_argument('--metric', type=str, default='acc', help='acc, auc, avg_proba_delta, median_proba_delta')
+    parser.add_argument('--model', type=str, default='cb', help='tree-ensemble model.')
+    parser.add_argument('--metric', type=str, default='acc', help='acc, auc, avg_proba_delta, or median_proba_delta')
 
     args = parser.parse_args()
     main(args)

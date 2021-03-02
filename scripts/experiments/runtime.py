@@ -1,7 +1,7 @@
 """
 Experiment:
-    1) Train / initialize explainer.
-    2) Compute influence of ALL training instances on a SINGLE test instance.
+    1) Record time to train / initialize explainer.
+    2) Record time to compute influence of ALL training instances on a SINGLE test instance.
 """
 import os
 import sys
@@ -288,6 +288,7 @@ def main(args):
     out_dir = os.path.join(args.out_dir,
                            args.dataset,
                            args.model,
+                           args.preprocessing,
                            args.method,
                            'rs_{}'.format(args.rs))
 
@@ -314,7 +315,7 @@ if __name__ == '__main__':
     parser.add_argument('--out_dir', type=str, default='output/runtime/', help='output directory.')
 
     # Data settings
-    parser.add_argument('--train_frac', type=float, default=1.0, help='dataset to explain.')
+    parser.add_argument('--train_frac', type=float, default=1.0, help='fraction of data for training.')
     parser.add_argument('--tune_frac', type=float, default=0.1, help='fraction of train data for validation.')
 
     # Tree-ensemble settings

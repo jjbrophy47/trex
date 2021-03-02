@@ -1,5 +1,5 @@
 """
-This script plots the cleaning experiment results.
+Plot cleaning results for a single dataset.
 """
 import os
 import argparse

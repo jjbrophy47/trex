@@ -56,7 +56,7 @@ def main(args):
     plt.rc('ytick', labelsize=13)
     plt.rc('axes', labelsize=13)
     plt.rc('axes', titlesize=13)
-    # plt.rc('legend', fontsize=16)
+    plt.rc('legend', fontsize=13)
     # plt.rc('legend', title_fontsize=11)
     # plt.rc('lines', linewidth=1)
     # plt.rc('lines', markersize=6)
@@ -130,6 +130,7 @@ def main(args):
                 line = ax.errorbar(checked_pcts, metric_mean, yerr=metric_sem,
                                    marker=marker, color=color, zorder=zorder)
 
+                # save for legend
                 if i == 0 and j == 0:
                     lines.append(line)
                     labels.append(label)
@@ -155,7 +156,6 @@ def main(args):
 
     # save figure
     fp = os.path.join(out_dir, 'all_datasets.pdf')
-    # plt.savefig(fp, bbox_inches='tight')
     plt.savefig(fp)
     print('saving to {}...'.format(fp))
 
