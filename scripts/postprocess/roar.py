@@ -40,7 +40,7 @@ def process_results(df):
     Averages utility results over different random states.
     """
 
-    groups = ['dataset', 'model', 'method']
+    groups = ['dataset', 'model', 'preprocessing', 'method']
 
     main_result_list = []
 
@@ -52,8 +52,6 @@ def process_results(df):
 
         # compute average accuracy
         accs = [np.array(x) for x in gf['accs'].values]
-        print(tup)
-        print([len(x) for x in accs])
         main_result['accs_mean'] = np.mean(accs, axis=0)
         main_result['accs_sem'] = sem(accs, axis=0)
 

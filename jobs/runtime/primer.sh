@@ -7,7 +7,7 @@ mem=$6
 time=$7
 partition=$8
 
-rs_list=(1 2 3 4 5)
+rs_list=(1 2 3 4 5 6 7 8 9 10)
 method_list=('klr-leaf_output' 'svm-leaf_output' \
              'leaf_influence' 'maple' 'knn-leaf_output')
 

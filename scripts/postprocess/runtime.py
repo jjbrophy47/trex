@@ -14,7 +14,7 @@ from tqdm import tqdm
 
 here = os.path.abspath(os.path.dirname(__file__))
 sys.path.insert(0, here + '/../')
-from utility import print_util
+import util
 
 
 def get_result(template, in_dir):
@@ -40,7 +40,7 @@ def process_results(df):
     Averages utility results over different random states.
     """
 
-    groups = ['dataset', 'model', 'method']
+    groups = ['dataset', 'model', 'preprocessing', 'method']
 
     main_result_list = []
 
@@ -67,16 +67,18 @@ def create_csv(args, out_dir, logger):
     # experiment variabless
     experiment_settings = list(product(*[args.dataset,
                                          args.model,
+                                         args.preprocessing,
                                          args.method,
                                          args.rs]))
 
     # organize results
     results = []
-    for dataset, model, method, rs in tqdm(experiment_settings):
+    for dataset, model, preprocessing, method, rs in tqdm(experiment_settings):
 
         # create result
         template = {'dataset': dataset,
                     'model': model,
+                    'preprocessing': preprocessing,
                     'method': method,
                     'rs': rs}
 
@@ -84,6 +86,7 @@ def create_csv(args, out_dir, logger):
         experiment_dir = os.path.join(args.in_dir,
                                       dataset,
                                       model,
+                                      preprocessing,
                                       method,
                                       'rs_{}'.format(rs))
 
@@ -108,7 +111,8 @@ def create_csv(args, out_dir, logger):
     main_df = process_results(df)
     logger.info('\nProcessed results:\n{}'.format(main_df))
 
-    # save processed results
+    # save raw and processed results
+    df.to_csv(os.path.join(out_dir, 'raw.csv'), index=None)
     main_df.to_csv(os.path.join(out_dir, 'results.csv'), index=None)
 
 
@@ -119,7 +123,7 @@ def main(args):
     os.makedirs(out_dir, exist_ok=True)
 
     # create logger
-    logger = print_util.get_logger(os.path.join(out_dir, 'log.txt'))
+    logger = util.get_logger(os.path.join(out_dir, 'log.txt'))
     logger.info(args)
     logger.info(datetime.now())
 
@@ -137,8 +141,10 @@ if __name__ == '__main__':
     # experiment settings
     parser.add_argument('--dataset', type=str, nargs='+', help='dataset.',
                         default=['churn', 'surgical', 'vaccine', 'amazon', 'bank_marketing', 'adult', 'census'])
-    parser.add_argument('--model', type=int, nargs='+', default=['cb'], help='model to extract the results for.')
-    parser.add_argument('--method', type=int, nargs='+',
+    parser.add_argument('--model', type=str, nargs='+', default=['cb', 'rf'], help='model to extract the results for.')
+    parser.add_argument('--preprocessing', type=str, nargs='+', default=['categorical', 'standard'],
+                        help='preprocessing directory.')
+    parser.add_argument('--method', type=str, nargs='+',
                         default=['klr-leaf_output', 'svm-leaf_output',
                                  'maple', 'knn-leaf_output', 'leaf_influence'],
                         help='method for sorting train data.')

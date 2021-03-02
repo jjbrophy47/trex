@@ -40,7 +40,7 @@ def process_results(df):
     Averages utility results over different random states.
     """
 
-    groups = ['dataset', 'model', 'method']
+    groups = ['dataset', 'model', 'preprocessing', 'method']
 
     main_result_list = []
 
