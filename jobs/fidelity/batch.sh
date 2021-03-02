@@ -8,10 +8,10 @@
 # ./jobs/fidelity/primer.sh 'census' 'cb' 'categorical' 250 5 30 1440 'short'
 
 # RF
-./jobs/fidelity/primer.sh 'churn' 'rf' 'standard' 250 7 2 1440 'short'
-./jobs/fidelity/primer.sh 'surgical' 'rf' 'standard' 250 7 2 1440 'short'
-./jobs/fidelity/primer.sh 'vaccine' 'rf' 'standard' 250 7 6 1440 'short'
-./jobs/fidelity/primer.sh 'amazon' 'rf' 'standard' 10 3 15 1440 'short'
-./jobs/fidelity/primer.sh 'bank_marketing' 'rf' 'standard' 100 7 15 1440 'short'
-./jobs/fidelity/primer.sh 'adult' 'rf' 'standard' 250 7 15 1440 'short'
+./jobs/fidelity/primer.sh 'churn' 'rf' 'standard' 250 10 2 1440 'short'
+./jobs/fidelity/primer.sh 'surgical' 'rf' 'standard' 250 15 2 1440 'short'
+./jobs/fidelity/primer.sh 'vaccine' 'rf' 'standard' 250 15 6 1440 'short'
+./jobs/fidelity/primer.sh 'amazon' 'rf' 'standard' 10 3 25 1440 'short'
+./jobs/fidelity/primer.sh 'bank_marketing' 'rf' 'standard' 100 7 25 1440 'short'
+./jobs/fidelity/primer.sh 'adult' 'rf' 'standard' 250 7 25 1440 'short'
 ./jobs/fidelity/primer.sh 'census' 'rf' 'standard' 10 7 30 1440 'short'

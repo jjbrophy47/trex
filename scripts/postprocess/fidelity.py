@@ -155,7 +155,7 @@ if __name__ == '__main__':
     parser.add_argument('--surrogate', type=int, nargs='+', default=['klr', 'svm', 'knn'], help='surrogate model.')
     parser.add_argument('--tree_kernel', type=int, nargs='+', help='tree kernel.',
                         default=['feature_path', 'feature_output', 'leaf_path', 'leaf_output', 'tree_output'])
-    parser.add_argument('--metric', type=str, nargs='+', default=['mse', 'spearman'], help='tuning metric.')
+    parser.add_argument('--metric', type=str, nargs='+', default=['mse'], help='tuning metric.')
     parser.add_argument('--rs', type=int, nargs='+', default=[1, 2, 3, 4, 5], help='random state.')
 
     args = parser.parse_args()

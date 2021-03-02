@@ -9,7 +9,7 @@ partition=$8
 
 surrogate_list=('klr' 'svm' 'knn')
 tree_kernel_list=('feature_path' 'feature_output' 'leaf_path' 'leaf_output' 'tree_output')
-metric_list=('spearman' 'mse')
+metric_list=('mse')
 rs_list=(1 2 3 4 5)
 
 for surrogate in ${surrogate_list[@]}; do
