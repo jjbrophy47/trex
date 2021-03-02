@@ -25,13 +25,13 @@
 # ./jobs/performance/primer_single.sh 'census' 'cb' 'categorical' 'accuracy' 1.0 7 1440 'short'
 
 # RF
-./jobs/performance/primer_single.sh 'churn' 'rf' 'standard' 'accuracy' 1.0 10 1440 'short'
-./jobs/performance/primer_single.sh 'surgical' 'rf' 'standard' 'accuracy' 1.0 10 1440 'short'
-./jobs/performance/primer_single.sh 'vaccine' 'rf' 'standard' 'accuracy' 1.0 10 1440 'short'
-./jobs/performance/primer_single.sh 'amazon' 'rf' 'standard' 'accuracy' 1.0 15 1440 'short'
-./jobs/performance/primer_single.sh 'bank_marketing' 'rf' 'standard' 'accuracy' 1.0 10 1440 'short'
-./jobs/performance/primer_single.sh 'adult' 'rf' 'standard' 'accuracy' 1.0 10 1440 'short'
-./jobs/performance/primer_single.sh 'census' 'rf' 'standard' 'accuracy' 1.0 15 1440 'short'
+# ./jobs/performance/primer_single.sh 'churn' 'rf' 'standard' 'accuracy' 1.0 10 1440 'short'
+# ./jobs/performance/primer_single.sh 'surgical' 'rf' 'standard' 'accuracy' 1.0 10 1440 'short'
+# ./jobs/performance/primer_single.sh 'vaccine' 'rf' 'standard' 'accuracy' 1.0 10 1440 'short'
+# ./jobs/performance/primer_single.sh 'amazon' 'rf' 'standard' 'accuracy' 1.0 15 1440 'short'
+# ./jobs/performance/primer_single.sh 'bank_marketing' 'rf' 'standard' 'accuracy' 1.0 10 1440 'short'
+# ./jobs/performance/primer_single.sh 'adult' 'rf' 'standard' 'accuracy' 1.0 10 1440 'short'
+# ./jobs/performance/primer_single.sh 'census' 'rf' 'standard' 'accuracy' 1.0 15 1440 'short'
 
 # RF scoring using AUC
 ./jobs/performance/primer_single.sh 'amazon' 'rf' 'standard' 'roc_auc' 1.0 15 1440 'short'

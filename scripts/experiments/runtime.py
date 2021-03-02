@@ -7,6 +7,7 @@ import os
 import sys
 import time
 import uuid
+import shutil
 import signal
 import argparse
 import resource
@@ -22,9 +23,7 @@ here = os.path.abspath(os.path.dirname(__file__))
 sys.path.insert(0, here + '/../../')  # for influence_boosting
 sys.path.insert(0, here + '/../')  # for utility
 import trex
-from utility import model_util
-from utility import data_util
-from utility import print_util
+import util
 from baselines.influence_boosting.influence.leaf_influence import CBLeafInfluenceEnsemble
 from baselines.maple.MAPLE import MAPLE
 
@@ -93,7 +92,11 @@ def leaf_influence_method(args, model, test_ndx, X_train, y_train,
 
     # initialize Leaf Influence
     start = time.time()
-    temp_fp = '.{}_cb.json'.format(str(uuid.uuid4()))
+
+    # save CatBoost model
+    temp_dir = os.path.join('.catboost_info', 'leaf_influence_{}'.format(str(uuid.uuid4())))
+    temp_fp = os.path.join(temp_dir, 'cb.json')
+    os.makedirs(temp_dir, exist_ok=True)
     model.save_model(temp_fp, format='json')
 
     explainer = CBLeafInfluenceEnsemble(temp_fp, X_train, y_train, k=k,
@@ -131,7 +134,7 @@ def leaf_influence_method(args, model, test_ndx, X_train, y_train,
                 exit(0)
 
     # clean up
-    os.system('rm {}'.format(temp_fp))
+    shutil.rmtree(temp_dir)
 
     # result object
     result = {'train_time': train_time, 'test_time': test_time}
@@ -226,17 +229,17 @@ def experiment(args, logger, out_dir):
     rng = np.random.default_rng(args.rs)
 
     # get data
-    data = data_util.get_data(args.dataset,
-                              data_dir=args.data_dir,
-                              processing_dir=args.processing_dir)
+    data = util.get_data(args.dataset,
+                         data_dir=args.data_dir,
+                         processing_dir=args.processing_dir)
     X_train, X_test, y_train, y_test, feature, cat_indices = data
 
     # get tree-ensemble
-    clf = model_util.get_model(args.model,
-                               n_estimators=args.n_estimators,
-                               max_depth=args.max_depth,
-                               random_state=args.rs,
-                               cat_indices=cat_indices)
+    clf = util.get_model(args.model,
+                         n_estimators=args.n_estimators,
+                         max_depth=args.max_depth,
+                         random_state=args.rs,
+                         cat_indices=cat_indices)
 
     logger.info('\nno. train instances: {:,}'.format(X_train.shape[0]))
     logger.info('no. test instances: {:,}'.format(X_test.shape[0]))
@@ -244,8 +247,8 @@ def experiment(args, logger, out_dir):
 
     # train a tree ensemble
     model = clone(clf).fit(X_train, y_train)
-    model_util.performance(model, X_train, y_train, logger=logger, name='Train')
-    model_util.performance(model, X_test, y_test, logger=logger, name='Test')
+    util.performance(model, X_train, y_train, logger=logger, name='Train')
+    util.performance(model, X_test, y_test, logger=logger, name='Test')
 
     # randomly pick a test instances to explain
     test_ndx = rng.choice(y_test.shape[0], size=1, replace=False)
@@ -290,10 +293,10 @@ def main(args):
 
     # create output directory
     os.makedirs(out_dir, exist_ok=True)
-    print_util.clear_dir(out_dir)
+    util.clear_dir(out_dir)
 
     # create logger
-    logger = print_util.get_logger(os.path.join(out_dir, 'log.txt'))
+    logger = util.get_logger(os.path.join(out_dir, 'log.txt'))
     logger.info(args)
     logger.info('\ntimestamp: {}'.format(datetime.now()))
 
@@ -325,7 +328,7 @@ if __name__ == '__main__':
 
     # Experiment settings
     parser.add_argument('--rs', type=int, default=1, help='random state.')
-    parser.add_argument('--max_time', type=int, default=172800, help='max. experiment time in seconds.')
+    parser.add_argument('--max_time', type=int, default=259200, help='max. experiment time in seconds.')
 
     # Additional Settings
     parser.add_argument('--verbose', type=int, default=0, help='Verbosity level.')

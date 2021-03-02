@@ -182,13 +182,13 @@ def main(args):
 
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='Feature representation extractions for tree ensembles',
-                                     formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    parser = argparse.ArgumentParser()
+
     parser.add_argument('--in_dir', type=str, default='output/roar/csv/', help='input directory.')
     parser.add_argument('--out_dir', type=str, default='output/plots/roar/', help='output directory.')
     parser.add_argument('--dataset', type=str, default='churn', help='dataset to explain.')
     parser.add_argument('--model', type=str, default='cb', help='tree type.')
-    parser.add_argument('--metric', type=str, default='acc', help='performance metric.')
+    parser.add_argument('--metric', type=str, default='acc', help='acc, auc, avg_proba_delta, median_proba_delta')
 
     args = parser.parse_args()
     main(args)

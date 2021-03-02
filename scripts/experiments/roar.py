@@ -272,7 +272,7 @@ def teknn_method(args, model, X_train, y_train, X_test, logger=None,
     # transform the data
     tree_kernel = args.method.split('-')[-1]
     extractor = trex.TreeExtractor(model, tree_kernel=tree_kernel)
-    X_train_alt = extractor.fit_transform(X_train)
+    X_train_alt = extractor.transform(X_train)
 
     # train surrogate model
     param_grid = {'n_neighbors': [3, 5, 7, 9, 11, 13, 15, 31, 45, 61]}
