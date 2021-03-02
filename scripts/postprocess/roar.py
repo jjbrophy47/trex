@@ -52,6 +52,8 @@ def process_results(df):
 
         # compute average accuracy
         accs = [np.array(x) for x in gf['accs'].values]
+        print(tup)
+        print([len(x) for x in accs])
         main_result['accs_mean'] = np.mean(accs, axis=0)
         main_result['accs_sem'] = sem(accs, axis=0)
 
@@ -160,7 +162,7 @@ if __name__ == '__main__':
 
     # experiment settings
     parser.add_argument('--dataset', type=str, nargs='+', help='dataset.',
-                        default=['churn', 'surgical', 'vaccine', 'amazon', 'bank_marketing', 'adult', 'census'])
+                        default=['surgical', 'vaccine', 'amazon', 'bank_marketing', 'adult', 'census'])
     parser.add_argument('--model', type=int, nargs='+', default=['cb', 'rf'], help='model to extract the results for.')
     parser.add_argument('--preprocessing', type=int, nargs='+', default=['categorical', 'standard'],
                         help='preprocessing directory.')

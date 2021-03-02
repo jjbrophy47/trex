@@ -140,7 +140,7 @@ def leaf_influence_method(args, model, test_ndx, X_train, y_train,
 
 
 def maple_method(args, model, test_ndx, X_train, y_train, X_test,
-                 dstump=True, logger=None):
+                 dstump=False, logger=None):
     """
     Produces a train weight distribution for a single test instance.
     """
