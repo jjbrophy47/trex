@@ -231,7 +231,7 @@ def experiment(args, logger, out_dir):
     # get data
     data = util.get_data(args.dataset,
                          data_dir=args.data_dir,
-                         processing_dir=args.processing_dir)
+                         preprocessing=args.preprocessing)
     X_train, X_test, y_train, y_test, feature, cat_indices = data
 
     # get tree-ensemble
@@ -311,7 +311,7 @@ if __name__ == '__main__':
     # I/O settings
     parser.add_argument('--dataset', type=str, default='churn', help='dataset to evaluate.')
     parser.add_argument('--data_dir', type=str, default='data', help='data directory.')
-    parser.add_argument('--processing_dir', type=str, default='standard', help='processing directory.')
+    parser.add_argument('--preprocessing', type=str, default='standard', help='preprocessing directory.')
     parser.add_argument('--out_dir', type=str, default='output/runtime/', help='output directory.')
 
     # Data settings
