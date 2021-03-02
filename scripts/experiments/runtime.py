@@ -110,7 +110,6 @@ def leaf_influence_method(args, model, test_ndx, X_train, y_train,
             start = time.time()
 
             contributions = []
-            contributions_sum = np.zeros(X_train.shape[0])
             buf = deepcopy(explainer)
 
             for i in range(X_train.shape[0]):
@@ -123,9 +122,7 @@ def leaf_influence_method(args, model, test_ndx, X_train, y_train,
                     train_frac_complete = i / X_train.shape[0] * 100
                     logger.info('Train {:.1f}%...{:.3f}s'.format(train_frac_complete, elapsed))
 
-                contributions = np.array(contributions)
-                contributions_sum += contributions
-
+            contributions = np.array(contributions)
             test_time = time.time() - start
 
         except TimeoutError:
@@ -183,7 +180,7 @@ def teknn_method(args, model, test_ndx, X_train, y_train, X_test,
             # transform the data
             tree_kernel = args.method.split('-')[-1]
             extractor = trex.TreeExtractor(model, tree_kernel=tree_kernel)
-            X_train_alt = extractor.fit_transform(X_train)
+            X_train_alt = extractor.transform(X_train)
 
             # train surrogate model
             param_grid = {'n_neighbors': [3, 5, 7, 9, 11, 13, 15, 31, 45, 61]}
