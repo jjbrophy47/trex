@@ -27,6 +27,7 @@ def main(args):
     color_list = ['red', 'blue', 'orange', 'purple']
     label_list = ['Random', 'TREX-KLR', 'MAPLE', 'TEKNN']
     marker_list = ['o', 'd', '^', 'x']
+    zorder_list = [3, 4, 2, 1]
 
     # get results
     df = pd.read_csv(os.path.join(args.in_dir, 'results.csv'))
@@ -42,7 +43,7 @@ def main(args):
     plt.rc('legend', fontsize=13)
     # plt.rc('legend', title_fontsize=11)
     # plt.rc('lines', linewidth=1)
-    # plt.rc('lines', markersize=3)
+    plt.rc('lines', markersize=5)
 
     # inches
     width = 4.8  # Machine Learning journal
@@ -86,8 +87,8 @@ def main(args):
             ax.tick_params(axis='both', which='major')
 
             # plot each method
-            methods = list(zip(method_list, label_list, color_list, marker_list))
-            for method, label, color, marker in methods:
+            methods = list(zip(method_list, label_list, color_list, marker_list, zorder_list))
+            for method, label, color, marker, zorder in methods:
 
                 # get method results
                 temp_df2 = temp_df1[temp_df1['method'] == method]
@@ -108,7 +109,7 @@ def main(args):
 
                 # plot
                 line = ax.errorbar(removed_pcts, metric_mean, yerr=metric_sem,
-                                   marker=marker, color=color, label=label)
+                                   marker=marker, color=color, label=label, zorder=zorder)
 
                 # save for legend
                 if i == 0 and j == 0:

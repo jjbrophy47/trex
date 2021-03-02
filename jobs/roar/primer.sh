@@ -12,7 +12,7 @@ partition=${10}
 method_list=('random' 'klr-leaf_output' 'knn-leaf_output' 'maple')
 
 for method in ${method_list[@]}; do
-    for rs in {1..40}; do
+    for rs in {1..100}; do
         job_name="R_${dataset}_${model}_${method}"
 
         sbatch --mem=${mem}G \
