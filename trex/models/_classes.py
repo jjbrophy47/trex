@@ -87,6 +87,13 @@ class SVM(BaseEstimator, ClassifierMixin):
         x_sim = linear_kernel(x, self.X_train_)
         return x_sim * self.alpha_
 
+    def similarity(self, x):
+        """
+        Return a 2d array of train instance impacts of shape=(1, no train samples).
+        """
+        assert x.shape == (1, self.X_train_.shape[1])
+        return linear_kernel(x, self.X_train_)
+
 
 class KLR(BaseEstimator, ClassifierMixin):
     """
@@ -153,6 +160,13 @@ class KLR(BaseEstimator, ClassifierMixin):
         x_sim = linear_kernel(x, self.X_train_)
         impact = x_sim * self.alpha_
         return impact
+
+    def similarity(self, x):
+        """
+        Return a 2d array of train instance impacts of shape=(1, no train samples).
+        """
+        assert x.shape == (1, self.X_train_.shape[1])
+        return linear_kernel(x, self.X_train_)
 
 
 # private

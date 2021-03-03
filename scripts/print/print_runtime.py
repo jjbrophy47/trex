@@ -3,6 +3,7 @@ This script prints the runtime results.
 
 Grouped boxplots is possible using the raw data.
 https://stackoverflow.com/questions/16592222/matplotlib-group-boxplots
+sns.boxplot(x='dataset', y='train_time', data=df, hue='method')
 """
 import os
 import sys

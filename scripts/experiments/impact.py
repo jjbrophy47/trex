@@ -67,7 +67,7 @@ def measure_performance(train_indices, clf, X_train, y_train, X_test, y_test, lo
         logger.info('test label: {}, before prob.: {:.5f}'.format(int(y_test[0]), base_proba[0]))
 
     result = {}
-    result['proba_delta'] = []
+    result['proba_diff'] = []
     result['remove_pct'] = []
 
     # fraction for removing one sample
@@ -94,7 +94,7 @@ def measure_performance(train_indices, clf, X_train, y_train, X_test, y_test, lo
             logger.info(s.format(train_frac_to_remove * 100, proba[0], proba_diff))
 
         # add to results
-        result['proba_delta'].append(np.abs(base_proba - proba)[0])
+        result['proba_diff'].append(np.abs(base_proba - proba)[0])
         result['remove_pct'].append(train_frac_to_remove * 100)
 
     return result
@@ -137,10 +137,15 @@ def trex_method(args, model, X_train, y_train, X_test, logger=None,
     for i in range(X_test.shape[0]):
         attributions_sum += surrogate.compute_attributions(X_test[[i]])[0]
 
+    sim = surrogate.similarity(X_test)[0]
+    train_indices = np.argsort(sim)[::-1]
+
     # sort instances most inhibitory samples first
     # train_indices = np.argsort(attributions_sum)[::-1]
-    train_indices = np.argsort(attributions_sum)
+    # train_indices = np.argsort(attributions_sum)
     # train_indices = np.argsort(np.abs(attributions_sum))[::-1]
+
+    # train_indices = np.argsort(np.abs(surrogate.get_alpha()))[::-1]
 
     # print(attributions_sum[train_indices])
 

@@ -8,4 +8,4 @@
 ./jobs/impact/primer.sh 'census' 'cb' 'standard' 250 5 20 1440 'short'
 
 # methods that will not finish in less than 3 days
---scancel --name=I_census_cb_leaf_influence
+scancel --name=I_census_cb_leaf_influence

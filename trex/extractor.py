@@ -324,7 +324,7 @@ class TreeExtractor:
 
         # RF
         if self.model_type_ == 'RandomForestClassifier':
-            encoding = np.hstack([tree.predict_proba(X)[:, 1].reshape(-1, 1) for tree in self.model.estimators_])
+            encoding = np.hstack([tree.predict_proba(X) for tree in self.model.estimators_])
 
         # CatBoost
         elif self.model_type_ == 'CatBoostClassifier':
