@@ -8,11 +8,12 @@ n_checkpoints=$7
 mem=$8
 time=$9
 partition=${10}
+rs_start=${11}
 
 method_list=('random' 'klr-leaf_output' 'knn-leaf_output' 'maple')
 
 for method in ${method_list[@]}; do
-    for rs in {1..20}; do
+    for (( rs = $rs_start; rs < $rs_start + 20; rs++ )); do
         job_name="R_${dataset}_${model}_${method}"
 
         sbatch --mem=${mem}G \
