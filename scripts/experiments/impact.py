@@ -137,15 +137,14 @@ def trex_method(args, model, X_train, y_train, X_test, logger=None,
     for i in range(X_test.shape[0]):
         attributions_sum += surrogate.compute_attributions(X_test[[i]])[0]
 
-    sim = surrogate.similarity(X_test)[0]
-    train_indices = np.argsort(sim)[::-1]
+    # sim = surrogate.similarity(X_test)[0]
+    # train_indices = np.argsort(sim)[::-1]
 
     # sort instances most inhibitory samples first
-    # train_indices = np.argsort(attributions_sum)[::-1]
-    # train_indices = np.argsort(attributions_sum)
-    # train_indices = np.argsort(np.abs(attributions_sum))[::-1]
-
-    # train_indices = np.argsort(np.abs(surrogate.get_alpha()))[::-1]
+    train_indices = np.argsort(attributions_sum)[::-1]  # most excitatory to most inhibitory
+    # train_indices = np.argsort(attributions_sum)  # most inhibitory to most excitatory
+    # train_indices = np.argsort(np.abs(attributions_sum))[::-1]  # biggest impacts
+    # train_indices = np.argsort(np.abs(surrogate.get_alpha()))[::-1]  # biggest weights
 
     # print(attributions_sum[train_indices])
 

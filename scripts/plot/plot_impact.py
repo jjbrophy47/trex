@@ -99,8 +99,8 @@ def main(args):
 
                 # extract performance results
                 temp_df2 = temp_df2.iloc[0]
-                metric_mean = temp_df2['{}s_mean'.format(args.metric)]
-                metric_sem = temp_df2['{}s_sem'.format(args.metric)]
+                metric_mean = temp_df2['{}_mean'.format(args.metric)]
+                metric_sem = temp_df2['{}_sem'.format(args.metric)]
                 removed_pcts = temp_df2['remove_pcts']
 
                 # convert results from strings to arrays
@@ -143,7 +143,7 @@ if __name__ == '__main__':
     parser.add_argument('--in_dir', type=str, default='output/impact/csv/', help='input directory.')
     parser.add_argument('--out_dir', type=str, default='output/plots/impact/', help='output directory.')
     parser.add_argument('--model', type=str, default='cb', help='tree-ensemble model.')
-    parser.add_argument('--metric', type=str, default='proba_delta', help='peformance metric.')
+    parser.add_argument('--metric', type=str, default='proba_diff', help='peformance metric.')
 
     args = parser.parse_args()
     main(args)
