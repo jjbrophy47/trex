@@ -74,7 +74,7 @@ def experiment(args, out_dir, logger):
                                        random_state=args.rs,
                                        logger=logger)
         train_time = time.time() - start
-        logger.info('fitting surrgoate model...{:.3f}s'.format(train_time))
+        logger.info('fitting surrogate model...{:.3f}s'.format(train_time))
 
         # make predictions
         start = time.time()

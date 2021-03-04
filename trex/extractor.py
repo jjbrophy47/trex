@@ -123,7 +123,14 @@ class TreeExtractor:
 
             # extract leaf indices traversed to and all leaf value
             leaf_indices = self.model.apply(X)  # in terms of all nodes in each tree, (no. samples, no. trees)
-            leaf_values = np.hstack([t.predict_proba(X)[:, 1].reshape(-1, 1) for t in self.model.estimators_])
+
+            # get leaf value of each tree for each sample
+            proba_diffs = []
+            for tree in self.model.estimators_:
+                proba = tree.predict_proba(X)  # (no. samples, no. classes)
+                proba_diff = (proba[:, 1] - proba[:, 0]).reshape(-1, 1)  # (no. samples, 1)
+                proba_diffs.append(proba_diff)
+            leaf_values = np.hstack(proba_diffs)
 
             # substitute leaf value into the feature path encoding
             for i in range(leaf_indices.shape[0]):  # per instance
@@ -240,6 +247,7 @@ class TreeExtractor:
 
         # convert to np.float32
         encoding = encoding.astype(np.float32)
+        print('done encoding')
 
         return encoding
 
@@ -261,16 +269,28 @@ class TreeExtractor:
             encoding = self.leaf_path(X)
 
             # get leaf value of each tree for each sample
-            probas = np.hstack([tree.predict_proba(X)[:, 1].reshape(-1, 1) for tree in self.model.estimators_])
+            proba_diffs = []
+            for tree in self.model.estimators_:
+                proba = tree.predict_proba(X)  # (no. samples, no. classes)
+                proba_diff = (proba[:, 1] - proba[:, 0]).reshape(-1, 1)  # (no. samples, 1)
+                proba_diffs.append(proba_diff)
+            probas = np.hstack(proba_diffs)
 
-            # replace leaf positions with leaf values
-            for i in range(encoding.shape[0]):  # per instance
-                tree_cnt = 0  # reset tree count
+            # flatten leaf values, new shape = (no. samples * no. trees)
+            probas = probas.flatten()
+            proba_cnt = 0  # no. leaves whose value has been replaced
 
-                for j in range(encoding.shape[1]):  # per tree
-                    if encoding[i][j] == 1:
-                        encoding[i][j] *= probas[i][tree_cnt]
-                        tree_cnt += 1
+            # indices that contain a leaf that has been traversed to
+            rows, cols = np.where(encoding == 1)
+
+            # replace traversed to leaves with their leaf values
+            for i in range(rows.shape[0]):
+                row, col = rows[i], cols[i]
+                encoding[row][col] = probas[proba_cnt]
+                proba_cnt += 1
+
+            # make sure no. replaced values is equal to the no. samples times no. trees
+            assert proba_cnt == X.shape[0] * len(self.model.estimators_)
 
         # CatBoost
         elif self.model_type_ == 'CatBoostClassifier':
@@ -324,7 +344,12 @@ class TreeExtractor:
 
         # RF
         if self.model_type_ == 'RandomForestClassifier':
-            encoding = np.hstack([tree.predict_proba(X) for tree in self.model.estimators_])
+            proba_diffs = []
+            for tree in self.model.estimators_:
+                proba = tree.predict_proba(X)  # (no. samples, no. classes)
+                proba_diff = (proba[:, 1] - proba[:, 0]).reshape(-1, 1)  # (no. samples, 1)
+                proba_diffs.append(proba_diff)
+            encoding = np.hstack(proba_diffs)
 
         # CatBoost
         elif self.model_type_ == 'CatBoostClassifier':

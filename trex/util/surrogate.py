@@ -43,7 +43,8 @@ def train_surrogate(model, surrogate, param_grid, X_train, X_train_alt, y_train,
 
     # start timing
     begin = time.time()
-    logger.info('\ntraining surrogate model...')
+    if logger:
+        logger.info('\ntraining surrogate model...')
 
     # tune surrogate model using the validation data
     skf = StratifiedKFold(n_splits=cv, shuffle=True, random_state=seed)
