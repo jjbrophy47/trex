@@ -51,9 +51,9 @@ def process_results(df):
         main_result['total_time'] = gf['total_time'].mean()
 
         # compute average accuracy
-        proba_deltas = [np.array(x) for x in gf['proba_diff'].values]
-        main_result['proba_diff_mean'] = np.mean(proba_deltas, axis=0)
-        main_result['proba_diff_sem'] = sem(proba_deltas, axis=0)
+        proba_diffs = [np.array(x) for x in gf['proba_diff'].values]
+        main_result['proba_diff_mean'] = np.mean(proba_diffs, axis=0)
+        main_result['proba_diff_sem'] = sem(proba_diffs, axis=0)
 
         # get removed percentages
         removed_pcts = [np.array(x) for x in gf['remove_pct'].values]
