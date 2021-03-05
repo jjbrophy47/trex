@@ -28,8 +28,10 @@ class TreeExplainer:
                  kernel_model='klr',
                  tree_kernel='leaf_output',
                  val_frac=0.1,
-                 param_grid={'C': [1e-2, 1e-1, 1e0, 1e1]},
+                 param_grid={'C': [1e-5, 1e-4, 1e-3, 1e-2, 1e-1, 1e0, 1e1]},
                  metric='pearson',
+                 weighed=False,
+                 weighted=False,
                  pred_size=1000,
                  random_state=None,
                  logger=None):
@@ -40,7 +42,7 @@ class TreeExplainer:
         ----------
         model : object
             Learned tree ensemble.
-            Supported: RandomForestClassifier, GradientBoostingClassifier, LightGBM, CatBoost, XGBoost.
+            Supported: CatBoost and RandomForestClassifier.
         X_train : 2d array-like
             Train instances in original feature space.
         y_train : 1d array-like (default=None)
@@ -55,6 +57,9 @@ class TreeExplainer:
             Hyperparameter values to try during tuning.
         metric : str (default='mse')
             Metric to use for scoring during tuning.
+        weighted : bool (default=False)
+            If True, train surrogate on weighted training samples based on the predicted
+            probabilities of the tree ensemble.
         pred_size : int (default=1000)
             Break predictions up into chunks to avoid memory explosion.
         random_state : int (default=None)
@@ -67,6 +72,7 @@ class TreeExplainer:
         self.tree_kernel = tree_kernel
         self.param_grid = param_grid
         self.metric = metric
+        self.weighted = weighted
         self.pred_size = pred_size
         self.random_state = random_state
         self.logger = logger
@@ -93,6 +99,7 @@ class TreeExplainer:
                                           y_train,
                                           val_frac=val_frac,
                                           metric=self.metric,
+                                          weighted=self.weighted,
                                           seed=self.random_state,
                                           logger=self.logger)
 

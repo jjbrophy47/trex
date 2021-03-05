@@ -1,13 +1,11 @@
 #ifndef _LIBLINEAR_H
 #define _LIBLINEAR_H
 
-#define LIBLINEAR_VERSION 230
-
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-extern int liblinear_version;
+#include "_cython_blas_helpers.h"
 
 struct feature_node
 {
@@ -21,6 +19,7 @@ struct problem
 	double *y;
 	struct feature_node **x;
 	double bias;            /* < 0 if no bias term */
+	double *W;
     int *perm;
 };
 
@@ -36,8 +35,8 @@ struct parameter
 	int nr_weight;
 	int *weight_label;
 	double* weight;
+	int max_iter;
 	double p;
-	double *init_sol;
 };
 
 struct model
@@ -48,16 +47,16 @@ struct model
 	double *w;
 	int *label;		/* label of each class */
 	double bias;
+	int *n_iter;    /* no. of iterations of each class */
     double *alpha;  /* coefficients for each training instance */
     int alpha_size; /* number of training instances */
     int *perm;  /* oroginal training indices */
 };
 
-// void set_seed(unsigned seed);
+void set_seed(unsigned seed);
 
-struct model* train(const struct problem *prob, const struct parameter *param);
+struct model* train(const struct problem *prob, const struct parameter *param, BlasFunctions *blas_functions);
 void cross_validation(const struct problem *prob, const struct parameter *param, int nr_fold, double *target);
-void find_parameters(const struct problem *prob, const struct parameter *param, int nr_fold, double start_C, double start_p, double *best_C, double *best_p, double *best_score);
 
 double predict_values(const struct model *model_, const struct feature_node *x, double* dec_values);
 double predict(const struct model *model_, const struct feature_node *x);
@@ -70,8 +69,11 @@ int get_nr_feature(const struct model *model_);
 int get_nr_class(const struct model *model_);
 int get_nr_sample(const struct model *model_);
 void get_labels(const struct model *model_, int* label);
+void get_n_iter(const struct model *model_, int* n_iter);
+#if 0
 double get_decfun_coef(const struct model *model_, int feat_idx, int label_idx);
 double get_decfun_bias(const struct model *model_, int label_idx);
+#endif
 
 void free_model_content(struct model *model_ptr);
 void free_and_destroy_model(struct model **model_ptr_ptr);

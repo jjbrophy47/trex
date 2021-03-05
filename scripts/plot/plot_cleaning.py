@@ -56,7 +56,7 @@ def main(args):
     plt.rc('ytick', labelsize=13)
     plt.rc('axes', labelsize=13)
     plt.rc('axes', titlesize=13)
-    plt.rc('legend', fontsize=13)
+    # plt.rc('legend', fontsize=13)
     # plt.rc('legend', title_fontsize=11)
     # plt.rc('lines', linewidth=1)
     # plt.rc('lines', markersize=6)

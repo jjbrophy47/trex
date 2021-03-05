@@ -26,7 +26,7 @@ class SVM(BaseEstimator, ClassifierMixin):
     NOTE: Supports binary classification only!
     """
 
-    def __init__(self, C=1.0, pred_size=1000):
+    def __init__(self, C=1.0, pred_size=1000, random_state=1):
         """
         Parameters
         ----------
@@ -34,18 +34,23 @@ class SVM(BaseEstimator, ClassifierMixin):
             Regularization parameter.
         pred_size: int (default=1000)
             Max. number of instancs to predict at one time.
+        random_state : int (default=1)
+            Random seed to enhance reproducibility.
         """
         self.C = C
         self.pred_size = pred_size
+        self.random_state = random_state
 
-    def fit(self, X, y):
+    def fit(self, X, y, sample_weight=None):
 
         # store training instances for later use
         self.X_train_ = X
         self.classes_ = np.unique(y)
         assert len(self.classes_) == 2
 
-        self.alpha_ = fit_liblinear(X, y, self.C, solver=1)
+        self.alpha_ = fit_liblinear(X, y, self.C, solver=1,
+                                    sample_weight=sample_weight,
+                                    random_seed=self.random_state)
 
         return self
 
@@ -107,7 +112,7 @@ class KLR(BaseEstimator, ClassifierMixin):
     NOTE: Supports binary classification only!
     """
 
-    def __init__(self, C=1.0, pred_size=1000):
+    def __init__(self, C=1.0, pred_size=1000, random_state=1):
         """
         Parameters
         ----------
@@ -116,18 +121,22 @@ class KLR(BaseEstimator, ClassifierMixin):
         pred_size: int (default=1000)
             Max number of instancs to predict at one time. A higher number can
             be faster, but requires more memory to create the similarity matrix.
+        random_state: int (default=1)
         """
         self.C = C
         self.pred_size = pred_size
+        self.random_state = random_state
 
-    def fit(self, X, y):
+    def fit(self, X, y, sample_weight=None):
 
         # store training instances for later use
         self.X_train_ = X
         self.classes_ = np.unique(y)
         assert len(self.classes_) == 2
 
-        self.alpha_ = fit_liblinear(X, y, self.C, solver=7)
+        self.alpha_ = fit_liblinear(X, y, self.C, solver=7,
+                                    sample_weight=sample_weight,
+                                    random_seed=self.random_state)
 
         return self
 
@@ -170,7 +179,9 @@ class KLR(BaseEstimator, ClassifierMixin):
 
 
 # private
-def fit_liblinear(X, y, C, solver, tol=0.1, bias=0, epsilon=0.1):
+def fit_liblinear(X, y, C, solver, eps=0.1, bias=0, max_iter=1000,
+                  random_seed=1, epsilon=0.1, class_weight=None, sample_weight=None,
+                  is_sparse=False):
     """
     Used by Logistic Regression (and CV) and LinearSVC/LinearSVR.
     Preprocessing is done in this function before supplying it to liblinear.
@@ -204,24 +215,36 @@ def fit_liblinear(X, y, C, solver, tol=0.1, bias=0, epsilon=0.1):
     # stores a new array in case a slice is passed in
     X = X.copy()
 
-    y_ind = np.where(y_ind == 0, -1, y_ind)
-
     # LibLinear wants targets as doubles, even for classification
     y_ind = np.asarray(y_ind, dtype=np.float64).ravel()
     y_ind = np.require(y_ind, requirements="W")
 
-    # uniform class weights
-    class_weight = np.ones(classes_.shape[0], dtype=np.float64, order='C')
+    # set class weights
+    if class_weight is None:
+        class_weight = np.ones(classes_.shape[0], dtype=np.float64, order='C')
+    assert class_weight.shape[0] == classes_.shape[0]
+
+    # set sample weights
+    if sample_weight is None:
+        sample_weight = np.ones(y_ind.shape[0], dtype=np.float64, order='C')
+    assert sample_weight.shape[0] == y_ind.shape[0]
+
+    print(sample_weight)
+    print(sample_weight.shape)
 
     # liblinear train
     alpha = train_wrap(X,
                        y_ind,
+                       is_sparse,
                        solver,
-                       tol,
+                       eps,
                        bias,
                        C,
                        class_weight,
-                       epsilon)
+                       max_iter,
+                       random_seed,
+                       epsilon,
+                       sample_weight)
 
     return alpha[0]
 

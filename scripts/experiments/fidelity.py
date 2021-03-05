@@ -71,6 +71,7 @@ def experiment(args, out_dir, logger):
                                        tree_kernel=args.tree_kernel,
                                        val_frac=args.tune_frac,
                                        metric=args.metric,
+                                       weighted=args.weighted,
                                        random_state=args.rs,
                                        logger=logger)
         train_time = time.time() - start
@@ -115,6 +116,7 @@ def experiment(args, out_dir, logger):
                                               val_frac=args.tune_frac,
                                               metric=args.metric,
                                               seed=args.rs,
+                                              weighted=args.weighted,
                                               logger=logger)
         train_time = time.time() - start
 
@@ -204,6 +206,7 @@ if __name__ == '__main__':
     parser.add_argument('--tree_kernel', type=str, default='leaf_output', help='type of tree feature extraction.')
     parser.add_argument('--tune_frac', type=float, default=0.1, help='fraction of training data to use for tuning.')
     parser.add_argument('--metric', type=str, default='mse', help='pearson, spearman, or mse.')
+    parser.add_argument('--weighted', type=int, default=0, help='If 1, train surrogate on weighted train instances.')
 
     # Experiment settings
     parser.add_argument('--n_test', type=int, default=1000, help='no. test samples to test fidelity.')

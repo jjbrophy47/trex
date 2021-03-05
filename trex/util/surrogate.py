@@ -17,7 +17,8 @@ from ..models import KLR
 
 
 def train_surrogate(model, surrogate, param_grid, X_train, X_train_alt, y_train,
-                    val_frac=0.1, metric='pearson', cv=5, seed=1, logger=None):
+                    val_frac=0.1, metric='pearson', cv=5, seed=1, weighted=False,
+                    logger=None):
     """
     Tunes a surrogate model by choosing hyperparameters that provide the best fidelity
     correlation to the tree-ensemble predictions.
@@ -70,8 +71,12 @@ def train_surrogate(model, surrogate, param_grid, X_train, X_train_alt, y_train,
             m1 = clone(model).fit(X_val_train, y_val_train)
             y_val_train_pred = m1.predict(X_val_train)
 
+            # compute sample weights if specified
+            sample_weight = get_sample_weight(m1, X_val_train, weighted)
+
             # train a surrogate model on the predicted labels
-            m2 = get_surrogate_model(surrogate, params).fit(X_val_alt_train, y_val_train_pred)
+            m2 = get_surrogate_model(surrogate, params, random_state=seed)
+            m2 = m2.fit(X_val_alt_train, y_val_train_pred, sample_weight=sample_weight)
 
             # generate predictions on the test set
             m1_proba = m1.predict_proba(X_val_test)[:, 1]
@@ -104,8 +109,9 @@ def train_surrogate(model, surrogate, param_grid, X_train, X_train_alt, y_train,
     # train the surrogate model on the train set using predicted labels
     start = time.time()
     y_train_pred = model.predict(X_train)
-    surrogate_model = get_surrogate_model(surrogate, params=best_params)
-    surrogate_model = surrogate_model.fit(X_train_alt, y_train_pred)
+    sample_weight = get_sample_weight(model, X_train, weighted)
+    surrogate_model = get_surrogate_model(surrogate, params=best_params, random_state=seed)
+    surrogate_model = surrogate_model.fit(X_train_alt, y_train_pred, sample_weight=sample_weight)
 
     # display train results
     if logger:
@@ -115,15 +121,15 @@ def train_surrogate(model, surrogate, param_grid, X_train, X_train_alt, y_train,
 
 
 # private
-def get_surrogate_model(surrogate='klr', params={}):
+def get_surrogate_model(surrogate='klr', params={}, random_state=1):
     """
     Return C implementation of the kernel model.
     """
     if surrogate == 'klr':
-        surrogate_model = KLR(C=params['C'])
+        surrogate_model = KLR(C=params['C'], random_state=random_state)
 
     elif surrogate == 'svm':
-        surrogate_model = SVM(C=params['C'])
+        surrogate_model = SVM(C=params['C'], random_state=random_state)
 
     elif surrogate == 'knn':
         surrogate_model = KNeighborsClassifier(n_neighbors=params['n_neighbors'], weights='uniform')
@@ -132,6 +138,31 @@ def get_surrogate_model(surrogate='klr', params={}):
         raise ValueError('surrogate {} unknown!'.format(surrogate))
 
     return surrogate_model
+
+
+def get_sample_weight(model, X, weighted=False, threshold=0.5):
+    """
+    Return weight of each sample x in X, shape=(X.shape[0],).
+
+    Weight of each sample is p if the predicted label is 1, otherwise
+    it is 1-p, in which p is the predicted probability.
+
+    NOTE: Only works for binary classification models that have an
+          attribute `predict_proba` in which the output is of
+          shape (X.shape[0], no. classes) and the second column contains
+          the output probabilities of the positive class.
+    """
+    sample_weight = None
+
+    # compute weight of each sample
+    if weighted:
+        proba = model.predict_proba(X)[:, 1]
+        sample_weight = np.where(proba < threshold, 1 - proba, proba)
+
+    return sample_weight
+
+
+# TODO: create KNN wrapper with a `sample_weight` arg in its `fit` method
 
 
 def score_fidelity(p1, p2, metric='pearson'):
@@ -145,7 +176,6 @@ def score_fidelity(p1, p2, metric='pearson'):
     elif metric == 'spearman':
         result, p_value = spearmanr(p1, p2)
 
-    # return 1 - mse so that each score can be maximized
     elif metric == 'mse':
         result = mean_squared_error(p1, p2)
 
