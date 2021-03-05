@@ -82,7 +82,8 @@ def get_model(model,
               max_depth=5,
               learning_rate=0.03,
               random_state=1,
-              cat_indices=None):
+              cat_indices=None,
+              class_weight=None):
     """
     Returns a tree ensemble classifier.
     """
@@ -109,7 +110,8 @@ def get_model(model,
     elif model == 'rf':
         clf = RandomForestClassifier(random_state=random_state,
                                      n_estimators=n_estimators,
-                                     max_depth=max_depth)
+                                     max_depth=max_depth,
+                                     class_weight=class_weight)
     # GBM
     elif model == 'gbm':
         max_depth = 3 if max_depth is None else max_depth  # gbm default

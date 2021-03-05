@@ -26,12 +26,6 @@ def configuration(parent_package='', top_path=None):
     if os.name == 'posix':
         libraries.append('m')
 
-    # config.add_extension("_cython_blas",
-    #                      sources=["_cython_blas.pyx"],
-    #                      include_dirs=[numpy.get_include()],
-    #                      libraries=libraries,
-    #                      extra_compile_args=["-O3"])
-
     # precompile liblinear to use C++11 flag
     config.add_library('liblinear-skl',
                        sources=[join('src', 'liblinear', 'linear.cpp'),

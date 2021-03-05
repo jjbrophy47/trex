@@ -7,11 +7,6 @@ Author: fabian.pedregosa@inria.fr
 import  numpy as np
 cimport numpy as np
 
-# from ._cython_blas cimport _dot
-# from ._cython_blas cimport _axpy
-# from ._cython_blas cimport _scal
-# from ._cython_blas cimport _nrm2
-
 from cython cimport floating
 from scipy.linalg.cython_blas cimport sdot, ddot
 from scipy.linalg.cython_blas cimport saxpy, daxpy
@@ -95,28 +90,6 @@ def train_wrap(X,
     ### FREE
     free_problem(problem)
     free_parameter(param)
-    # destroy_param(param)  don't call this or it will destroy class_weight_label and class_weight
-
-    # # coef matrix holder created as fortran since that's what's used in liblinear
-    # cdef np.ndarray[np.float64_t, ndim=2, mode='fortran'] w
-    # cdef int nr_class = get_nr_class(model)
-
-    # cdef int labels_ = nr_class
-    # if nr_class == 2:
-    #     labels_ = 1
-    # cdef np.ndarray[np.int32_t, ndim=1, mode='c'] n_iter = np.zeros(labels_, dtype=np.intc)
-    # get_n_iter(model, <int *>n_iter.data)
-
-    # # get feature coefficients
-    # cdef int nr_feature = get_nr_feature(model)
-    # if bias > 0: nr_feature = nr_feature + 1
-    # if nr_class == 2 and solver_type != 4:  # solver is not Crammer-Singer
-    #     w = np.empty((1, nr_feature),order='F')
-    #     copy_w(w.data, model, nr_feature)
-    # else:
-    #     len_w = (nr_class) * nr_feature
-    #     w = np.empty((nr_class, nr_feature),order='F')
-    #     copy_w(w.data, model, len_w)
 
     # get sample coefficients
     cdef np.ndarray[np.float64_t, ndim=2, mode='fortran'] alpha
@@ -124,6 +97,7 @@ def train_wrap(X,
     alpha = np.empty((1, nr_sample), order='F')
     copy_alpha(alpha.data, model, nr_sample)
 
+    # clean up
     free_and_destroy_model(&model)
 
     return alpha
