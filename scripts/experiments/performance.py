@@ -47,7 +47,8 @@ def get_model(args, cat_indices=None):
                              n_estimators=args.n_estimators,
                              max_depth=args.max_depth,
                              random_state=args.rs)
-        params = {'n_estimators': [10, 25, 50, 100, 250], 'max_depth': [3, 7, 11, 15]}
+        params = {'n_estimators': [10, 25, 50, 100, 250], 'max_depth': [3, 5, 7],
+                  'class_weight': [None, 'balanced']}
 
     elif args.model == 'dt':
         clf = DecisionTreeClassifier(random_state=args.rs)

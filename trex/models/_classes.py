@@ -229,9 +229,6 @@ def fit_liblinear(X, y, C, solver, eps=0.1, bias=0, max_iter=1000,
         sample_weight = np.ones(y_ind.shape[0], dtype=np.float64, order='C')
     assert sample_weight.shape[0] == y_ind.shape[0]
 
-    print(sample_weight)
-    print(sample_weight.shape)
-
     # liblinear train
     alpha = train_wrap(X,
                        y_ind,

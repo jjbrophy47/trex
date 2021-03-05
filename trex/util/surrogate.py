@@ -16,6 +16,15 @@ from ..models import SVM
 from ..models import KLR
 
 
+class KNN(KNeighborsClassifier):
+    """
+    Wrapper around SKLearn's KneighborsClassifier that takes in a `sample_weight`
+    argument in its `fit` method.
+    """
+    def fit(self, X, y, sample_weight=None):
+        return super().fit(X, y)
+
+
 def train_surrogate(model, surrogate, param_grid, X_train, X_train_alt, y_train,
                     val_frac=0.1, metric='pearson', cv=5, seed=1, weighted=False,
                     logger=None):
@@ -132,7 +141,7 @@ def get_surrogate_model(surrogate='klr', params={}, random_state=1):
         surrogate_model = SVM(C=params['C'], random_state=random_state)
 
     elif surrogate == 'knn':
-        surrogate_model = KNeighborsClassifier(n_neighbors=params['n_neighbors'], weights='uniform')
+        surrogate_model = KNN(n_neighbors=params['n_neighbors'], weights='uniform')
 
     else:
         raise ValueError('surrogate {} unknown!'.format(surrogate))
@@ -160,9 +169,6 @@ def get_sample_weight(model, X, weighted=False, threshold=0.5):
         sample_weight = np.where(proba < threshold, 1 - proba, proba)
 
     return sample_weight
-
-
-# TODO: create KNN wrapper with a `sample_weight` arg in its `fit` method
 
 
 def score_fidelity(p1, p2, metric='pearson'):

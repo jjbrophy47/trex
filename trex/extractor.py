@@ -247,7 +247,6 @@ class TreeExtractor:
 
         # convert to np.float32
         encoding = encoding.astype(np.float32)
-        print('done encoding')
 
         return encoding
 
