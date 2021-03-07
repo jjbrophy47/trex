@@ -21,7 +21,6 @@ python3 scripts/experiments/fidelity.py \
   --n_estimators $n_estimators \
   --max_depth $max_depth \
   --surrogate $surrogate \
-  --kernel_model $surrogate \
   --tree_kernel $tree_kernel \
   --metric $metric \
   --rs $rs
