@@ -25,10 +25,10 @@
 # ./jobs/performance/primer_single.sh 'census' 'cb' 'categorical' 'accuracy' 1.0 7 1440 'short'
 
 # RF
-./jobs/performance/primer_single.sh 'churn' 'rf' 'standard' 'accuracy' 1.0 5 1440 'short'
-./jobs/performance/primer_single.sh 'surgical' 'rf' 'standard' 'accuracy' 1.0 5 1440 'short'
-./jobs/performance/primer_single.sh 'vaccine' 'rf' 'standard' 'accuracy' 1.0 5 1440 'short'
-./jobs/performance/primer_single.sh 'amazon' 'rf' 'categorical' 'accuracy' 1.0 10 1440 'short'
-./jobs/performance/primer_single.sh 'bank_marketing' 'rf' 'standard' 'accuracy' 1.0 7 1440 'short'
-./jobs/performance/primer_single.sh 'adult' 'rf' 'standard' 'accuracy' 1.0 10 1440 'short'
-./jobs/performance/primer_single.sh 'census' 'rf' 'standard' 'accuracy' 1.0 15 1440 'short'
+# ./jobs/performance/primer_single.sh 'churn' 'rf' 'standard' 'accuracy' 1.0 2 1440 'short'
+# ./jobs/performance/primer_single.sh 'surgical' 'rf' 'standard' 'accuracy' 1.0 2 1440 'short'
+# ./jobs/performance/primer_single.sh 'vaccine' 'rf' 'standard' 'accuracy' 1.0 2 1440 'short'
+# ./jobs/performance/primer_single.sh 'amazon' 'rf' 'categorical' 'accuracy' 1.0 2 1440 'short'
+# ./jobs/performance/primer_single.sh 'bank_marketing' 'rf' 'standard' 'accuracy' 1.0 2 1440 'short'
+# ./jobs/performance/primer_single.sh 'adult' 'rf' 'standard' 'accuracy' 1.0 2 1440 'short'
+# ./jobs/performance/primer_single.sh 'census' 'rf' 'standard' 'accuracy' 1.0 2 1440 'short'

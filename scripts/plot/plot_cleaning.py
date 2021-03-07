@@ -56,7 +56,7 @@ def main(args):
     plt.rc('ytick', labelsize=13)
     plt.rc('axes', labelsize=13)
     plt.rc('axes', titlesize=13)
-    # plt.rc('legend', fontsize=13)
+    plt.rc('legend', fontsize=12)
     # plt.rc('legend', title_fontsize=11)
     # plt.rc('lines', linewidth=1)
     # plt.rc('lines', markersize=6)
@@ -64,7 +64,8 @@ def main(args):
     # inches
     width = 4.8  # Machine Learning journal
     height = get_height(width=width, subplots=(2, 3))
-    fig, axs = plt.subplots(2, 3, figsize=(width * 1.75, height * 2.25))
+    # fig, axs = plt.subplots(2, 3, figsize=(width * 1.75, height * 2.25))
+    fig, axs = plt.subplots(2, 3, figsize=(width * 1.75, height * 2.5))
 
     # legend containers
     lines = []
@@ -148,11 +149,13 @@ def main(args):
     os.makedirs(out_dir, exist_ok=True)
 
     # adjust legend
-    fig.legend(tuple(lines), tuple(labels), loc='center', ncol=6, bbox_to_anchor=(0.5, 0.065))
+    # fig.legend(tuple(lines), tuple(labels), loc='center', ncol=6, bbox_to_anchor=(0.5, 0.065))
+    fig.legend(tuple(lines), tuple(labels), loc='center', ncol=4, bbox_to_anchor=(0.5, 0.0925))
 
     # adjust figure
     plt.tight_layout()
-    fig.subplots_adjust(bottom=0.25, wspace=0.3)
+    # fig.subplots_adjust(bottom=0.25, wspace=0.3)
+    fig.subplots_adjust(bottom=0.3, wspace=0.3)
 
     # save figure
     fp = os.path.join(out_dir, 'all_datasets.pdf')

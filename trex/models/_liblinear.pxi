@@ -30,6 +30,7 @@ cdef extern from "linear.h":
 
 cdef extern from "liblinear_helper.c":
     void copy_alpha(void*, model*, int)
+    void copy_alpha_svr(void*, model*, int)
     void copy_w(void *, model *, int)
     parameter *set_parameter(int, double, double, int, char *, char *, int, int, double)
     problem *set_problem (char *, int, int, int, int, double, char *, char *)

@@ -67,7 +67,7 @@ def experiment(args, out_dir, logger):
         surrogate = trex.TreeExplainer(model,
                                        X_train,
                                        y_train,
-                                       kernel_model=args.kernel_model,
+                                       kernel_model=args.surrogate,
                                        tree_kernel=args.tree_kernel,
                                        val_frac=args.tune_frac,
                                        metric=args.metric,
@@ -155,6 +155,8 @@ def experiment(args, out_dir, logger):
     ax.scatter(result['surrogate_proba'], result['model_proba'])
     ax.set_xlabel('Surrogate prob.')
     ax.set_ylabel('Tree-ensemble prob.')
+    ax.set_xlim(0, 1)
+    ax.set_ylim(0, 1)
     plt.savefig(os.path.join(out_dir, 'scatter.pdf'))
 
     logger.info('\nsaving results to {}/...'.format(os.path.join(out_dir)))
@@ -202,7 +204,6 @@ if __name__ == '__main__':
 
     # Surrogate settings
     parser.add_argument('--surrogate', type=str, default='klr', help='klr, svm, or knn.')
-    parser.add_argument('--kernel_model', type=str, default='klr', help='klr or svm.')
     parser.add_argument('--tree_kernel', type=str, default='leaf_output', help='type of tree feature extraction.')
     parser.add_argument('--tune_frac', type=float, default=0.1, help='fraction of training data to use for tuning.')
     parser.add_argument('--metric', type=str, default='mse', help='pearson, spearman, or mse.')

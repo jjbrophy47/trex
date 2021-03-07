@@ -995,8 +995,8 @@ static int solve_l2r_l1l2_svc(
 	}
 
 	// info("\noptimization finished, #iter = %d\n",iter);
-	if (iter >= max_iter)
-		info("\nWARNING: reaching max number of iterations\nUsing -s 2 may be faster (also see FAQ)\n\n");
+	// if (iter >= max_iter)
+	// 	info("\nWARNING: reaching max number of iterations\nUsing -s 2 may be faster (also see FAQ)\n\n");
 
 	// calculate objective value
 
@@ -1062,7 +1062,7 @@ static int solve_l2r_l1l2_svc(
 
 static int solve_l2r_l1l2_svr(
 	const problem *prob, double *w, const parameter *param,
-	int solver_type, int max_iter)
+	int solver_type, int max_iter, double *alpha_coef)
 {
 	int l = prob->l;
 	double C = param->C;
@@ -1227,8 +1227,8 @@ static int solve_l2r_l1l2_svr(
 		if(iter == 0)
 			Gnorm1_init = Gnorm1_new;
 		iter++;
-		if(iter % 10 == 0)
-			info(".");
+		// if(iter % 10 == 0)
+		// 	info(".");
 
 		if(Gnorm1_new <= eps*Gnorm1_init)
 		{
@@ -1237,7 +1237,7 @@ static int solve_l2r_l1l2_svr(
 			else
 			{
 				active_size = l;
-				info("*");
+				// info("*");
 				Gmax_old = INF;
 				continue;
 			}
@@ -1246,9 +1246,9 @@ static int solve_l2r_l1l2_svr(
 		Gmax_old = Gmax_new;
 	}
 
-	info("\noptimization finished, #iter = %d\n", iter);
-	if(iter >= max_iter)
-		info("\nWARNING: reaching max number of iterations\nUsing -s 11 may be faster\n\n");
+	// info("\noptimization finished, #iter = %d\n", iter);
+	// if(iter >= max_iter)
+	// 	info("\nWARNING: reaching max number of iterations\nUsing -s 11 may be faster\n\n");
 
 	// calculate objective value
 	double v = 0;
@@ -1263,8 +1263,17 @@ static int solve_l2r_l1l2_svr(
 			nSV++;
 	}
 
-	info("Objective value = %lf\n", v);
-	info("nSV = %d\n",nSV);
+	// info("Objective value = %lf\n", v);
+	// info("nSV = %d\n",nSV);
+
+    // fill up alpha coefficients
+    // NOTE: we multiply alpha by the label here!! NOT!!!
+    for (int i = 0; i < l; i++) {
+        // info("beta[%d]: %.5f\n", i, beta[i]);
+        // alpha_coef[i] = beta[i] * prob->y[i];
+        alpha_coef[i] = beta[i];
+    }
+    // info("done\n");
 
 	delete [] beta;
 	delete [] QD;
@@ -1437,8 +1446,8 @@ int solve_l2r_lr_dual(const problem *prob, double *w, double eps, double Cp, dou
 	}
 
 	// info("\noptimization finished, #iter = %d\n",iter);
-	if (iter >= max_iter)
-		info("\nWARNING: reaching max number of iterations\nUsing -s 0 may be faster (also see FAQ)\n\n");
+	// if (iter >= max_iter)
+	// 	info("\nWARNING: reaching max number of iterations\nUsing -s 0 may be faster (also see FAQ)\n\n");
 
 	// calculate objective value
 
@@ -2423,10 +2432,10 @@ static int train_one(const problem *prob, const parameter *param, double *w, dou
 
 		}
 		case L2R_L1LOSS_SVR_DUAL:
-			n_iter=solve_l2r_l1l2_svr(prob, w, param, L2R_L1LOSS_SVR_DUAL, max_iter);
+			n_iter=solve_l2r_l1l2_svr(prob, w, param, L2R_L1LOSS_SVR_DUAL, max_iter, alpha);
 			break;
 		case L2R_L2LOSS_SVR_DUAL:
-			n_iter=solve_l2r_l1l2_svr(prob, w, param, L2R_L2LOSS_SVR_DUAL, max_iter);
+			n_iter=solve_l2r_l1l2_svr(prob, w, param, L2R_L2LOSS_SVR_DUAL, max_iter, alpha);
 			break;
 		default:
 			fprintf(stderr, "ERROR: unknown solver_type\n");

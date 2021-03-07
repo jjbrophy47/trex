@@ -78,14 +78,13 @@ def train_surrogate(model, surrogate, param_grid, X_train, X_train_alt, y_train,
 
             # fit a tree ensemble and make predictions on the train fold
             m1 = clone(model).fit(X_val_train, y_val_train)
-            y_val_train_pred = m1.predict(X_val_train)
 
             # compute sample weights if specified
             sample_weight = get_sample_weight(m1, X_val_train, weighted)
 
             # train a surrogate model on the predicted labels
             m2 = get_surrogate_model(surrogate, params, random_state=seed)
-            m2 = m2.fit(X_val_alt_train, y_val_train_pred, sample_weight=sample_weight)
+            m2 = m2.fit(X_val_alt_train, y_val_train, sample_weight=sample_weight)
 
             # generate predictions on the test set
             m1_proba = m1.predict_proba(X_val_test)[:, 1]
@@ -117,10 +116,9 @@ def train_surrogate(model, surrogate, param_grid, X_train, X_train_alt, y_train,
 
     # train the surrogate model on the train set using predicted labels
     start = time.time()
-    y_train_pred = model.predict(X_train)
     sample_weight = get_sample_weight(model, X_train, weighted)
     surrogate_model = get_surrogate_model(surrogate, params=best_params, random_state=seed)
-    surrogate_model = surrogate_model.fit(X_train_alt, y_train_pred, sample_weight=sample_weight)
+    surrogate_model = surrogate_model.fit(X_train_alt, y_train, sample_weight=sample_weight)
 
     # display train results
     if logger:

@@ -48,6 +48,8 @@ class SVM(BaseEstimator, ClassifierMixin):
         self.classes_ = np.unique(y)
         assert len(self.classes_) == 2
 
+        # original solver: 1
+        # regression solver: 12
         self.alpha_ = fit_liblinear(X, y, self.C, solver=1,
                                     sample_weight=sample_weight,
                                     random_seed=self.random_state)
@@ -134,6 +136,8 @@ class KLR(BaseEstimator, ClassifierMixin):
         self.classes_ = np.unique(y)
         assert len(self.classes_) == 2
 
+        # original solver: 7
+        # regression solver: ?
         self.alpha_ = fit_liblinear(X, y, self.C, solver=7,
                                     sample_weight=sample_weight,
                                     random_seed=self.random_state)
@@ -150,8 +154,11 @@ class KLR(BaseEstimator, ClassifierMixin):
         for i in range(0, len(X), self.pred_size):
             X_sim = linear_kernel(X[i: i + self.pred_size], self.X_train_)
             pos_probas.append(sigmoid(np.sum(X_sim * self.alpha_, axis=1)))
+
+        # assemble result
         pos_proba = np.concatenate(pos_probas).reshape(-1, 1)
         proba = np.hstack([1 - pos_proba, pos_proba])
+
         return proba
 
     def predict(self, X):

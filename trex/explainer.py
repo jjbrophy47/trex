@@ -28,7 +28,7 @@ class TreeExplainer:
                  kernel_model='klr',
                  tree_kernel='leaf_output',
                  val_frac=0.1,
-                 param_grid={'C': [1e-4, 1e-3, 1e-2, 1e-1, 1e0, 1e1]},
+                 param_grid={'C': [1e-3, 1e-2, 1e-1, 1e0, 1e1, 1e2]},
                  metric='pearson',
                  weighed=False,
                  weighted=False,
@@ -132,7 +132,7 @@ class TreeExplainer:
 
     def predict_proba(self, X):
         """
-        Computes the probabilities for X using the logistic regression model.
+        Computes the probabilities for X using the surrogate model.
 
         Parameters
         ----------

@@ -13,6 +13,8 @@ from scipy.linalg.cython_blas cimport saxpy, daxpy
 from scipy.linalg.cython_blas cimport snrm2, dnrm2
 from scipy.linalg.cython_blas cimport sscal, dscal
 
+from libc.stdio cimport printf
+
 include "_liblinear.pxi"
 
 np.import_array()

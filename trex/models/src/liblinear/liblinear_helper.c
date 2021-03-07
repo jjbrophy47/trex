@@ -221,6 +221,23 @@ void copy_alpha(void *data, struct model *model, int len)
     free(alpha_);
 }
 
+
+// SVR solver
+void copy_alpha_svr(void *data, struct model *model, int len)
+{
+    // unwind alpha values to original indices
+    double *alpha_ = Malloc(double, model->alpha_size);
+
+    int i = 0;
+
+    for (i=0; i < model->alpha_size; i++) {
+            alpha_[i] = model->alpha[i];
+    }
+
+    memcpy(data, alpha_, len * sizeof(double));
+    free(alpha_);
+}
+
 double get_bias(struct model *model)
 {
     return model->bias;
