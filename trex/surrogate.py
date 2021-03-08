@@ -34,8 +34,8 @@ def train_surrogate(model, surrogate, X_train, y_train,
         tree_extractor = TreeExtractor(model, tree_kernel=params['tree_kernel'])
 
         # train surrogate
-        surrogate_model = get_surrogate_model(tree_extractor, surrogate, params=params, random_state=seed)
-        surrogate_model = surrogate_model.fit(X_train, y_train)
+        surrogate = get_surrogate_model(tree_extractor, surrogate, params=params, random_state=seed)
+        surrogate = surrogate.fit(X_train, y_train)
 
         # display train results
         if logger:
