@@ -9,7 +9,7 @@ import shutil
 import numpy as np
 import catboost
 
-from .util import tree_model
+from . import tree_model
 
 
 class TreeExtractor:

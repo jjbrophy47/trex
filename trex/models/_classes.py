@@ -1,108 +1,165 @@
 """
+Surrogate models that identify influential samples for their respective
+tree-ensemble models.
+
 SVM and kernel kernel logistic regression binary classification model
 wrappers around Liblinear cython extensions.
 
-NOTE: Liblinear has been modifield to multiply the dual coefficients (alpha)
-      by their corresponding training labels y. Thus, alpha values in this
-      module can be positive or negative, and multiplying alpha by y is not
-      necessary here!
+    NOTE: Liblinear has been modifield to multiply the dual coefficients (alpha)
+          by their corresponding training labels y. Thus, alpha values in this
+          module can be positive or negative, and multiplying alpha by y is not
+          necessary here!
+
+KNN is a wrapper around SKLearn's Kneighbors classifier.
+
+NOTE: Binary classification only!
+NOTE: Dense input only!
 """
 import numpy as np
 from sklearn.base import BaseEstimator, ClassifierMixin
+from sklearn.neighbors import KNeighborsClassifier
 from sklearn.metrics.pairwise import linear_kernel
 from sklearn.preprocessing import LabelEncoder
 
 from ._liblinear import train_wrap
 
 
-class SVM(BaseEstimator, ClassifierMixin):
+class Surrogate(BaseEstimator, ClassifierMixin):
     """
-    Wrapper around liblinear. Solves the l2 regularized l2 loss (squared hinge)
-    support vector classifier dual problem using a linear kernel:
-        -Solver number 1: https://github.com/cjlin1/liblinear.
-        -Reference: https://www.csie.ntu.edu.tw/~cjlin/papers/liblinear.pdf
-        -This is equivalent to sklearn's LinearSVC.
+    Surrogate model abstract class.
 
     NOTE: Supports binary classification only!
     """
 
-    def __init__(self, C=1.0, pred_size=1000, random_state=1):
+    def __init__(self, tree_extractor, C=1.0, pred_size=1000, random_state=1):
         """
         Parameters
         ----------
+        tree_extractor: TreeExtractor object.
+            Object to extract features from a tree-ensembel.
         C: float (default=1.0)
-            Regularization parameter.
+            Regularization parameter, where 0 <= alpha_i <= C.
         pred_size: int (default=1000)
-            Max. number of instancs to predict at one time.
-        random_state : int (default=1)
-            Random seed to enhance reproducibility.
+            Max number of instancs to predict at one time. A higher number can
+            be faster, but requires more memory to create the similarity matrix.
+        random_state: int (default=1)
+            Random state to seed Liblinear.
         """
+        self.tree_extractor = tree_extractor
         self.C = C
         self.pred_size = pred_size
         self.random_state = random_state
 
-    def fit(self, X, y, sample_weight=None):
+    def fit(self, X, y, solver, max_iter=1000):
 
-        # store training instances for later use
-        self.X_train_ = X
+        # populate attributes
+        self.X_train_alt_ = self.tree_extractor.transform(X)
+        self.n_features_ = X.shape[1]
+        self.n_features_alt_ = self.X_train_alt_.shape[1]
+        self.tree_kernel_ = self.tree_extractor.tree_kernel
+
+        # make sure labels are binary
         self.classes_ = np.unique(y)
-        assert len(self.classes_) == 2
+        assert np.all(self.classes_ == np.array([0, 1]))
 
-        # original solver: 1
-        # regression solver: 12
-        self.alpha_ = fit_liblinear(X, y, self.C, solver=1,
-                                    sample_weight=sample_weight,
+        # fit model
+        self.alpha_ = fit_liblinear(X=self.X_train_alt_,
+                                    y=y,
+                                    C=self.C,
+                                    solver=solver,
+                                    max_iter=max_iter,
                                     random_seed=self.random_state)
 
         return self
 
-    def decision_function(self, X):
-        """
-        Returns a 1d array of decision values of shape=(no. samples,).
-        """
-        assert X.ndim == 2
-
-        # concatenate chunks of predictions to avoid memory explosion
-        decisions = []
-        for i in range(0, len(X), self.pred_size):
-            X_sim = linear_kernel(X[i: i + self.pred_size], self.X_train_)
-            decisions.append(np.sum(X_sim * self.alpha_, axis=1))
-
-        decision = np.concatenate(decisions)
-        return decision
-
     def predict_proba(self, X):
         """
-        Returns a 2d array of probabilities of shape=(no. samples, no. classes).
+        Returns a 2d array of probabilities of shape=(X.shape[0], no. classes).
         """
-        assert X.ndim == 2
-        a = sigmoid(self.decision_function(X)).reshape(-1, 1)
-        return np.hstack([1 - a, a])
+        result_list = []
+
+        # compute probabilities for each chunk of test instances
+        for i in range(0, len(X), self.pred_size):
+            X_sub_alt = self.transform(X[i: i + self.pred_size])
+            X_sub_sim = linear_kernel(X_sub_alt, self.X_train_alt_)
+            X_sub_proba = sigmoid(np.sum(X_sub_sim * self.alpha_, axis=1))
+            result_list.append(X_sub_proba)
+
+        # assemble result
+        pos_proba = np.concatenate(result_list).reshape(-1, 1)
+        proba = np.hstack([1 - pos_proba, pos_proba])
+        assert proba.shape == (X.shape[0], 2), 'proba shape is no good!'
+
+        return proba
 
     def predict(self, X):
         """
-        Returns a 1d array of predicted labels of shape=(no. samples,).
+        Returns a 1d array of predicted labels of shape=(X.shape[0],).
         """
-        return np.where(self.decision_function(X) >= 0, 1, 0)
+        preds = np.argmax(self.predict_proba(X), axis=1)
+        assert preds.shape == (X.shape[0],), 'preds shape is no good!'
+        return preds
 
-    def compute_attributions(self, x):
+    def compute_attributions(self, X):
         """
-        Return a matrix of the impact of the training instances on x.
-        The resulting array is of shape (1, n_train_samples).
+        Return a 2d array of train instance impacts of shape=(X.shape[0], no. train samples).
         """
-        assert x.shape == (1, self.X_train_.shape[1])
-        x_sim = linear_kernel(x, self.X_train_)
-        return x_sim * self.alpha_
+        result_list = []
 
-    def similarity(self, x):
+        # compute attributions of training samples on each input chunk
+        for i in range(0, X.shape[0], self.pred_size):
+            X_sub_alt = self.transform(X[i: i + self.pred_size])  # 2d
+            X_sub_sim = linear_kernel(X_sub_alt, self.X_train_alt_)  # 2d
+            X_sub_impact = X_sub_sim * self.alpha_  # 1d
+            result_list.append(X_sub_impact)
+
+        # concatenate attributions
+        attributions = np.vstack(result_list)
+        assert attributions.shape == (X.shape[0], self.X_train_alt_.shape[0]), 'attributions shape is no good!'
+
+        return attributions
+
+    def similarity(self, X):
         """
-        Return a 2d array of train instance impacts of shape=(1, no train samples).
+        Computes the similarity between the instances in X and the training data.
+
+        Parameters
+        ----------
+        X : 2D numpy array
+            Instances to compute the similarity to.
+
+        Returns an array of shape=(X.shape[0], no. train samples).
         """
-        assert x.shape == (1, self.X_train_.shape[1])
-        return linear_kernel(x, self.X_train_)
+        X_alt = self.transform(X)
+        X_sim = linear_kernel(X_alt, self.X_train_alt_)
+        assert X_sim.shape == (X.shape[0], self.X_train_alt_.shape[0]), 'sim shape is no good!'
+        return X_sim
+
+    def transform(self, X):
+        """
+        Transform X using the tree-ensemble feature extractor.
+
+        Parameters
+        ----------
+        X : 2d array-like
+            Instances to transform.
+
+        Returns an array of shape=(X.shape[0], no. alt. features).
+        """
+        assert X.ndim == 2, 'X is not 2d!'
+        assert X.shape[1] == self.n_features_, 'no. original features do not match!'
+        X_alt = self.tree_extractor.transform(X)
+        assert X_alt.shape == (X.shape[0], self.n_features_alt_), 'no. transformed features do not match!'
+        return X_alt
+
+    def get_alpha(self):
+        """
+        Return training sample alpha coefficients.
+        """
+        return self.alpha_.copy()
 
 
-class KLR(BaseEstimator, ClassifierMixin):
+class KLR(Surrogate):
     """
     Wrapper around liblinear. Solves the l2 logistic
     regression dual problem using a linear kernel:
@@ -114,75 +171,112 @@ class KLR(BaseEstimator, ClassifierMixin):
     NOTE: Supports binary classification only!
     """
 
-    def __init__(self, C=1.0, pred_size=1000, random_state=1):
+    # override
+    def fit(self, X, y):
         """
-        Parameters
-        ----------
-        C: float (default=1.0)
-            Regularization parameter, where 0 <= alpha_i <= C.
-        pred_size: int (default=1000)
-            Max number of instancs to predict at one time. A higher number can
-            be faster, but requires more memory to create the similarity matrix.
-        random_state: int (default=1)
+        Fit model using Liblinear solver no. 7.
         """
-        self.C = C
-        self.pred_size = pred_size
-        self.random_state = random_state
+        return super().fit(X, y, solver=7)
 
-    def fit(self, X, y, sample_weight=None):
 
-        # store training instances for later use
-        self.X_train_ = X
-        self.classes_ = np.unique(y)
-        assert len(self.classes_) == 2
+class SVM(Surrogate):
+    """
+    Wrapper around liblinear. Solves the l2 regularized l2 loss (squared hinge)
+    support vector classifier dual problem using a linear kernel:
+        -Solver number 1: https://github.com/cjlin1/liblinear.
+        -Reference: https://www.csie.ntu.edu.tw/~cjlin/papers/liblinear.pdf
+        -This is equivalent to sklearn's LinearSVC.
 
-        # original solver: 7
-        # regression solver: ?
-        self.alpha_ = fit_liblinear(X, y, self.C, solver=7,
-                                    sample_weight=sample_weight,
-                                    random_seed=self.random_state)
+    NOTE: Supports binary classification only!
+    """
 
-        return self
+    # overrride
+    def fit(self, X, y):
+        """
+        Fit model using Liblinear solver no. 1.
+        """
+        return super().fit(X, y, solver=1)
 
+    # extend
+    def decision_function(self, X):
+        """
+        Returns a 1d array of decision values of shape=(no. samples,).
+        """
+        result_list = []
+
+        # concatenate chunks of predictions to avoid memory explosion
+        for i in range(0, len(X), self.pred_size):
+            X_sub_alt = self.transform(X[i: i + self.pred_size])  # 2d
+            X_sub_sim = linear_kernel(X_sub_alt, self.X_train_alt_)  # 2d
+            result_list.append(np.sum(X_sub_sim * self.alpha_, axis=1))  # 1d
+
+        # concatenate decisions
+        decision_values = np.concatenate(result_list)
+        assert decision_values.shape == (X.shape[0],), 'decision_values shape is no good!'
+
+        return decision_values
+
+    # override
     def predict_proba(self, X):
         """
-        Returns a 2d array of probabilities of shape=(X.shape[0], no. classes).
+        Returns a 2d array of probabilities of shape=(no. samples, no. classes).
         """
-        assert X.ndim == 2
+        pos_proba = sigmoid(self.decision_function(X)).reshape(-1, 1)
+        probas = np.hstack([1 - pos_proba, pos_proba])
+        assert probas.shape == (X.shape[0], 2), 'probas shape is no good!'
+        return probas
 
-        pos_probas = []
-        for i in range(0, len(X), self.pred_size):
-            X_sim = linear_kernel(X[i: i + self.pred_size], self.X_train_)
-            pos_probas.append(sigmoid(np.sum(X_sim * self.alpha_, axis=1)))
-
-        # assemble result
-        pos_proba = np.concatenate(pos_probas).reshape(-1, 1)
-        proba = np.hstack([1 - pos_proba, pos_proba])
-
-        return proba
-
+    # override
     def predict(self, X):
         """
-        Returns a 1d array of predicted labels of shape=(X.shape[0],).
+        Returns a 1d array of predicted labels of shape=(no. samples,).
         """
-        pred_label = np.argmax(self.predict_proba(X), axis=1)
-        return pred_label
+        preds = np.where(self.decision_function(X) >= 0, 1, 0)
+        assert preds.shape == (X.shape[0],), 'preds shape is no good!'
+        return preds
 
-    def compute_attributions(self, x):
-        """
-        Return a 2d array of train instance impacts of shape=(1, no train samples).
-        """
-        assert x.shape == (1, self.X_train_.shape[1])
-        x_sim = linear_kernel(x, self.X_train_)
-        impact = x_sim * self.alpha_
-        return impact
 
-    def similarity(self, x):
+class KNN(KNeighborsClassifier):
+    """
+    Wrapper around SKLearn's KNeighborsClassifier that takes care of
+    transforming the data before predicting.
+
+    NOTE: Supports binary classification only!
+    """
+
+    # override
+    def __init__(self, tree_extractor, n_neighbors=5, weights='uniform'):
         """
-        Return a 2d array of train instance impacts of shape=(1, no train samples).
+        Fit model using Liblinear solver no. 7.
         """
-        assert x.shape == (1, self.X_train_.shape[1])
-        return linear_kernel(x, self.X_train_)
+        self.tree_extractor = tree_extractor
+        return super().__init__(n_neighbors=n_neighbors, weights=weights)
+
+    # override
+    def fit(self, X, y):
+        """
+        Transform using tree extractor, and then call `fit`.
+        """
+        X_alt = self.tree_extractor.transform(X)
+        self.n_features_alt_ = X_alt.shape[1]
+        self.tree_kernel_ = self.tree_extractor.tree_kernel
+        return super().fit(X_alt, y)
+
+    # override
+    def predict_proba(self, X):
+        """
+        Transform using tree extractor, and then call `predict_proba`.
+        """
+        X_alt = self.tree_extractor.transform(X)
+        return super().predict_proba(X_alt)
+
+    # override
+    def predict(self, X):
+        """
+        Transform using tree extractor, and then call `predict`.
+        """
+        X_alt = self.tree_extractor.transform(X)
+        return super().predict(X_alt)
 
 
 # private

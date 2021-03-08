@@ -26,6 +26,7 @@ trex/models/*.html
 trex/models/*.c
 trex/models/build/
 trex_old/
+trex_old_old/
 
 # data
 data/*/raw
