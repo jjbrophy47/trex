@@ -29,8 +29,12 @@ def get_result(template, in_dir):
         result = None
 
     else:
-        d = np.load(fp, allow_pickle=True)[()]
-        result.update(d)
+        try:
+            d = np.load(fp, allow_pickle=True)[()]
+            result.update(d)
+
+        except (OSError, EOFError):
+            result = None
 
     return result
 

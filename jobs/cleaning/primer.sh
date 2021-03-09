@@ -16,6 +16,12 @@ method_list=('random' \
              'tree_loss' 'leaf_influence' 'maple' \
              'knn-leaf_output' 'knn_loss-leaf_output' 'tree_prototype')
 
+method_list=('random' \
+             'klr' 'svm-leaf_output' \
+             'klr_loss-leaf_output' 'svm_loss-leaf_output' \
+             'tree_loss' 'leaf_influence' 'maple' \
+             'knn-leaf_output' 'knn_loss-leaf_output' 'tree_prototype')
+
 for method in ${method_list[@]}; do
     for rs in ${rs_list[@]}; do
         job_name="C_${dataset}_${model}_${method}"

@@ -96,7 +96,6 @@ def flip_labels(arr, k=100, seed=1, indices=None, logger=None):
     return new_arr, indices
 
 
-# def record_fixes(train_indices, noisy_indices, n_checkpoint):
 def fix_noisy_instances(train_indices, noisy_indices, n_check, n_checkpoint,
                         clf, X_train, y_train, X_test, y_test,
                         acc_noisy, auc_noisy, logger=None):
@@ -185,9 +184,10 @@ def trex_method(args, model_noisy, y_train_noisy,
     # train surrogate model
     params = {'C': args.C, 'n_neighbors': args.n_neighbors, 'tree_kernel': args.tree_kernel}
     surrogate = trex.train_surrogate(model=model_noisy,
-                                     surrogate=args.surrogate,
+                                     surrogate=args.method.split('_')[0],
                                      X_train=X_train,
-                                     y_train=y_train_noisy,
+                                     # y_train=y_train_noisy,
+                                     y_train=model_noisy.predict(X_train),
                                      val_frac=args.tune_frac,
                                      metric=args.metric,
                                      seed=args.rs,
@@ -227,7 +227,6 @@ def tree_loss_method(model_noisy, y_train_noisy,
     return result
 
 
-# def leaf_influence_method(explainer, noisy_ndx, X_train, y_train, y_train_noisy, interval, to_check=1):
 def leaf_influence_method(model_noisy, y_train_noisy,
                           noisy_indices, n_check, n_checkpoint,
                           clf, X_train, y_train, X_test, y_test,
@@ -344,14 +343,14 @@ def teknn_method(model_noisy, y_train_noisy,
     """
 
     # transform the data
-    tree_kernel = args.method.split('-')[-1]
+    tree_kernel = args.method.split('_')[-1]
     extractor = trex.TreeExtractor(model_noisy, tree_kernel=tree_kernel)
     X_train_alt = extractor.transform(X_train)
 
     # train surrogate model
     params = {'C': args.C, 'n_neighbors': args.n_neighbors, 'tree_kernel': args.tree_kernel}
     surrogate = trex.train_surrogate(model=model_noisy,
-                                     surrogate=args.method,
+                                     surrogate=args.method.split('-')[0],
                                      X_train=X_train,
                                      y_train=y_train_noisy,
                                      val_frac=args.tune_frac,
@@ -466,7 +465,6 @@ def tree_prototype_method(model_noisy, y_train_noisy,
     return result
 
 
-# def mmd_protoype_method(model, X_train, y_train, noisy_ndx, interval, n_check):
 def mmd_prototype_method(model_noisy, y_train_noisy,
                          noisy_indices, n_check, n_checkpoint,
                          clf, X_train, y_train, X_test, y_test,
@@ -675,18 +673,17 @@ def main(args):
 
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='Feature representation extractions for tree ensembles',
-                                     formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    parser = argparse.ArgumentParser()
 
     # I/O settings
     parser.add_argument('--dataset', type=str, default='churn', help='dataset to explain.')
     parser.add_argument('--data_dir', type=str, default='data', help='data directory.')
-    parser.add_argument('--preprocessing', type=str, default='categorical', help='preprocessing directory.')
+    parser.add_argument('--preprocessing', type=str, default='standard', help='preprocessing directory.')
     parser.add_argument('--out_dir', type=str, default='output/cleaning/', help='output directory.')
 
     # Data settings
     parser.add_argument('--train_frac', type=float, default=1.0, help='amount of training data to use.')
-    parser.add_argument('--tune_frac', type=float, default=0.1, help='amount of training data to use for validation.')
+    parser.add_argument('--tune_frac', type=float, default=0.0, help='amount of training data to use for validation.')
 
     # Tree-ensemble settings
     parser.add_argument('--model', type=str, default='cb', help='model to use.')
@@ -696,6 +693,11 @@ if __name__ == '__main__':
     # Method settings
     parser.add_argument('--method', type=str, default='klr-leaf_output', help='explanation method.')
     parser.add_argument('--metric', type=str, default='mse', help='fidelity metric to use for TREX.')
+
+    # No tuning settings
+    parser.add_argument('--C', type=float, default=0.1, help='penalty parameters for KLR or SVM.')
+    parser.add_argument('--n_neighbors', type=int, default=5, help='no. neighbors to use for KNN.')
+    parser.add_argument('--tree_kernel', type=str, default='leaf_output', help='tree kernel.')
 
     # Experiment settings
     parser.add_argument('--rs', type=int, default=1, help='random state.')

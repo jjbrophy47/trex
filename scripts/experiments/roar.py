@@ -433,7 +433,7 @@ if __name__ == '__main__':
 
     # Experiment settings
     parser.add_argument('--rs', type=int, default=1, help='random state.')
-    parser.add_argument('--n_test', type=int, default=50, help='no. of test instances.')
+    parser.add_argument('--n_test', type=int, default=100, help='no. of test instances.')
     parser.add_argument('--train_frac_to_remove', type=float, default=0.5, help='fraction of train data to remove.')
     parser.add_argument('--n_checkpoints', type=int, default=10, help='no. checkpoints to perform retraining.')
 
