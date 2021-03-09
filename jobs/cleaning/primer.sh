@@ -20,7 +20,7 @@ method_list=('random' \
              'tree_loss' 'leaf_influence' 'maple' \
              'knn-leaf_output' 'knn_loss-leaf_output' 'tree_prototype')
 
-method_list=('klr' 'klr_loss' 'tree_loss' 'knn' 'knn_loss')
+method_list=('knn')
 
 for method in ${method_list[@]}; do
     for rs in ${rs_list[@]}; do

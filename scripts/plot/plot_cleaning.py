@@ -26,23 +26,19 @@ def main(args):
     # settings
     dataset_list = ['surgical', 'vaccine', 'amazon', 'bank_marketing', 'adult', 'census']
 
-    method_list = ['klr-leaf_output', 'svm-leaf_output',
-                   'random', 'tree_loss',
-                   'klr_loss-leaf_output', 'svm_loss-leaf_output',
+    method_list = ['klr', 'random', 'tree_loss', 'klr_loss',
                    'maple', 'leaf_influence', 'tree_prototype',
-                   'knn-leaf_output', 'knn_loss-leaf_output']
+                   'knn', 'knn_loss']
 
-    label_list = ['TREX-KLR', 'TREX-SVM', 'Random',
-                  'GBDT Loss', 'KLR Loss', 'SVM Loss',
-                  'MAPLE', 'LeafInfluence', 'TreeProto',
-                  'TEKNN', 'KNN Loss']
+    label_list = ['TREX-KLR', 'Random', 'GBDT Loss', 'KLR Loss',
+                  'MAPLE', 'LeafInfluence', 'TreeProto', 'TEKNN', 'KNN Loss']
 
-    color_list = ['blue', 'cyan', 'red', 'green', 'purple', 'magenta', 'orange',
+    color_list = ['blue', 'red', 'green', 'purple', 'orange',
                   'black', '#EEC64F', 'yellow', 'brown']
 
-    marker_list = ['1', '2', 'o', 'v', '^', '<', '>', '.', '*', 'h', 's']
+    marker_list = ['1', 'o', 'v', '^', '>', '.', '*', 'h', 's']
 
-    zorder_list = [11, 10, 9, 3, 2, 1, 7, 1, 6, 5, 8]
+    zorder_list = [11, 9, 3, 2, 7, 1, 6, 5, 8]
 
     # get results
     df = pd.read_csv(os.path.join(args.in_dir, 'results.csv'))
