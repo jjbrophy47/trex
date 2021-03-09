@@ -64,9 +64,7 @@ def experiment(args, out_dir, logger):
     model_proba = model.predict_proba(X_test)[:, 1]
 
     # used if no tuning is done on the surrogate model
-    params = {'C': args.C,
-              'n_neighbors': args.n_neighbors,
-              'tree_kernel': args.tree_kernel}
+    params = {'C': args.C, 'n_neighbors': args.n_neighbors, 'tree_kernel': args.tree_kernel}
 
     # train and predict with using a surrogate model
     start = time.time()

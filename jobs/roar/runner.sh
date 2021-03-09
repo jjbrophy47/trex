@@ -10,9 +10,17 @@ preprocessing=$3
 n_estimators=$4
 max_depth=$5
 method=$6
-train_frac_to_remove=$7
-n_checkpoints=$8
-rs=$9
+klr_tree_kernel=$7
+klr_C=$8
+knn_tree_kernel=$9
+knn_n_neighbors=${10}
+rs=${11}
+
+if [ $method = 'klr' ]; then
+    tree_kernel=$klr_tree_kernel
+else
+    tree_kernel=$knn_tree_kernel
+fi
 
 python3 scripts/experiments/roar.py \
   --dataset $dataset \
@@ -21,6 +29,7 @@ python3 scripts/experiments/roar.py \
   --n_estimators $n_estimators \
   --max_depth $max_depth \
   --method $method \
-  --train_frac_to_remove $train_frac_to_remove \
-  --n_checkpoints $n_checkpoints \
+  --tree_kernel $tree_kernel \
+  --C $klr_C \
+  --n_neighbors $knn_n_neighbors \
   --rs $rs

@@ -25,6 +25,7 @@ import numpy as np
 from sklearn.base import clone
 from sklearn.metrics import accuracy_score
 from sklearn.metrics import roc_auc_score
+from sklearn.model_selection import train_test_split
 
 here = os.path.abspath(os.path.dirname(__file__))
 sys.path.insert(0, here + '/../../')  # for influence_boosting
@@ -70,7 +71,7 @@ def measure_performance(train_indices, n_checkpoint, n_checkpoints,
     result['aucs'] = [auc]
     result['avg_proba_deltas'] = [0]
     result['median_proba_deltas'] = [0]
-    result['removed_pcts'] = [0]
+    result['remove_pcts'] = [0]
 
     # result containers
     start = time.time()
@@ -108,11 +109,11 @@ def measure_performance(train_indices, n_checkpoint, n_checkpoints,
         result['aucs'].append(auc)
         result['avg_proba_deltas'].append(np.mean(np.abs(base_proba - proba)))
         result['median_proba_deltas'].append(np.median(np.abs(base_proba - proba)))
-        result['removed_pcts'].append(n_samples / train_indices.shape[0] * 100)
+        result['remove_pcts'].append(n_samples / train_indices.shape[0] * 100)
 
         # display progress
         if logger:
-            logger.info(s.format(i + 1, result['removed_pcts'][-1], result['accs'][-1], result['aucs'][-1],
+            logger.info(s.format(i + 1, result['remove_pcts'][-1], result['accs'][-1], result['aucs'][-1],
                                  result['avg_proba_deltas'][-1], result['median_proba_deltas'][-1],
                                  time.time() - start))
 
@@ -133,36 +134,24 @@ def trex_method(args, model, X_train, y_train, X_test, logger=None,
     """
 
     # train surrogate model
-    kernel_model = args.method.split('-')[0].split('_')[0]
-    tree_kernel = args.method.split('-')[-1]
-    surrogate = trex.TreeExplainer(model,
-                                   X_train,
-                                   y_train,
-                                   kernel_model=kernel_model,
-                                   tree_kernel=tree_kernel,
-                                   val_frac=args.tune_frac,
-                                   metric=args.metric,
-                                   random_state=args.rs,
-                                   logger=logger)
+    params = {'C': args.C, 'n_neighbors': args.n_neighbors, 'tree_kernel': args.tree_kernel}
+    surrogate = trex.train_surrogate(model=model,
+                                     surrogate=args.method,
+                                     X_train=X_train,
+                                     y_train=y_train,
+                                     val_frac=args.tune_frac,
+                                     metric=args.metric,
+                                     seed=args.rs,
+                                     params=params,
+                                     logger=logger)
 
     # display status
     if logger:
         logger.info('\ncomputing influence of each training sample on the test set...')
 
     # sort instances with highest positive influence first
-    start = time.time()
-    attributions_sum = np.zeros(X_train.shape[0])
-
-    # compute impact of each training sample on the test set
-    for i in range(X_test.shape[0]):
-        attributions_sum += surrogate.compute_attributions(X_test[[i]])[0]
-
-        # display progress
-        if X_test.shape[0] > 1 and logger and i % int(X_test.shape[0] * frac_progress_update) == 0:
-            elapsed = time.time() - start
-            logger.info('finished {:.1f}% test instances...{:.3f}s'.format((i / X_test.shape[0]) * 100, elapsed))
-
-    # sort instances by their contributions
+    attributions = surrogate.compute_attributions(X_test)
+    attributions_sum = np.sum(attributions, axis=0)
     train_indices = np.argsort(attributions_sum)[::-1]
 
     return train_indices
@@ -263,56 +252,27 @@ def influence_method(args, model, X_train, y_train, X_test, y_test, logger=None,
     return train_indices
 
 
-def teknn_method(args, model, X_train, y_train, X_test, logger=None,
-                 frac_progress_update=0.1):
+def teknn_method(args, model, X_train, y_train, X_test, logger=None):
     """
     Sort trainnig instance based on similarity density to the test instances.
     """
 
-    # transform the data
-    tree_kernel = args.method.split('-')[-1]
-    extractor = trex.TreeExtractor(model, tree_kernel=tree_kernel)
-    X_train_alt = extractor.transform(X_train)
-
     # train surrogate model
-    param_grid = {'n_neighbors': [3, 5, 7, 9, 11, 13, 15, 31, 45, 61]}
-    surrogate = trex.util.train_surrogate(model,
-                                          'knn',
-                                          param_grid,
-                                          X_train,
-                                          X_train_alt,
-                                          y_train,
-                                          val_frac=args.tune_frac,
-                                          metric=args.metric,
-                                          seed=args.rs,
-                                          logger=logger)
+    params = {'C': args.C, 'n_neighbors': args.n_neighbors, 'tree_kernel': args.tree_kernel}
+    surrogate = trex.train_surrogate(model=model,
+                                     surrogate=args.method,
+                                     X_train=X_train,
+                                     y_train=y_train,
+                                     val_frac=args.tune_frac,
+                                     metric=args.metric,
+                                     seed=args.rs,
+                                     params=params,
+                                     logger=logger)
 
-    # display status
-    if logger:
-        logger.info('\ncomputing influence of each training sample on the test set...')
-
-    # contributions container
-    start = time.time()
-    contributions_sum = np.zeros(X_train.shape[0])
-
-    # compute the contribution of all training samples on each test instance
-    for i in range(X_test.shape[0]):
-        x_test_alt = extractor.transform(X_test[[i]])
-        pred_label = int(surrogate.predict(x_test_alt)[0])
-        distances, neighbor_ids = surrogate.kneighbors(x_test_alt)
-
-        # add density to training instances that are in the neighborhood of the test instance
-        for neighbor_id in neighbor_ids[0]:
-            contribution = 1 if y_train[neighbor_id] == pred_label else -1
-            contributions_sum[neighbor_id] += contribution
-
-        # display progress
-        if logger and i % int(X_test.shape[0] * frac_progress_update) == 0:
-            elapsed = time.time() - start
-            logger.info('finished {:.1f}% test instances...{:.3f}s'.format((i / X_test.shape[0]) * 100, elapsed))
-
-    # sort instances based on similarity density
-    train_indices = np.argsort(contributions_sum)[::-1]
+    # sort instances based on highest similarity density
+    attributions = surrogate.compute_attributions(X_test)
+    attributions_sum = np.sum(attributions, axis=0)
+    train_indices = np.argsort(attributions_sum)[::-1]
 
     return train_indices
 
@@ -380,15 +340,11 @@ def experiment(args, logger, out_dir):
         train_indices = rng.choice(X_train.shape[0], size=n_train_samples, replace=False)
         X_train, y_train = X_train[train_indices], y_train[train_indices]
 
-    # select a subset of test instances uniformly at random
-    test_indices = rng.choice(X_test.shape[0], size=args.n_test, replace=False)
-    X_test_sub, y_test_sub = X_test[test_indices], y_test[test_indices]
-
-    # choose new subset if test subset all contain the same label
-    if args.n_test > 1:
-        while y_test_sub.sum() == len(y_test_sub) or y_test_sub.sum() == 0:
-            test_indices = rng.choice(X_test.shape[0], size=args.n_test, replace=False)
-            X_test_sub, y_test_sub = X_test[test_indices], y_test[test_indices]
+    # select a (stratified) subset of test instances uniformly at random
+    _, X_test_sub, _, y_test_sub = train_test_split(X_test, y_test,
+                                                    test_size=args.n_test,
+                                                    random_state=args.rs,
+                                                    stratify=y_test)
 
     # display dataset statistics
     logger.info('\nno. train instances: {:,}'.format(X_train.shape[0]))
@@ -453,12 +409,12 @@ if __name__ == '__main__':
     # I/O settings
     parser.add_argument('--dataset', type=str, default='churn', help='dataset to explain.')
     parser.add_argument('--data_dir', type=str, default='data', help='data directory.')
-    parser.add_argument('--preprocessing', type=str, default='categorical', help='preprocessing directory.')
+    parser.add_argument('--preprocessing', type=str, default='standard', help='preprocessing directory.')
     parser.add_argument('--out_dir', type=str, default='output/roar/', help='directory to save results.')
 
     # Data settings
     parser.add_argument('--train_frac', type=float, default=1.0, help='fraction of train data to evaluate.')
-    parser.add_argument('--tune_frac', type=float, default=0.1, help='amount of data for validation.')
+    parser.add_argument('--tune_frac', type=float, default=0.0, help='amount of data for validation.')
     parser.add_argument('--scoring', type=str, default='accuracy', help='metric for tuning the tree-ensemble.')
 
     # Tree-ensemble settings
@@ -467,8 +423,13 @@ if __name__ == '__main__':
     parser.add_argument('--max_depth', type=int, default=3, help='max. depth in tree ensemble.')
 
     # Method settings
-    parser.add_argument('--method', type=str, default='klr-leaf_output', help='method.')
+    parser.add_argument('--method', type=str, default='klr', help='method.')
     parser.add_argument('--metric', type=str, default='mse', help='metric for tuning surrogate models.')
+
+    # No tuning settings
+    parser.add_argument('--C', type=float, default=0.1, help='penalty parameters for KLR or SVM.')
+    parser.add_argument('--n_neighbors', type=int, default=5, help='no. neighbors to use for KNN.')
+    parser.add_argument('--tree_kernel', type=str, default='leaf_output', help='tree kernel.')
 
     # Experiment settings
     parser.add_argument('--rs', type=int, default=1, help='random state.')

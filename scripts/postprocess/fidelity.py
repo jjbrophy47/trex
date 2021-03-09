@@ -43,22 +43,37 @@ def process_results(df):
     Averages utility results over different random states.
     """
 
-    groups = ['dataset', 'model', 'preprocessing', 'surrogate', 'tree_kernel', 'metric']
+    groups = ['dataset', 'model', 'preprocessing', 'surrogate', 'metric']
 
     main_result_list = []
 
     for tup, gf in tqdm(df.groupby(groups)):
         main_result = {k: v for k, v in zip(groups, tup)}
+
+        # general info
         main_result['num_runs'] = len(gf)
         main_result['max_rss'] = gf['max_rss'].mean()
-        main_result['n_features_alt'] = gf['n_features_alt'].mean()
+        main_result['total_time_mean'] = gf['total_time'].mean()
+
+        # fidelity info
         main_result['pearson_mean'] = gf['pearson'].mean()
         main_result['pearson_sem'] = sem(gf['pearson'])
         main_result['spearman_mean'] = gf['spearman'].mean()
         main_result['spearman_sem'] = sem(gf['spearman'])
         main_result['mse_mean'] = gf['mse'].mean()
         main_result['mse_sem'] = sem(gf['mse'])
-        main_result['train_time_mean'] = gf['train_time'].mean()
+
+        # surrogate info
+        a = gf['surrogate_tree_kernel'].mode()
+        b = gf['surrogate_C'].mode()
+        c = gf['surrogate_n_neighbors'].mode()
+        d = gf['surrogate_n_features']
+
+        main_result['tree_kernel'] = a[0] if len(a) > 0 else None
+        main_result['C'] = b[0] if len(b) == 1 else None
+        main_result['n_neighbors'] = c[0] if len(c) > 0 else None
+        main_result['n_features_alt'] = d.mean() if len(d) == len(gf) else d.mode()[0]
+
         main_result_list.append(main_result)
 
     main_df = pd.DataFrame(main_result_list)
@@ -75,20 +90,18 @@ def create_csv(args, out_dir, logger):
                                          args.model,
                                          args.preprocessing,
                                          args.surrogate,
-                                         args.tree_kernel,
                                          args.metric,
                                          args.rs]))
 
     # organize results
     results = []
-    for dataset, model, preprocessing, surrogate, tree_kernel, metric, rs in tqdm(experiment_settings):
+    for dataset, model, preprocessing, surrogate, metric, rs in tqdm(experiment_settings):
 
         # create result
         template = {'dataset': dataset,
                     'model': model,
                     'preprocessing': preprocessing,
                     'surrogate': surrogate,
-                    'tree_kernel': tree_kernel,
                     'metric': metric,
                     'rs': rs}
 
@@ -98,7 +111,6 @@ def create_csv(args, out_dir, logger):
                                       model,
                                       preprocessing,
                                       surrogate,
-                                      tree_kernel,
                                       metric,
                                       'rs_{}'.format(rs))
 
@@ -156,8 +168,6 @@ if __name__ == '__main__':
     parser.add_argument('--preprocessing', type=str, nargs='+', default=['categorical', 'standard'],
                         help='preprocessing directory.')
     parser.add_argument('--surrogate', type=int, nargs='+', default=['klr', 'svm', 'knn'], help='surrogate model.')
-    parser.add_argument('--tree_kernel', type=int, nargs='+', help='tree kernel.',
-                        default=['feature_path', 'feature_output', 'leaf_path', 'leaf_output', 'tree_output'])
     parser.add_argument('--metric', type=str, nargs='+', default=['mse'], help='tuning metric.')
     parser.add_argument('--rs', type=int, nargs='+', default=[1, 2, 3, 4, 5], help='random state.')
 

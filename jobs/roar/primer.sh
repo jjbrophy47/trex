@@ -3,14 +3,16 @@ model=$2
 preprocessing=$3
 n_estimators=$4
 max_depth=$5
-train_frac_to_remove=$6
-n_checkpoints=$7
-mem=$8
-time=$9
-partition=${10}
-rs_start=${11}
+klr_tree_kernel=$6
+klr_C=$7
+knn_tree_kernel=$8
+knn_n_neighbors=$9
+mem=${10}
+time=${11}
+partition=${12}
+rs_start=${13}
 
-method_list=('random' 'klr-leaf_output' 'knn-leaf_output' 'maple')
+method_list=('random' 'klr' 'knn' 'maple')
 
 for method in ${method_list[@]}; do
     for (( rs = $rs_start; rs < $rs_start + 20; rs++ )); do
@@ -23,6 +25,7 @@ for method in ${method_list[@]}; do
                --output=jobs/logs/roar/$job_name \
                --error=jobs/errors/roar/$job_name \
                jobs/roar/runner.sh $dataset $model $preprocessing \
-               $n_estimators $max_depth $method $train_frac_to_remove $n_checkpoints $rs
+               $n_estimators $max_depth $method $klr_tree_kernel $klr_C \
+               $knn_tree_kernel $knn_n_neighbors $rs
     done
 done

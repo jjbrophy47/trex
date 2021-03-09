@@ -199,17 +199,17 @@ def performance(model, X, y, logger=None,
 
     # get display string
     if y_proba is not None:
-        score_str = '[{}] auc: {:.3f}, acc: {:.3f}, ap: {:.3f}, ll: {:.3f}'
+        score_str = '[{}] acc: {:.3f}, auc: {:.3f}, ap: {:.3f}, ll: {:.3f}'
 
     else:
-        score_str = '[{}] auc: {}, acc: {:.3f}, ap: {}, ll: {}'
+        score_str = '[{}] acc: {}, auc: {:.3f}, ap: {}, ll: {}'
 
     # print scores
     if logger:
-        logger.info(score_str.format(name, auc, acc, ap, ll))
+        logger.info(score_str.format(name, acc, auc, ap, ll))
 
     elif do_print:
-        print(score_str.format(name, auc, acc, ll))
+        print(score_str.format(name, acc, auc, ll))
 
     return auc, acc, ap, ll
 

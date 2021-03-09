@@ -15,6 +15,8 @@ KNN is a wrapper around SKLearn's Kneighbors classifier.
 NOTE: Binary classification only!
 NOTE: Dense input only!
 """
+import time
+
 import numpy as np
 from sklearn.base import BaseEstimator, ClassifierMixin
 from sklearn.neighbors import KNeighborsClassifier
@@ -257,26 +259,84 @@ class KNN(KNeighborsClassifier):
         """
         Transform using tree extractor, and then call `fit`.
         """
-        X_alt = self.tree_extractor.transform(X)
-        self.n_features_alt_ = X_alt.shape[1]
+
+        # populate attributes
+        self.X_train_alt_ = self.tree_extractor.transform(X)
+        self.y_train_ = y.copy()
+        self.n_features_ = X.shape[1]
+        self.n_features_alt_ = self.X_train_alt_.shape[1]
         self.tree_kernel_ = self.tree_extractor.tree_kernel
-        return super().fit(X_alt, y)
+
+        return super().fit(self.X_train_alt_, y)
 
     # override
     def predict_proba(self, X):
         """
         Transform using tree extractor, and then call `predict_proba`.
         """
-        X_alt = self.tree_extractor.transform(X)
-        return super().predict_proba(X_alt)
+        return super().predict_proba(X)
 
     # override
     def predict(self, X):
         """
         Transform using tree extractor, and then call `predict`.
         """
+        preds = np.argmax(self.predict_proba(X), axis=1)
+        assert preds.shape == (X.shape[0],), 'preds shape is no good!'
+        return preds
+
+    # override
+    def kneighbors(self, X):
+        """
+        Transform using tree extractor, and then call `kneighbors`.
+        """
+        X_alt = self.transform(X)
+        return super().kneighbors(X_alt)
+
+    def compute_attributions(self, X, frac_progress=0.1, logger=None):
+        """
+        Return a 2d array of train instance impacts of shape=(X.shape[0], no. train samples).
+        """
+        start = time.time()
+
+        # result container
+        attributions = np.zeros((X.shape[0], self.X_train_alt_.shape[0]))
+
+        # compute the contribution of all training samples on each test instance
+        for i in range(X.shape[0]):
+            x = X[[i]]
+
+            # get predicted label and neighbors
+            pred = int(self.predict(x)[0])
+            distances, neighbor_ids = self.kneighbors(x)
+
+            # add density to neighbor training instances if they have the same label as the predicted label
+            for neighbor_id in neighbor_ids[0]:
+                attributions[i][neighbor_id] = 1 if self.y_train_[neighbor_id] == pred else -1
+
+            # display progress
+            if logger and i % int(X.shape[0] * frac_progress) == 0:
+                elapsed = time.time() - start
+                logger.info('done {:.1f}% test instances...{:.3f}s'.format((i / X.shape[0]) * 100, elapsed))
+
+        return attributions
+
+    def transform(self, X):
+        """
+        Transform X using the tree-ensemble feature extractor.
+
+        Parameters
+        ----------
+        X : 2d array-like
+            Instances to transform.
+
+        Returns an array of shape=(X.shape[0], no. alt. features).
+        """
+        assert X.ndim == 2, 'X is not 2d!'
+        assert X.shape[1] == self.n_features_, 'no. original features do not match!'
         X_alt = self.tree_extractor.transform(X)
-        return super().predict(X_alt)
+        assert X_alt.shape == (X.shape[0], self.n_features_alt_), 'no. transformed features do not match!'
+        return X_alt
 
 
 # private
