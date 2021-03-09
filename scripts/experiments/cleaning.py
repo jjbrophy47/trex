@@ -369,7 +369,7 @@ def teknn_method(model_noisy, y_train_noisy,
     else:
 
         # sort instances based on highest neighborhood density
-        attributions = surrogate.compute_attributions(X_train)
+        attributions = surrogate.compute_attributions(X_train, logger=logger)
         attributions_sum = np.sum(attributions, axis=0)
         train_indices = np.argsort(attributions_sum)[::-1]
 
