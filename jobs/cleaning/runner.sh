@@ -10,9 +10,19 @@ preprocessing=$3
 n_estimators=$4
 max_depth=$5
 method=$6
-check_pct=$7
-train_frac=$8
-rs=$9
+klr_tree_kernel=$7
+klr_C=$8
+knn_tree_kernel=$9
+knn_n_neighbors=${10}
+check_pct=${11}
+train_frac=${12}
+rs=${13}
+
+if [ $method = 'klr' ]; then
+    tree_kernel=$klr_tree_kernel
+else
+    tree_kernel=$knn_tree_kernel
+fi
 
 python3 scripts/experiments/cleaning.py \
   --dataset $dataset \
@@ -23,4 +33,7 @@ python3 scripts/experiments/cleaning.py \
   --method $method \
   --check_pct $check_pct \
   --train_frac $train_frac \
+  --tree_kernel $tree_kernel \
+  --C $klr_C \
+  --n_neighbors $knn_n_neighbors \
   --rs $rs
