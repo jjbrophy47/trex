@@ -69,7 +69,7 @@ def trex_method(args, model, test_ndx, X_train, y_train, X_test,
 
     # compute influential training instances on the test instance
     start = time.time()
-    surrogate.compute_attributions(X_test[test_ndx].reshape(1, -1))
+    surrogate.compute_attributions(X_test[test_ndx])
     test_time = time.time() - start
 
     # result object
@@ -113,7 +113,7 @@ def leaf_influence_method(args, model, test_ndx, X_train, y_train,
 
             for i in range(X_train.shape[0]):
                 explainer.fit(removed_point_idx=i, destination_model=buf)
-                contributions.append(buf.loss_derivative(X_test[[test_ndx]], y_test[[test_ndx]])[0])
+                contributions.append(buf.loss_derivative(X_test[test_ndx], y_test[test_ndx])[0])
 
                 # display progress
                 if logger and i % int(X_train.shape[0] * frac_progress_update) == 0:
@@ -197,7 +197,7 @@ def teknn_method(args, model, test_ndx, X_train, y_train, X_test,
 
     # retrieve k nearest neighbors as most influential to the test instance
     start = time.time()
-    surrogate.compute_attributions(X_test[[test_ndx]])
+    surrogate.compute_attributions(X_test[test_ndx])
     test_time = time.time() - start
 
     # result object
