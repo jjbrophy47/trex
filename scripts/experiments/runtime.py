@@ -54,18 +54,17 @@ def trex_method(args, model, test_ndx, X_train, y_train, X_test,
     """
 
     # train surrogate model
-    kernel_model = args.method.split('-')[0].split('_')[0]
-    tree_kernel = args.method.split('-')[-1]
     start = time.time()
-    surrogate = trex.TreeExplainer(model,
-                                   X_train,
-                                   y_train,
-                                   kernel_model=kernel_model,
-                                   tree_kernel=tree_kernel,
-                                   val_frac=args.tune_frac,
-                                   metric=args.metric,
-                                   random_state=args.rs,
-                                   logger=logger)
+    params = {'C': args.C, 'n_neighbors': args.n_neighbors, 'tree_kernel': args.tree_kernel}
+    surrogate = trex.train_surrogate(model=model,
+                                     surrogate=args.method,
+                                     X_train=X_train,
+                                     y_train=y_train,
+                                     val_frac=args.tune_frac,
+                                     metric=args.metric,
+                                     seed=args.rs,
+                                     params=params,
+                                     logger=logger)
     train_time = time.time() - start
 
     # compute influential training instances on the test instance
@@ -175,25 +174,20 @@ def teknn_method(args, model, test_ndx, X_train, y_train, X_test,
     """
     with timeout(seconds=args.max_time):
         try:
-            start = time.time()
-
-            # transform the data
-            tree_kernel = args.method.split('-')[-1]
-            extractor = trex.TreeExtractor(model, tree_kernel=tree_kernel)
-            X_train_alt = extractor.transform(X_train)
 
             # train surrogate model
-            param_grid = {'n_neighbors': [3, 5, 7, 9, 11, 13, 15, 31, 45, 61]}
-            surrogate = trex.util.train_surrogate(model,
-                                                  'knn',
-                                                  param_grid,
-                                                  X_train,
-                                                  X_train_alt,
-                                                  y_train,
-                                                  val_frac=args.tune_frac,
-                                                  metric=args.metric,
-                                                  seed=args.rs,
-                                                  logger=logger)
+            start = time.time()
+            params = {'C': args.C, 'n_neighbors': args.n_neighbors, 'tree_kernel': args.tree_kernel}
+            surrogate = trex.train_surrogate(model=model,
+                                             surrogate=args.method,
+                                             X_train=X_train,
+                                             y_train=y_train,
+                                             val_frac=args.tune_frac,
+                                             metric=args.metric,
+                                             seed=args.rs,
+                                             params=params,
+                                             logger=logger)
+
             train_time = time.time() - start
 
         except TimeoutError:
@@ -203,8 +197,7 @@ def teknn_method(args, model, test_ndx, X_train, y_train, X_test,
 
     # retrieve k nearest neighbors as most influential to the test instance
     start = time.time()
-    x_test_alt = extractor.transform(X_test[test_ndx])
-    distances, neighbor_ids = surrogate.kneighbors(x_test_alt)
+    distances, neighbor_ids = surrogate.compute_attributions(X_test[[test_ndx]])
     test_time = time.time() - start
 
     # result object
@@ -313,7 +306,7 @@ if __name__ == '__main__':
 
     # Data settings
     parser.add_argument('--train_frac', type=float, default=1.0, help='fraction of data for training.')
-    parser.add_argument('--tune_frac', type=float, default=0.1, help='fraction of train data for validation.')
+    parser.add_argument('--tune_frac', type=float, default=0.0, help='fraction of train data for validation.')
 
     # Tree-ensemble settings
     parser.add_argument('--model', type=str, default='cb', help='tree-ensemble.')
@@ -323,6 +316,11 @@ if __name__ == '__main__':
     # Method settings
     parser.add_argument('--method', type=str, default='klr-leaf_output', help='influence method.')
     parser.add_argument('--metric', type=str, default='mse', help='surrogate tuning metric.')
+
+    # No tuning settings
+    parser.add_argument('--C', type=float, default=0.1, help='penalty parameters for KLR or SVM.')
+    parser.add_argument('--n_neighbors', type=int, default=5, help='no. neighbors to use for KNN.')
+    parser.add_argument('--tree_kernel', type=str, default='leaf_output', help='tree kernel.')
 
     # Experiment settings
     parser.add_argument('--rs', type=int, default=1, help='random state.')
