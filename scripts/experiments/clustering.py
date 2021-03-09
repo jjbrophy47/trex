@@ -7,37 +7,20 @@ import time
 import argparse
 import warnings
 warnings.simplefilter(action='ignore', category=UserWarning)  # lgb compiler warning
-here = os.path.abspath(os.path.dirname(__file__))
-sys.path.insert(0, here + '/../')  # for utility
-sys.path.insert(0, here + '/../../')  # for libliner
 
 import numpy as np
 from sklearn.base import clone
 from sklearn.manifold import TSNE
 from sklearn.decomposition import PCA
 
-from trex import TreeExtractor
-from utility import model_util
-from utility import data_util
-from utility import print_util
+here = os.path.abspath(os.path.dirname(__file__))
+sys.path.insert(0, here + '/../')  # for utility
+sys.path.insert(0, here + '/../../')  # for libliner
+import trex
+import util
 
 
-def align_feature(feature, reduced_feature):
-    """
-    Return the intersection of the two feature sets.
-    """
-    keep_ndx = []
-
-    for f1 in reduced_feature:
-        for i, f2 in enumerate(feature):
-            if f1 == f2:
-                keep_ndx.append(i)
-    keep_ndx = np.array(keep_ndx)
-
-    return keep_ndx
-
-
-def reduce_and_embed(args, X_train, X_test, logger, init='random'):
+def reduce_and_embed(args, X_train, X_test, logger):
     """
     Reduces dimensionality using PCA and then embeds the
     remaining features using TSNE.
@@ -57,7 +40,7 @@ def reduce_and_embed(args, X_train, X_test, logger, init='random'):
     # embed feature space using TSNE
     start = time.time()
 
-    tsne = TSNE(verbose=args.verbose, random_state=args.rs, init=init, learning_rate=1000)
+    tsne = TSNE(verbose=args.verbose, random_state=args.rs)
     X_train = tsne.fit_transform(X_train)
     # X_test = tsne.transform(X_test)
 
@@ -66,44 +49,32 @@ def reduce_and_embed(args, X_train, X_test, logger, init='random'):
     return X_train, X_test
 
 
-def experiment(args, logger, out_dir, seed):
+def experiment(args, logger, out_dir):
 
-    # get model and data
-    clf = model_util.get_classifier(args.tree_type,
-                                    n_estimators=args.n_estimators,
-                                    max_depth=args.max_depth,
-                                    random_state=seed)
+    # start timer
+    begin = time.time()
 
-    # get original feature space
-    data = data_util.get_data(args.dataset,
-                              random_state=seed,
-                              data_dir=args.data_dir,
-                              return_feature=True)
-    X_train, X_test, y_train, y_test, label, feature = data
+    # get data
+    data = util.get_data(args.dataset,
+                         data_dir=args.data_dir,
+                         preprocessing=args.preprocessing)
+    X_train, X_test, y_train, y_test, feature, cat_indices = data
 
-    logger.info('\ntrain instances: {}'.format(len(X_train)))
-    logger.info('test instances: {}'.format(len(X_test)))
-    logger.info('no. features: {}'.format(X_train.shape[1]))
+    logger.info('\ntrain instances: {:,}'.format(X_train.shape[0]))
+    logger.info('test instances: {:,}'.format(X_test.shape[0]))
+    logger.info('no. features: {:,}'.format(X_train.shape[1]))
 
-    # filter the features to be the same as MFC18
-    mapping = {'NC17_EvalPart1': 'nc17_mfc18',
-               'MFC18_EvalPart1': 'mfc18_mfc19',
-               'MFC19_EvalPart1': 'mfc19_mfc20'}
+    # get tree-ensemble
+    clf = util.get_model(args.model,
+                         n_estimators=args.n_estimators,
+                         max_depth=args.max_depth,
+                         random_state=args.rs,
+                         cat_indices=cat_indices)
 
-    if args.dataset in mapping:
-        reduced_feature = data_util.get_data(mapping[args.dataset],
-                                             random_state=seed,
-                                             data_dir=args.data_dir,
-                                             return_feature=True)[-1]
-
-        keep_ndx = align_feature(feature, reduced_feature)
-        feature = feature[keep_ndx]
-        X_train = X_train[:, keep_ndx]
-        X_test = X_test[:, keep_ndx]
-
-    # train a tree ensemble and explainer
-    tree = clone(clf).fit(X_train, y_train)
-    model_util.performance(tree, X_train, y_train, X_test, y_test)
+    # train a tree ensemble
+    model = clone(clf).fit(X_train, y_train)
+    util.performance(model, X_train, y_train, logger=logger, name='Train')
+    util.performance(model, X_test, y_test, logger=logger, name='Test')
 
     # store indexes of different subgroups
     train_neg = np.where(y_train == 0)[0]
@@ -112,22 +83,23 @@ def experiment(args, logger, out_dir, seed):
     # test_pos = np.where(y_test == 1)[0]
 
     # transform features to tree kernel space
-    logger.info('\ntransforming features into tree kernel space')
+    logger.info('\ntransforming features into tree kernel space...')
+    extractor = trex.TreeExtractor(model, tree_kernel=args.tree_kernel)
+
     start = time.time()
-    extractor = TreeExtractor(tree, tree_kernel=args.tree_kernel)
+    X_train_alt = extractor.transform(X_train)
+    logger.info('train transform time: {:.3f}s'.format(time.time() - start))
 
-    X_train_tree = extractor.fit_transform(X_train)
-    logger.info('  train transform time: {:.3f}s'.format(time.time() - start))
-
-    X_test_tree = extractor.transform(X_test)
-    logger.info('  test transform time: {:.3f}s'.format(time.time() - start))
+    start = time.time()
+    X_test_alt = extractor.transform(X_test)
+    logger.info('test transform time: {:.3f}s'.format(time.time() - start))
 
     # reduce dimensionality on original and tree feature spaces
     logger.info('\nembed original features into a lower dimensional space')
-    X_train, X_test = reduce_and_embed(args, X_train, X_test, logger, init='random')
+    X_train, X_test = reduce_and_embed(args, X_train, X_test, logger)
 
     logger.info('\nembed tree kernel features into a lower dimensional space')
-    X_train_tree, X_test_tree = reduce_and_embed(args, X_train_tree, X_test_tree, logger, init='pca')
+    X_train_alt, X_test_alt = reduce_and_embed(args, X_train_alt, X_test_alt, logger)
 
     # separating embedded points into train and test
     # n_train = len(y_train)
@@ -141,8 +113,8 @@ def experiment(args, logger, out_dir, seed):
     np.save(os.path.join(out_dir, 'train_positive'), X_train[train_pos])
 
     # save tree kenel space results
-    np.save(os.path.join(out_dir, 'train_tree_negative'), X_train_tree[train_neg])
-    np.save(os.path.join(out_dir, 'train_tree_positive'), X_train_tree[train_pos])
+    np.save(os.path.join(out_dir, 'train_tree_negative'), X_train_alt[train_neg])
+    np.save(os.path.join(out_dir, 'train_tree_positive'), X_train_alt[train_pos])
 
     # np.save(os.path.join(out_dir, 'test_negative'), test_negative)
     # np.save(os.path.join(out_dir, 'test_positive'), test_positive)
@@ -150,31 +122,29 @@ def experiment(args, logger, out_dir, seed):
 
 def main(args):
 
-    # make logger
-    dataset = args.dataset
-
-    out_dir = os.path.join(args.out_dir, dataset, args.tree_type, args.tree_kernel)
+    # create output directory
+    out_dir = os.path.join(args.out_dir, args.dataset, args.model, args.tree_kernel)
     os.makedirs(out_dir, exist_ok=True)
 
-    logger = print_util.get_logger(os.path.join(out_dir, 'log.txt'))
+    # create logger
+    logger = util.get_logger(os.path.join(out_dir, 'log.txt'))
     logger.info(args)
 
-    experiment(args, logger, out_dir, seed=args.rs)
-
-    print_util.remove_logger(logger)
+    # run experiment
+    experiment(args, logger, out_dir)
 
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='Feature representation extractions for tree ensembles',
-                                     formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    parser = argparse.ArgumentParser()
 
     # I/O settings
     parser.add_argument('--dataset', type=str, default='churn', help='dataset to explain.')
     parser.add_argument('--data_dir', type=str, default='data', help='dataset directory.')
+    parser.add_argument('--preprocessing', type=str, default='standard', help='preprocessing directory.')
     parser.add_argument('--out_dir', type=str, default='output/clustering/', help='output directory.')
 
     # Tree settings
-    parser.add_argument('--tree_type', type=str, default='cb', help='model to use.')
+    parser.add_argument('--model', type=str, default='cb', help='model to use.')
     parser.add_argument('--n_estimators', type=int, default=100, help='number of trees.')
     parser.add_argument('--max_depth', type=int, default=3, help='maximum depth.')
 

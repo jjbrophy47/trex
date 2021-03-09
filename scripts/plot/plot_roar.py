@@ -22,8 +22,9 @@ def main(args):
     print(args)
 
     # settings
+    # dataset_list = ['churn', 'surgical', 'vaccine', 'amazon', 'bank_marketing', 'adult']
     dataset_list = ['surgical', 'vaccine', 'amazon', 'bank_marketing', 'adult', 'census']
-    method_list = ['random', 'klr-leaf_output', 'maple', 'knn-leaf_output']
+    method_list = ['random', 'klr', 'maple', 'knn']
     color_list = ['red', 'blue', 'orange', 'purple']
     label_list = ['Random', 'TREX-KLR', 'MAPLE', 'TEKNN']
     marker_list = ['o', 'd', '^', 'x']
@@ -100,7 +101,7 @@ def main(args):
                 temp_df2 = temp_df2.iloc[0]
                 metric_mean = temp_df2['{}s_mean'.format(args.metric)]
                 metric_sem = temp_df2['{}s_sem'.format(args.metric)]
-                removed_pcts = temp_df2['removed_pcts']
+                removed_pcts = temp_df2['remove_pcts']
 
                 # convert results from strings to arrays
                 metric_mean = np.fromstring(metric_mean[1: -1], dtype=np.float32, sep=' ')

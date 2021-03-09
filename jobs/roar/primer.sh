@@ -15,7 +15,7 @@ rs_start=${13}
 method_list=('random' 'klr' 'knn' 'maple')
 
 for method in ${method_list[@]}; do
-    for (( rs = $rs_start; rs < $rs_start + 20; rs++ )); do
+    for (( rs = $rs_start; rs < $rs_start + 40; rs++ )); do
         job_name="R_${dataset}_${model}_${method}"
 
         sbatch --mem=${mem}G \

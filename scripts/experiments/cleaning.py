@@ -183,23 +183,22 @@ def trex_method(args, model_noisy, y_train_noisy,
     """
 
     # train surrogate model
-    kernel_model = args.method.split('-')[0].split('_')[0]
-    tree_kernel = args.method.split('-')[-1]
-    surrogate = trex.TreeExplainer(model_noisy,
-                                   X_train,
-                                   y_train_noisy,
-                                   kernel_model=kernel_model,
-                                   tree_kernel=tree_kernel,
-                                   val_frac=args.tune_frac,
-                                   metric=args.metric,
-                                   random_state=args.rs,
-                                   logger=logger)
+    params = {'C': args.C, 'n_neighbors': args.n_neighbors, 'tree_kernel': args.tree_kernel}
+    surrogate = trex.train_surrogate(model=model_noisy,
+                                     surrogate=args.surrogate,
+                                     X_train=X_train,
+                                     y_train=y_train_noisy,
+                                     val_frac=args.tune_frac,
+                                     metric=args.metric,
+                                     seed=args.rs,
+                                     params=params,
+                                     logger=logger)
 
     # sort by instance log loss using the surrogate model
     if 'loss' in args.method:
         y_train_proba = surrogate.predict_proba(X_train)[:, 1]
-        y_train_loss = util.instance_log_loss(y_train, y_train_proba)  # negative log-likelihood
-        train_indices = np.argsort(y_train_loss)  # ascending, largest log loss first
+        y_train_noisy_loss = util.instance_log_loss(y_train_noisy, y_train_proba)  # negative log-likelihood
+        train_indices = np.argsort(y_train_noisy_loss)  # ascending, largest log loss first
 
     # sort by absolute value of instance weights
     else:
@@ -212,7 +211,7 @@ def trex_method(args, model_noisy, y_train_noisy,
     return result
 
 
-def tree_loss_method(model_noisy,
+def tree_loss_method(model_noisy, y_train_noisy,
                      noisy_indices, n_check, n_checkpoint,
                      clf, X_train, y_train, X_test, y_test,
                      acc_noisy, auc_noisy, seed=1, logger=None):
@@ -220,8 +219,8 @@ def tree_loss_method(model_noisy,
     Orders training instances by largest loss.
     """
     y_train_proba = model_noisy.predict_proba(X_train)[:, 1]
-    y_train_loss = util.instance_log_loss(y_train, y_train_proba)  # negative log-likelihood
-    train_indices = np.argsort(y_train_loss)  # ascending, largest log loss first
+    y_train_noisy_loss = util.instance_log_loss(y_train_noisy, y_train_proba)  # negative log-likelihood
+    train_indices = np.argsort(y_train_noisy_loss)  # ascending, largest log loss first
     result = fix_noisy_instances(train_indices, noisy_indices, n_check, n_checkpoint,
                                  clf, X_train, y_train, X_test, y_test,
                                  acc_noisy, auc_noisy, logger=logger)
@@ -350,17 +349,16 @@ def teknn_method(model_noisy, y_train_noisy,
     X_train_alt = extractor.transform(X_train)
 
     # train surrogate model
-    param_grid = {'n_neighbors': [3, 5, 7, 9, 11, 13, 15, 31, 45, 61]}
-    surrogate = trex.util.train_surrogate(model_noisy,
-                                          'knn',
-                                          param_grid,
-                                          X_train,
-                                          X_train_alt,
-                                          y_train_noisy,
-                                          val_frac=args.tune_frac,
-                                          metric=args.metric,
-                                          seed=args.rs,
-                                          logger=logger)
+    params = {'C': args.C, 'n_neighbors': args.n_neighbors, 'tree_kernel': args.tree_kernel}
+    surrogate = trex.train_surrogate(model=model_noisy,
+                                     surrogate=args.method,
+                                     X_train=X_train,
+                                     y_train=y_train_noisy,
+                                     val_frac=args.tune_frac,
+                                     metric=args.metric,
+                                     seed=args.rs,
+                                     params=params,
+                                     logger=logger)
 
     # sort by instance log loss using the surrogate model
     if 'loss' in args.method:
@@ -370,30 +368,16 @@ def teknn_method(model_noisy, y_train_noisy,
             logger.info('\ncomputing KNN loss...')
 
         y_train_proba = surrogate.predict_proba(X_train_alt)[:, 1]
-        y_train_loss = util.instance_log_loss(y_train, y_train_proba)  # negative log-likelihood
-        train_indices = np.argsort(y_train_loss)  # ascending, largest log loss first
+        y_train_noisy_loss = util.instance_log_loss(y_train_noisy, y_train_proba)  # negative log-likelihood
+        train_indices = np.argsort(y_train_noisy_loss)  # ascending, largest log loss first
 
     # sort by absolute value of instance weights
     else:
 
-        # display progress
-        if logger:
-            logger.info('\ncomputing similarity density...')
-            start = time.time()
-
-        # compute similarity density
-        train_weight = np.zeros(X_train_alt.shape[0])
-        for i in range(X_train_alt.shape[0]):
-            distances, neighbor_ids = surrogate.kneighbors([X_train_alt[i]])
-            train_weight[neighbor_ids[0]] += 1
-
-            # display progress
-            if logger and i % int(X_train.shape[0] * frac_progress_update) == 0:
-                elapsed = time.time() - start
-                logger.info('finished {:.1f}% train instances...{:.3f}s'.format((i / X_train.shape[0]) * 100, elapsed))
-
-        # sort instances by their similarity density
-        train_indices = np.argsort(train_weight)[::-1]
+        # sort instances based on highest neighborhood density
+        attributions = surrogate.compute_attributions(X_train)
+        attributions_sum = np.sum(attributions, axis=0)
+        train_indices = np.argsort(attributions_sum)[::-1]
 
     # fix noisy instances
     result = fix_noisy_instances(train_indices, noisy_indices, n_check, n_checkpoint,
@@ -597,7 +581,7 @@ def experiment(args, logger, out_dir):
 
     # tree-esemble loss
     elif args.method == 'tree_loss':
-        result = tree_loss_method(model_noisy,
+        result = tree_loss_method(model_noisy, y_train_noisy,
                                   noisy_indices, n_check, n_checkpoint,
                                   clf, X_train, y_train, X_test, y_test,
                                   acc_noisy, auc_noisy, seed=args.rs, logger=logger)
