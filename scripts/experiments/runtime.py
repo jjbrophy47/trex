@@ -197,7 +197,7 @@ def teknn_method(args, model, test_ndx, X_train, y_train, X_test,
 
     # retrieve k nearest neighbors as most influential to the test instance
     start = time.time()
-    distances, neighbor_ids = surrogate.compute_attributions(X_test[[test_ndx]])
+    surrogate.compute_attributions(X_test[[test_ndx]])
     test_time = time.time() - start
 
     # result object
