@@ -197,7 +197,7 @@ def trex_method(args, model_noisy, y_train_noisy,
     if 'loss' in args.method:
         y_train_proba = surrogate.predict_proba(X_train)[:, 1]
         y_train_noisy_loss = util.instance_log_loss(y_train_noisy, y_train_proba)  # negative log-likelihood
-        train_indices = np.argsort(y_train_noisy_loss)  # ascending, largest log loss first
+        train_indices = np.argsort(y_train_noisy_loss)[::-1]  # descending, largest log loss first
 
     # sort by absolute value of instance weights
     else:
@@ -219,7 +219,7 @@ def tree_loss_method(model_noisy, y_train_noisy,
     """
     y_train_proba = model_noisy.predict_proba(X_train)[:, 1]
     y_train_noisy_loss = util.instance_log_loss(y_train_noisy, y_train_proba)  # negative log-likelihood
-    train_indices = np.argsort(y_train_noisy_loss)  # ascending, largest log loss first
+    train_indices = np.argsort(y_train_noisy_loss)[::-1]  # descending, largest log loss first
     result = fix_noisy_instances(train_indices, noisy_indices, n_check, n_checkpoint,
                                  clf, X_train, y_train, X_test, y_test,
                                  acc_noisy, auc_noisy, logger=logger)
@@ -341,15 +341,10 @@ def teknn_method(model_noisy, y_train_noisy,
     one another's neighborhood, this can be weighted by 1 / distance.
     """
 
-    # transform the data
-    tree_kernel = args.method.split('_')[-1]
-    extractor = trex.TreeExtractor(model_noisy, tree_kernel=tree_kernel)
-    X_train_alt = extractor.transform(X_train)
-
     # train surrogate model
     params = {'C': args.C, 'n_neighbors': args.n_neighbors, 'tree_kernel': args.tree_kernel}
     surrogate = trex.train_surrogate(model=model_noisy,
-                                     surrogate=args.method.split('-')[0],
+                                     surrogate=args.method.split('_')[0],
                                      X_train=X_train,
                                      y_train=model_noisy.predict(X_train),
                                      val_frac=args.tune_frac,
@@ -365,9 +360,9 @@ def teknn_method(model_noisy, y_train_noisy,
         if logger:
             logger.info('\ncomputing KNN loss...')
 
-        y_train_proba = surrogate.predict_proba(X_train_alt)[:, 1]
+        y_train_proba = surrogate.predict_proba(X_train)[:, 1]
         y_train_noisy_loss = util.instance_log_loss(y_train_noisy, y_train_proba)  # negative log-likelihood
-        train_indices = np.argsort(y_train_noisy_loss)  # ascending, largest log loss first
+        train_indices = np.argsort(y_train_noisy_loss)[::-1]  # descending, largest log loss first
 
     # sort by absolute value of instance weights
     else:

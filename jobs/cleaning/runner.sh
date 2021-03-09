@@ -18,7 +18,7 @@ check_pct=${11}
 train_frac=${12}
 rs=${13}
 
-if [ $method = 'klr' ]; then
+if [ $method = 'klr' ] || [ $method = 'klr_loss' ]; then
     tree_kernel=$klr_tree_kernel
 else
     tree_kernel=$knn_tree_kernel
