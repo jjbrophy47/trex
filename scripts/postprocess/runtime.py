@@ -29,8 +29,12 @@ def get_result(template, in_dir):
         result = None
 
     else:
-        d = np.load(fp, allow_pickle=True)[()]
-        result.update(d)
+        try:
+            d = np.load(fp, allow_pickle=True)[()]
+            result.update(d)
+
+        except (OSError, EOFError):
+            result = None
 
     return result
 
@@ -145,10 +149,9 @@ if __name__ == '__main__':
     parser.add_argument('--preprocessing', type=str, nargs='+', default=['categorical', 'standard'],
                         help='preprocessing directory.')
     parser.add_argument('--method', type=str, nargs='+',
-                        default=['klr-leaf_output', 'svm-leaf_output',
-                                 'maple', 'knn-leaf_output', 'leaf_influence'],
+                        default=['klr', 'svm', 'maple', 'knn', 'leaf_influence'],
                         help='method for sorting train data.')
-    parser.add_argument('--rs', type=int, nargs='+', default=[1, 2, 3, 4, 5], help='random state.')
+    parser.add_argument('--rs', type=int, nargs='+', default=list(range(1, 11)), help='random state.')
 
     args = parser.parse_args()
     main(args)

@@ -295,7 +295,7 @@ def sort_train_instances(args, model, X_train, y_train, X_test, y_test, rng, log
         train_indices = maple_method(args, model, X_train, y_train, X_test, logger=logger)
 
     # Leaf Influence (NOTE: can only compute influence of the LOSS, requires label)
-    elif args.method == 'leaf_influence':
+    elif args.model == 'cb' and args.method == 'leaf_influence':
         train_indices = influence_method(args, model, X_train, y_train, X_test, y_test, logger=logger)
 
     # TEKNN

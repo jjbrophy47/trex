@@ -23,8 +23,6 @@ from datetime import datetime
 
 import numpy as np
 from sklearn.base import clone
-from sklearn.metrics import accuracy_score
-from sklearn.metrics import roc_auc_score
 
 here = os.path.abspath(os.path.dirname(__file__))
 sys.path.insert(0, here + '/../../')  # for influence_boosting
@@ -33,24 +31,6 @@ import trex
 import util
 from baselines.influence_boosting.influence.leaf_influence import CBLeafInfluenceEnsemble
 from baselines.maple.MAPLE import MAPLE
-
-
-def score(model, X_test, y_test):
-    """
-    Evaluates the model the on test set and returns metric scores.
-    """
-
-    # 1 test sample
-    if y_test.shape[0] == 1:
-        result = (-1, -1)
-
-    # >1 test sample
-    else:
-        acc = accuracy_score(y_test, model.predict(X_test))
-        auc = roc_auc_score(y_test, model.predict_proba(X_test)[:, 1])
-        return (acc, auc)
-
-    return result
 
 
 def measure_performance(train_indices, clf, X_train, y_train, X_test, y_test, logger=None):
@@ -76,6 +56,8 @@ def measure_performance(train_indices, clf, X_train, y_train, X_test, y_test, lo
 
     # compute how many samples should be removed
     for train_frac_to_remove in args.train_frac_to_remove:
+
+        # get training instances to remove
         n_remove = round(train_frac_to_remove * X_train.shape[0])
         remove_indices = train_indices[:n_remove]
 
@@ -83,7 +65,7 @@ def measure_performance(train_indices, clf, X_train, y_train, X_test, y_test, lo
         new_X_train = np.delete(X_train, remove_indices, axis=0)
         new_y_train = np.delete(y_train, remove_indices)
 
-        # measure change in test instance predictive probability
+        # measure change in test instance probability
         new_model = clone(clf).fit(new_X_train, new_y_train)
         proba = new_model.predict_proba(X_test)[:, 1]
         proba_diff = np.abs(base_proba - proba)[0]
@@ -114,34 +96,31 @@ def trex_method(args, model, X_train, y_train, X_test, logger=None,
     """
 
     # train surrogate model
-    kernel_model = args.method.split('-')[0].split('_')[0]
-    tree_kernel = args.method.split('-')[-1]
-    surrogate = trex.TreeExplainer(model,
-                                   X_train,
-                                   y_train,
-                                   kernel_model=kernel_model,
-                                   tree_kernel=tree_kernel,
-                                   val_frac=args.tune_frac,
-                                   metric=args.metric,
-                                   random_state=args.rs,
-                                   logger=logger)
+    params = {'C': args.C, 'n_neighbors': args.n_neighbors, 'tree_kernel': args.tree_kernel}
+    surrogate = trex.train_surrogate(model=model,
+                                     surrogate=args.method,
+                                     X_train=X_train,
+                                     y_train=y_train,
+                                     val_frac=args.tune_frac,
+                                     metric=args.metric,
+                                     seed=args.rs,
+                                     params=params,
+                                     logger=logger)
 
     # display status
     if logger:
         logger.info('\ncomputing influence of each training sample on the test set...')
 
     # sort instances with highest positive influence first
-    attributions_sum = np.zeros(X_train.shape[0])
-
-    # compute impact of each training sample on the test set
-    for i in range(X_test.shape[0]):
-        attributions_sum += surrogate.compute_attributions(X_test[[i]])[0]
+    attributions = surrogate.compute_attributions(X_test)
+    attributions_sum = np.sum(attributions, axis=0)
+    train_indices = np.argsort(attributions_sum)[::-1]
 
     # sim = surrogate.similarity(X_test)[0]
     # train_indices = np.argsort(sim)[::-1]
 
     # sort instances most inhibitory samples first
-    train_indices = np.argsort(attributions_sum)[::-1]  # most excitatory to most inhibitory
+    # train_indices = np.argsort(attributions_sum)[::-1]  # most excitatory to most inhibitory
     # train_indices = np.argsort(attributions_sum)  # most inhibitory to most excitatory
     # train_indices = np.argsort(np.abs(attributions_sum))[::-1]  # biggest impacts
     # train_indices = np.argsort(np.abs(surrogate.get_alpha()))[::-1]  # biggest weights
@@ -188,7 +167,8 @@ def influence_method(args, model, X_train, y_train, X_test, y_test, logger=None,
     Reference:
     https://github.com/kohpangwei/influence-release/blob/master/influence/experiments.py
     """
-    assert k == -1, 'AllPoints method not used for k: {}'.format(k)
+    k = 0
+    # assert k == -1, 'AllPoints method not used for k: {}'.format(k)
     assert args.model == 'cb', 'tree-ensemble is not a CatBoost model!'
 
     # save CatBoost model
@@ -200,7 +180,8 @@ def influence_method(args, model, X_train, y_train, X_test, y_test, logger=None,
     # initialize Leaf Influence
     explainer = CBLeafInfluenceEnsemble(temp_fp, X_train, y_train, k=k,
                                         learning_rate=model.learning_rate_,
-                                        update_set='AllPoints')
+                                        # update_set='AllPoints')
+                                        update_set='SinglePoint')
 
     # display status
     if logger:
@@ -245,44 +226,22 @@ def teknn_method(args, model, X_train, y_train, X_test, logger=None,
     Sort trainnig instance based on similarity density to the test instances.
     """
 
-    # transform the data
-    tree_kernel = args.method.split('-')[-1]
-    extractor = trex.TreeExtractor(model, tree_kernel=tree_kernel)
-    X_train_alt = extractor.transform(X_train)
-
     # train surrogate model
-    param_grid = {'n_neighbors': [3, 5, 7, 9, 11, 13, 15, 31, 45, 61]}
-    surrogate = trex.util.train_surrogate(model,
-                                          'knn',
-                                          param_grid,
-                                          X_train,
-                                          X_train_alt,
-                                          y_train,
-                                          val_frac=args.tune_frac,
-                                          metric=args.metric,
-                                          seed=args.rs,
-                                          logger=logger)
+    params = {'C': args.C, 'n_neighbors': args.n_neighbors, 'tree_kernel': args.tree_kernel}
+    surrogate = trex.train_surrogate(model=model,
+                                     surrogate=args.method,
+                                     X_train=X_train,
+                                     y_train=y_train,
+                                     val_frac=args.tune_frac,
+                                     metric=args.metric,
+                                     seed=args.rs,
+                                     params=params,
+                                     logger=logger)
 
-    # display status
-    if logger:
-        logger.info('\ncomputing influence of all training samples on the test instance...')
-
-    # contributions container
-    contributions_sum = np.zeros(X_train.shape[0])
-
-    # compute the contribution of all training samples on each test instance
-    for i in range(X_test.shape[0]):
-        x_test_alt = extractor.transform(X_test[[i]])
-        pred_label = int(surrogate.predict(x_test_alt)[0])
-        distances, neighbor_ids = surrogate.kneighbors(x_test_alt)
-
-        # add density to training instances that are in the neighborhood of the test instance
-        for neighbor_id in neighbor_ids[0]:
-            contribution = 1 if y_train[neighbor_id] == pred_label else -1
-            contributions_sum[neighbor_id] += contribution
-
-    # sort instances based on similarity density
-    train_indices = np.argsort(contributions_sum)[::-1]
+    # sort instances based on highest similarity density
+    attributions = surrogate.compute_attributions(X_test)
+    attributions_sum = np.sum(attributions, axis=0)
+    train_indices = np.argsort(attributions_sum)[::-1]
 
     return train_indices
 
@@ -305,7 +264,7 @@ def sort_train_instances(args, model, X_train, y_train, X_test, y_test, rng, log
         train_indices = maple_method(args, model, X_train, y_train, X_test, logger=logger)
 
     # Leaf Influence (NOTE: can only compute influence of the LOSS, requires label)
-    elif args.method == 'leaf_influence':
+    elif args.model == 'cb' and args.method == 'leaf_influence':
         train_indices = influence_method(args, model, X_train, y_train, X_test, y_test, logger=logger)
 
     # TEKNN
@@ -410,7 +369,7 @@ if __name__ == '__main__':
 
     # Data settings
     parser.add_argument('--train_frac', type=float, default=1.0, help='fraction of train data to evaluate.')
-    parser.add_argument('--tune_frac', type=float, default=0.1, help='amount of data for validation.')
+    parser.add_argument('--tune_frac', type=float, default=0.0, help='amount of data for validation.')
 
     # Tree-ensemble settings
     parser.add_argument('--model', type=str, default='cb', help='model to use.')
@@ -418,12 +377,18 @@ if __name__ == '__main__':
     parser.add_argument('--max_depth', type=int, default=3, help='max. depth in tree ensemble.')
 
     # Method settings
-    parser.add_argument('--method', type=str, default='klr-leaf_output', help='method.')
+    parser.add_argument('--method', type=str, default='klr', help='method.')
     parser.add_argument('--metric', type=str, default='mse', help='metric for tuning surrogate models.')
+
+    # No tuning settings
+    parser.add_argument('--C', type=float, default=1.0, help='penalty parameters for KLR or SVM.')
+    parser.add_argument('--n_neighbors', type=int, default=5, help='no. neighbors to use for KNN.')
+    parser.add_argument('--tree_kernel', type=str, default='leaf_output', help='tree kernel.')
 
     # Experiment settings
     parser.add_argument('--rs', type=int, default=1, help='random state.')
-    parser.add_argument('--train_frac_to_remove', type=float, nargs='+', default=[0.001, 0.005, 0.01, 0.05, 0.1, 0.2],
+    parser.add_argument('--train_frac_to_remove', type=float, nargs='+',
+                        default=[0.001, 0.01, 0.05, 0.1, 0.2],
                         help='frac. train instances to remove.')
     parser.add_argument('--n_test', type=int, default=1, help='no. of test instances to evaluate.')
 
