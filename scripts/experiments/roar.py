@@ -18,6 +18,8 @@ import resource
 import argparse
 import warnings
 warnings.simplefilter(action='ignore', category=UserWarning)  # lgb compiler warning
+import matplotlib
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 from copy import deepcopy
 from datetime import datetime
