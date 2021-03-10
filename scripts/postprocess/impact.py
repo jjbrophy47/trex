@@ -29,8 +29,12 @@ def get_result(template, in_dir):
         result = None
 
     else:
-        d = np.load(fp, allow_pickle=True)[()]
-        result.update(d)
+        try:
+            d = np.load(fp, allow_pickle=True)[()]
+            result.update(d)
+
+        except (OSError, EOFError):
+            result = None
 
     return result
 
@@ -57,7 +61,7 @@ def process_results(df):
 
         # get removed percentages
         removed_pcts = [np.array(x) for x in gf['remove_pct'].values]
-        main_result['remove_pcts'] = np.mean(removed_pcts, axis=0)
+        main_result['remove_pct'] = np.mean(removed_pcts, axis=0)
 
         main_result_list.append(main_result)
 
@@ -147,13 +151,11 @@ if __name__ == '__main__':
     parser.add_argument('--dataset', type=str, nargs='+', help='dataset.',
                         default=['churn', 'surgical', 'vaccine', 'amazon', 'bank_marketing', 'adult', 'census'])
     parser.add_argument('--model', type=int, nargs='+', default=['cb', 'rf'], help='model to extract the results for.')
-    parser.add_argument('--preprocessing', type=int, nargs='+', default=['categorical', 'standard'],
-                        help='preprocessing directory.')
+    parser.add_argument('--preprocessing', type=int, nargs='+', default=['standard'], help='preprocessing directory.')
     parser.add_argument('--method', type=int, nargs='+',
-                        default=['random', 'klr-leaf_output', 'svm-leaf_output',
-                                 'maple', 'knn-leaf_output', 'leaf_influence'],
+                        default=['random', 'klr', 'svm', 'maple', 'knn', 'leaf_influence'],
                         help='method for sorting train data.')
-    parser.add_argument('--rs', type=int, nargs='+', default=list(range(1, 41)), help='random state.')
+    parser.add_argument('--rs', type=int, nargs='+', default=list(range(1, 21)), help='random state.')
 
     args = parser.parse_args()
     main(args)

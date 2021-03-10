@@ -39,7 +39,7 @@ def train_surrogate(model, surrogate, X_train, y_train,
 
         # display train results
         if logger:
-            logger.info('train time: {:.3f}s'.format(time.time() - start))
+            logger.info('\nsurrogate train time: {:.3f}s'.format(time.time() - start))
 
     # tune and train the surrogate model
     else:

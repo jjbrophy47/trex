@@ -23,11 +23,11 @@ def main(args):
 
     # settings
     dataset_list = ['surgical', 'vaccine', 'amazon', 'bank_marketing', 'adult', 'census']
-    method_list = ['random', 'klr-leaf_output', 'maple', 'knn-leaf_output']
-    color_list = ['red', 'blue', 'orange', 'purple']
-    label_list = ['Random', 'TREX-KLR', 'MAPLE', 'TEKNN']
-    marker_list = ['o', 'd', '^', 'x']
-    zorder_list = [3, 4, 2, 1]
+    method_list = ['random', 'klr', 'maple', 'knn', 'leaf_influence']
+    color_list = ['red', 'blue', 'orange', 'purple', 'black']
+    label_list = ['Random', 'TREX-KLR', 'MAPLE', 'TEKNN', 'Leaf Influence']
+    marker_list = ['o', 'd', '^', 'x', '1']
+    zorder_list = [3, 4, 2, 1, 1]
 
     # get results
     df = pd.read_csv(os.path.join(args.in_dir, 'results.csv'))
@@ -68,15 +68,9 @@ def main(args):
 
             # add y-axis
             if j == 0:
-                if args.metric in ['acc', 'auc']:
-                    label = 'accuracy' if args.metric == 'acc' else 'AUC'
-                    ax.set_ylabel('Test {}'.format(label))
 
-                elif args.metric == 'avg_proba_delta':
-                    ax.set_ylabel(r'Avg. test prob. $\Delta$')
-
-                elif args.metric == 'median_proba_delta':
-                    ax.set_ylabel(r'Median test prob. $\Delta$')
+                if args.metric == 'proba_diff':
+                    ax.set_ylabel(r'Test prob. $\Delta$')
 
             # add x-axis
             if i == 1:
@@ -85,7 +79,6 @@ def main(args):
             # add title
             ax.set_title('Census (10%)' if dataset == 'census_0p1' else dataset.capitalize())
             ax.tick_params(axis='both', which='major')
-            ax.set_xscale('log')
 
             # plot each method
             methods = list(zip(method_list, label_list, color_list, marker_list, zorder_list))
@@ -101,7 +94,7 @@ def main(args):
                 temp_df2 = temp_df2.iloc[0]
                 metric_mean = temp_df2['{}_mean'.format(args.metric)]
                 metric_sem = temp_df2['{}_sem'.format(args.metric)]
-                removed_pcts = temp_df2['remove_pcts']
+                removed_pcts = temp_df2['remove_pct']
 
                 # convert results from strings to arrays
                 metric_mean = np.fromstring(metric_mean[1: -1], dtype=np.float32, sep=' ')

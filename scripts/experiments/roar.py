@@ -18,6 +18,7 @@ import resource
 import argparse
 import warnings
 warnings.simplefilter(action='ignore', category=UserWarning)  # lgb compiler warning
+import matplotlib.pyplot as plt
 from copy import deepcopy
 from datetime import datetime
 
@@ -55,7 +56,8 @@ def score(model, X_test, y_test):
 
 
 def measure_performance(train_indices, n_checkpoint, n_checkpoints,
-                        clf, X_train, y_train, X_test, y_test, logger=None):
+                        clf, X_train, y_train, X_test, y_test,
+                        logger=None):
     """
     Measures the change in predictions as training instances are removed.
     """
@@ -86,8 +88,9 @@ def measure_performance(train_indices, n_checkpoint, n_checkpoints,
     for i in range(n_checkpoints):
 
         # compute how many samples should be removed
-        n_samples = (i + 1) * n_checkpoint
-        remove_indices = train_indices[:n_samples]
+        n_remove = (i + 1) * n_checkpoint
+        remove_indices = train_indices[:n_remove]
+        remove_pct = n_remove / X_train.shape[0] * 100
 
         # remove most influential training samples
         new_X_train = np.delete(X_train, remove_indices, axis=0)
@@ -108,13 +111,38 @@ def measure_performance(train_indices, n_checkpoint, n_checkpoints,
         result['aucs'].append(auc)
         result['avg_proba_deltas'].append(np.mean(np.abs(base_proba - proba)))
         result['median_proba_deltas'].append(np.median(np.abs(base_proba - proba)))
-        result['remove_pcts'].append(n_samples / train_indices.shape[0] * 100)
+        result['remove_pcts'].append(remove_pct)
 
         # display progress
         if logger:
-            logger.info(s.format(i + 1, result['remove_pcts'][-1], result['accs'][-1], result['aucs'][-1],
+            logger.info(s.format(i + 1, remove_pct, result['accs'][-1], result['aucs'][-1],
                                  result['avg_proba_deltas'][-1], result['median_proba_deltas'][-1],
                                  time.time() - start))
+
+        # plot original model and new model predictions on the test set
+        if (i + 1) == args.special_checkpoint and logger:
+            logger.info('special checkpoint, plotting predictions...')
+
+            pos_indices = np.where(y_test == 1)[0]
+            neg_indices = np.where(y_test == 0)[0]
+
+            fig, ax = plt.subplots()
+            ax.scatter(base_proba[pos_indices], proba[pos_indices], marker='+', label='pos. label', color='green')
+            ax.scatter(base_proba[neg_indices], proba[neg_indices], marker='.', label='neg. label', color='red',
+                       facecolors='none')
+            ax.plot([0, 1], [0, 1], transform=ax.transAxes, linestyle='--', color='black')
+            ax.set_xlabel('Original model prob.')
+            ax.set_ylabel('Updated model prob.')
+            ax.set_title('{:.0f}% Train Data Removed'.format(remove_pct))
+            ax.set_xlim(0, 1)
+            ax.set_ylim(0, 1)
+            ax.legend()
+
+            # add to results
+            result['ckpt_model_proba'] = base_proba
+            result['ckpt_new_model_proba'] = proba
+            result['ckpt_remove_pct'] = remove_pct
+            result['ckpt_y_test'] = y_test
 
     return result
 
@@ -153,6 +181,20 @@ def trex_method(args, model, X_train, y_train, X_test, logger=None,
     attributions = surrogate.pred_influence(X_test, pred)
     attributions_sum = np.sum(attributions, axis=0)
     train_indices = np.argsort(attributions_sum)[::-1]
+
+    # display k most influential training samples
+    if logger:
+        k = 20
+        sim_s = surrogate.similarity(X_test)[0][train_indices]
+        alpha_s = surrogate.get_alpha()[train_indices]
+        attributions_sum_s = attributions_sum[train_indices]
+        y_train_s = y_train[train_indices]
+
+        train_info = list(zip(train_indices, attributions_sum_s, y_train_s, alpha_s, sim_s))
+        s = '[{:5}] label: {}, alpha: {:.3f}, sim: {:.3f} attribution sum: {:.3f}'
+
+        for ndx, atr, lab, alpha, sim in train_info[:k]:
+            logger.info(s.format(ndx, lab, alpha, sim, atr))
 
     return train_indices
 
@@ -349,7 +391,8 @@ def experiment(args, logger, out_dir):
     # display dataset statistics
     logger.info('\nno. train instances: {:,}'.format(X_train.shape[0]))
     logger.info('no. test instances: {:,}'.format(X_test_sub.shape[0]))
-    logger.info('no. features: {:,}\n'.format(X_train.shape[1]))
+    logger.info('no. features: {:,}'.format(X_train.shape[1]))
+    logger.info('pos. label % (test): {:.1f}%\n'.format(np.sum(y_test) / y_test.shape[0] * 100))
 
     # train a tree ensemble
     model = clone(clf).fit(X_train, y_train)
@@ -375,6 +418,7 @@ def experiment(args, logger, out_dir):
     result['max_rss'] = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
     result['total_time'] = time.time() - begin
     np.save(os.path.join(out_dir, 'results.npy'), result)
+    plt.savefig(os.path.join(out_dir, 'special_ckpt.pdf'), bbox_inches='tight')
 
     # display results
     logger.info('\nResults:\n{}'.format(result))
@@ -435,6 +479,7 @@ if __name__ == '__main__':
     parser.add_argument('--n_test', type=int, default=100, help='no. test instances.')
     parser.add_argument('--train_frac_to_remove', type=float, default=0.5, help='fraction of train data to remove.')
     parser.add_argument('--n_checkpoints', type=int, default=10, help='no. checkpoints to perform retraining.')
+    parser.add_argument('--special_checkpoint', type=int, default=5, help='checkpoint to plot model predictions.')
 
     # Additional settings
     parser.add_argument('--verbose', type=int, default=0, help='verbosity level.')
