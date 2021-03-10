@@ -97,7 +97,6 @@ def measure_performance(train_indices, n_checkpoint, n_checkpoints,
         if len(np.unique(new_y_train)) == 1:
             logger.info('Only samples from one class remain!')
             break
-            # raise ValueError('Only samples from one class remain!')
 
         # remeasure test instance predictive performance
         new_model = clone(clf).fit(new_X_train, new_y_train)
@@ -149,8 +148,9 @@ def trex_method(args, model, X_train, y_train, X_test, logger=None,
     if logger:
         logger.info('\ncomputing influence of each training sample on the test set...')
 
-    # sort instances with highest positive influence first
-    attributions = surrogate.compute_attributions(X_test)
+    # sort instances with the larget influence on the predicted labels of the test set
+    pred = model.predict(X_test)
+    attributions = surrogate.pred_influence(X_test, pred)
     attributions_sum = np.sum(attributions, axis=0)
     train_indices = np.argsort(attributions_sum)[::-1]
 
@@ -269,7 +269,7 @@ def teknn_method(args, model, X_train, y_train, X_test, logger=None):
                                      params=params,
                                      logger=logger)
 
-    # sort instances based on highest similarity density
+    # sort instances based on largest influence on predicted test labels
     attributions = surrogate.compute_attributions(X_test)
     attributions_sum = np.sum(attributions, axis=0)
     train_indices = np.argsort(attributions_sum)[::-1]
@@ -415,7 +415,6 @@ if __name__ == '__main__':
     # Data settings
     parser.add_argument('--train_frac', type=float, default=1.0, help='fraction of train data to evaluate.')
     parser.add_argument('--tune_frac', type=float, default=0.0, help='amount of data for validation.')
-    parser.add_argument('--scoring', type=str, default='accuracy', help='metric for tuning the tree-ensemble.')
 
     # Tree-ensemble settings
     parser.add_argument('--model', type=str, default='cb', help='model to use.')
@@ -427,7 +426,7 @@ if __name__ == '__main__':
     parser.add_argument('--metric', type=str, default='mse', help='metric for tuning surrogate models.')
 
     # No tuning settings
-    parser.add_argument('--C', type=float, default=0.1, help='penalty parameters for KLR or SVM.')
+    parser.add_argument('--C', type=float, default=1.0, help='penalty parameters for KLR or SVM.')
     parser.add_argument('--n_neighbors', type=int, default=5, help='no. neighbors to use for KNN.')
     parser.add_argument('--tree_kernel', type=str, default='leaf_output', help='tree kernel.')
 

@@ -2,7 +2,7 @@
 Experiment:
     1) Select a test instance uniformly at random.
     2) Sort training instances by absolute difference on the test instance probability OR loss.
-    3) Remove 1 or 10 or 100 or etc. most impactful training instances.
+    3) Training samples in equal increments.
     4) Train a new tree-ensemble on the reduced training dataset.
     5) Measure absolute change in predicted probability.
 
@@ -33,7 +33,8 @@ from baselines.influence_boosting.influence.leaf_influence import CBLeafInfluenc
 from baselines.maple.MAPLE import MAPLE
 
 
-def measure_performance(train_indices, clf, X_train, y_train, X_test, y_test, logger=None):
+def measure_performance(args, train_indices, clf, X_train, y_train, X_test, y_test,
+                        logger=None):
     """
     Measures the change in predictions as training instances are removed.
     """
@@ -42,24 +43,27 @@ def measure_performance(train_indices, clf, X_train, y_train, X_test, y_test, lo
     model = clone(clf).fit(X_train, y_train)
     base_proba = model.predict_proba(X_test)[:, 1]
 
+    # display status
     if logger:
         logger.info('\nremoving, retraining, and remeasuring predicted probability...')
         logger.info('test label: {}, before prob.: {:.5f}'.format(int(y_test[0]), base_proba[0]))
 
+    # result container
     result = {}
     result['proba_diff'] = []
     result['remove_pct'] = []
 
-    # fraction for removing one sample
-    frac_zero = 1 / X_train.shape[0]
-    args.train_frac_to_remove.insert(0, frac_zero)
+    # compute no. samples to remove between each checkpoint
+    n_checkpoint = int(X_train.shape[0] * args.train_frac_to_remove / args.n_checkpoints)
 
-    # compute how many samples should be removed
-    for train_frac_to_remove in args.train_frac_to_remove:
+    # remove percentages of training samples and retrain
+    for i in range(args.n_checkpoints):
+        start = time.time()
 
-        # get training instances to remove
-        n_remove = round(train_frac_to_remove * X_train.shape[0])
+        # compute how many samples should be removed
+        n_remove = (i + 1) * n_checkpoint
         remove_indices = train_indices[:n_remove]
+        pct_remove = n_remove / X_train.shape[0] * 100
 
         # remove most influential training samples
         new_X_train = np.delete(X_train, remove_indices, axis=0)
@@ -70,14 +74,14 @@ def measure_performance(train_indices, clf, X_train, y_train, X_test, y_test, lo
         proba = new_model.predict_proba(X_test)[:, 1]
         proba_diff = np.abs(base_proba - proba)[0]
 
-        # display status
-        if logger:
-            s = '[{:.5f}% removed] after prob.: {:.5f}, delta: {:.5f}'
-            logger.info(s.format(train_frac_to_remove * 100, proba[0], proba_diff))
-
         # add to results
         result['proba_diff'].append(np.abs(base_proba - proba)[0])
-        result['remove_pct'].append(train_frac_to_remove * 100)
+        result['remove_pct'].append(pct_remove)
+
+        # display progress
+        if logger:
+            s = '[{:.1f}% removed] after prob.: {:.5f}, delta: {:.5f}...{:.3f}s'
+            logger.info(s.format(n_remove / X_train.shape[0] * 100, proba[0], proba_diff, time.time() - start))
 
     return result
 
@@ -111,21 +115,30 @@ def trex_method(args, model, X_train, y_train, X_test, logger=None,
     if logger:
         logger.info('\ncomputing influence of each training sample on the test set...')
 
-    # sort instances with highest positive influence first
-    attributions = surrogate.compute_attributions(X_test)
+    # sort instances by largest influence on the test instance
+    # attributions = surrogate.compute_attributions(X_test)
+    # attributions_sum = np.sum(attributions, axis=0)
+    # train_indices = np.argsort(attributions_sum)[::-1]
+
+    # sort instances most excitatory w.r.t. the predicted label
+    pred = model.predict(X_test)
+    attributions = surrogate.pred_influence(X_test, pred)
     attributions_sum = np.sum(attributions, axis=0)
     train_indices = np.argsort(attributions_sum)[::-1]
 
-    # sim = surrogate.similarity(X_test)[0]
-    # train_indices = np.argsort(sim)[::-1]
+    # display attributions from the top k train instances
+    if logger:
+        k = 20
+        sim_s = surrogate.similarity(X_test)[0][train_indices]
+        alpha_s = surrogate.get_alpha()[train_indices]
+        attributions_sum_s = attributions_sum[train_indices]
+        y_train_s = y_train[train_indices]
 
-    # sort instances most inhibitory samples first
-    # train_indices = np.argsort(attributions_sum)[::-1]  # most excitatory to most inhibitory
-    # train_indices = np.argsort(attributions_sum)  # most inhibitory to most excitatory
-    # train_indices = np.argsort(np.abs(attributions_sum))[::-1]  # biggest impacts
-    # train_indices = np.argsort(np.abs(surrogate.get_alpha()))[::-1]  # biggest weights
+        train_info = list(zip(train_indices, attributions_sum_s, y_train_s, alpha_s, sim_s))
+        s = '[{:5}] label: {}, alpha: {:.3f}, sim: {:.3f} attribution sum: {:.3f}'
 
-    # print(attributions_sum[train_indices])
+        for ndx, atr, lab, alpha, sim in train_info[:k]:
+            logger.info(s.format(ndx, lab, alpha, sim, atr))
 
     return train_indices
 
@@ -238,7 +251,7 @@ def teknn_method(args, model, X_train, y_train, X_test, logger=None,
                                      params=params,
                                      logger=logger)
 
-    # sort instances based on highest similarity density
+    # sort instances based on largest influence on predicted test labels
     attributions = surrogate.compute_attributions(X_test)
     attributions_sum = np.sum(attributions, axis=0)
     train_indices = np.argsort(attributions_sum)[::-1]
@@ -324,7 +337,7 @@ def experiment(args, logger, out_dir):
 
     # sort train instances, then remove, retrain, and re-evaluate
     train_indices = sort_train_instances(args, model, X_train, y_train, X_test_sub, y_test_sub, rng, logger=logger)
-    result = measure_performance(train_indices, clf, X_train, y_train, X_test_sub, y_test_sub, logger=logger)
+    result = measure_performance(args, train_indices, clf, X_train, y_train, X_test_sub, y_test_sub, logger=logger)
 
     # save results
     result['max_rss'] = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
@@ -387,10 +400,9 @@ if __name__ == '__main__':
 
     # Experiment settings
     parser.add_argument('--rs', type=int, default=1, help='random state.')
-    parser.add_argument('--train_frac_to_remove', type=float, nargs='+',
-                        default=[0.001, 0.01, 0.05, 0.1, 0.2],
-                        help='frac. train instances to remove.')
     parser.add_argument('--n_test', type=int, default=1, help='no. of test instances to evaluate.')
+    parser.add_argument('--train_frac_to_remove', type=float, default=0.5, help='fraction of train data to remove.')
+    parser.add_argument('--n_checkpoints', type=int, default=10, help='no. checkpoints to perform retraining.')
 
     # Additional settings
     parser.add_argument('--verbose', type=int, default=0, help='verbosity level.')

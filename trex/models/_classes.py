@@ -104,6 +104,8 @@ class Surrogate(BaseEstimator, ClassifierMixin):
 
     def compute_attributions(self, X):
         """
+        Compute the attribution of each training sample on each test instance x in X.
+
         Return a 2d array of train instance impacts of shape=(X.shape[0], no. train samples).
         """
         result_list = []
@@ -117,6 +119,29 @@ class Surrogate(BaseEstimator, ClassifierMixin):
 
         # concatenate attributions
         attributions = np.vstack(result_list)
+        assert attributions.shape == (X.shape[0], self.X_train_alt_.shape[0]), 'attributions shape is no good!'
+
+        return attributions
+
+    def pred_influence(self, X, pred):
+        """
+        Compute the attribution of each training sample TOWARDS or AWAY FROM the
+        PREDICTED label of each sample x in X; i.e. attributions are flipped
+        if the predicted label is 0, otherwise they stay the same.
+
+        Return a 2d array of predicted label influences of shape=(X.shape[0], no. train samples).
+        """
+        assert X.shape[0] == pred.shape[0], 'no. instances does not match no. labels!'
+
+        # compute attributions
+        attributions = self.compute_attributions(X)
+
+        # flip attributions if predictd label is negative
+        for i in range(pred.shape[0]):
+            if pred[i] == 0:
+                attributions[i] *= -1
+
+        # shape check
         assert attributions.shape == (X.shape[0], self.X_train_alt_.shape[0]), 'attributions shape is no good!'
 
         return attributions
