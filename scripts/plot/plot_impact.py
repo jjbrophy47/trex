@@ -70,7 +70,7 @@ def main(args):
             if j == 0:
 
                 if args.metric == 'proba_diff':
-                    ax.set_ylabel(r'Test prob. $\Delta$')
+                    ax.set_ylabel(r'|Test prob. $\Delta$|')
 
             # add x-axis
             if i == 1:
@@ -113,6 +113,9 @@ def main(args):
             # increment dataset
             k += 1
 
+            # set x-aixs limits
+            ax.set_xlim(left=0, right=None)
+
     # create output directory
     out_dir = os.path.join(args.out_dir, args.model, args.metric)
     os.makedirs(out_dir, exist_ok=True)
@@ -122,7 +125,7 @@ def main(args):
 
     # adjust figure
     plt.tight_layout()
-    fig.subplots_adjust(bottom=0.225, wspace=0.3)
+    fig.subplots_adjust(bottom=0.225, wspace=0.35)
 
     # save figure
     fp = os.path.join(out_dir, 'all_datasets.pdf')

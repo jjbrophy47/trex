@@ -11,7 +11,7 @@
 ./jobs/fidelity/primer.sh 'churn' 'rf' 'standard' 100 7 2 300 'short'
 ./jobs/fidelity/primer.sh 'surgical' 'rf' 'standard' 250 7 20 300 'short'
 ./jobs/fidelity/primer.sh 'vaccine' 'rf' 'standard' 250 7 20 300 'short'
-./jobs/fidelity/primer.sh 'amazon' 'rf' 'categorical' 10 7 20 300 'short'
+./jobs/fidelity/primer.sh 'amazon' 'rf' 'standard' 10 3 20 300 'short'
 ./jobs/fidelity/primer.sh 'bank_marketing' 'rf' 'standard' 250 7 20 300 'short'
 ./jobs/fidelity/primer.sh 'adult' 'rf' 'standard' 250 7 20 300 'short'
 ./jobs/fidelity/primer.sh 'census' 'rf' 'standard' 10 7 20 300 'short'

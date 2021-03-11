@@ -39,6 +39,44 @@ def get_result(template, in_dir):
     return result
 
 
+def mean_and_sem(arr_list, drop_arrs=True):
+    """
+    Computes mean and std. error across multiple arrays on axis 0.
+
+    If the arrays are of differing lengths, a masked array is built
+    using the array with the largest length; all NaN values are ignored
+    when computing the mean and std. error.
+    """
+    lens = [len(arr) for arr in arr_list]
+    same_len = True if len(np.unique(lens)) == 1 else False
+
+    # all arrays are of the same length
+    if same_len:
+        mean_vals = np.mean(arr_list, axis=0)
+        sem_vals = sem(arr_list, axis=0)
+
+    # drop arrays that do not have the same legnth as the majority of arrays
+    elif drop_arrs:
+        mode_len = max(set(lens), key=lens.count)
+        new_arr_list = [arr_list[i] for i in range(len(arr_list)) if lens[i] == mode_len]
+        mean_vals = np.mean(new_arr_list, axis=0)
+        sem_vals = sem(new_arr_list, axis=0)
+
+    # arrays have differing lengths and need a masked array
+    else:
+        arr_ma = np.ma.empty((len(arr_list), max(lens)))
+        arr_ma.mask = True
+
+        # fill masked array
+        for i, arr in enumerate(arr_list):
+            arr_ma[i, :lens[i]] = arr
+
+        mean_vals = np.mean(arr_ma, axis=0).data
+        sem_vals = sem(arr_ma, axis=0)
+
+    return mean_vals, sem_vals
+
+
 def process_results(df):
     """
     Averages utility results over different random states.
@@ -56,12 +94,17 @@ def process_results(df):
 
         # compute average accuracy
         proba_diffs = [np.array(x) for x in gf['proba_diff'].values]
-        main_result['proba_diff_mean'] = np.mean(proba_diffs, axis=0)
-        main_result['proba_diff_sem'] = sem(proba_diffs, axis=0)
+        mean_vals, sem_vals = mean_and_sem(proba_diffs)
+        main_result['proba_diff_mean'] = mean_vals
+        main_result['proba_diff_sem'] = sem_vals
+        # main_result['proba_diff_mean'] = np.mean(proba_diffs, axis=0)
+        # main_result['proba_diff_sem'] = sem(proba_diffs, axis=0)
 
         # get removed percentages
-        removed_pcts = [np.array(x) for x in gf['remove_pct'].values]
-        main_result['remove_pct'] = np.mean(removed_pcts, axis=0)
+        remove_pcts = [np.array(x) for x in gf['remove_pct'].values]
+        mean_vals, _ = mean_and_sem(remove_pcts)
+        main_result['remove_pct'] = mean_vals
+        # main_result['remove_pct'] = np.mean(removed_pcts, axis=0)
 
         main_result_list.append(main_result)
 

@@ -15,12 +15,12 @@ partition=${14}
 
 rs_list=(1 2 3 4 5)
 method_list=('random' \
-             'klr-leaf_output' 'svm-leaf_output' \
-             'klr_loss-leaf_output' 'svm_loss-leaf_output' \
+             'klr' 'svm' \
+             'klr_loss' 'svm_loss' \
              'tree_loss' 'leaf_influence' 'maple' \
-             'knn-leaf_output' 'knn_loss-leaf_output' 'tree_prototype')
+             'knn' 'knn_loss' 'tree_prototype')
 
-method_list=('knn')
+method_list=('klr_og' 'klr_loss_og')
 
 for method in ${method_list[@]}; do
     for rs in ${rs_list[@]}; do

@@ -183,11 +183,11 @@ def trex_method(args, model_noisy, y_train_noisy,
 
     # train surrogate model
     params = {'C': args.C, 'n_neighbors': args.n_neighbors, 'tree_kernel': args.tree_kernel}
+    train_label = y_train_noisy if 'og' in args.method else model_noisy.predict(X_train)
     surrogate = trex.train_surrogate(model=model_noisy,
                                      surrogate=args.method.split('_')[0],
                                      X_train=X_train,
-                                     # y_train=y_train_noisy,
-                                     y_train=model_noisy.predict(X_train),
+                                     y_train=train_label,
                                      val_frac=args.tune_frac,
                                      metric=args.metric,
                                      seed=args.rs,
@@ -344,10 +344,11 @@ def teknn_method(model_noisy, y_train_noisy,
 
     # train surrogate model
     params = {'C': args.C, 'n_neighbors': args.n_neighbors, 'tree_kernel': args.tree_kernel}
+    train_label = y_train_noisy if 'og' in args.method else model_noisy.predict(X_train)
     surrogate = trex.train_surrogate(model=model_noisy,
                                      surrogate=args.method.split('_')[0],
                                      X_train=X_train,
-                                     y_train=model_noisy.predict(X_train),
+                                     y_train=train_label,
                                      val_frac=args.tune_frac,
                                      metric=args.metric,
                                      seed=args.rs,

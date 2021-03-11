@@ -74,10 +74,10 @@ def main(args):
                     ax.set_ylabel('Test {}'.format(label))
 
                 elif args.metric == 'avg_proba_delta':
-                    ax.set_ylabel(r'Avg. test prob. $\Delta$')
+                    ax.set_ylabel(r'Avg. |test prob. $\Delta$|')
 
                 elif args.metric == 'median_proba_delta':
-                    ax.set_ylabel(r'Median test prob. $\Delta$')
+                    ax.set_ylabel(r'Median |test prob. $\Delta$|')
 
             # add x-axis
             if i == 1:
@@ -119,6 +119,9 @@ def main(args):
 
             # increment dataset
             k += 1
+
+            # aset x-axis limits
+            ax.set_xlim(left=0, right=None)
 
     # create output directory
     out_dir = os.path.join(args.out_dir, args.model, args.metric)

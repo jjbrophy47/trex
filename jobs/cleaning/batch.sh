@@ -1,5 +1,5 @@
 # all methods
-# NOTE: currently just KNN
+# NOTE: currently just KLR_OG and KLR_LOSS_OG
 ./jobs/cleaning/primer.sh 'churn' 'cb' 'standard' 100 3 0.3 1.0 'leaf_path' 0.01 'leaf_path' 61 2 900 'short'
 ./jobs/cleaning/primer.sh 'surgical' 'cb' 'standard' 250 5 0.12 1.0 'tree_output' 1.0 'leaf_path' 15 10 900 'short'
 ./jobs/cleaning/primer.sh 'vaccine' 'cb' 'standard' 250 5 0.18 1.0 'tree_output' 1.0 'tree_output' 61 10 900 'short'
