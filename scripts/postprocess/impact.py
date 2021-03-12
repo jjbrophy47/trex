@@ -54,6 +54,7 @@ def mean_and_sem(arr_list, drop_arrs=True):
     if same_len:
         mean_vals = np.mean(arr_list, axis=0)
         sem_vals = sem(arr_list, axis=0)
+        n_drop = 0
 
     # drop arrays that do not have the same legnth as the majority of arrays
     elif drop_arrs:
@@ -61,6 +62,7 @@ def mean_and_sem(arr_list, drop_arrs=True):
         new_arr_list = [arr_list[i] for i in range(len(arr_list)) if lens[i] == mode_len]
         mean_vals = np.mean(new_arr_list, axis=0)
         sem_vals = sem(new_arr_list, axis=0)
+        n_drop = len(arr_list) - len(new_arr_list)
 
     # arrays have differing lengths and need a masked array
     else:
@@ -73,8 +75,9 @@ def mean_and_sem(arr_list, drop_arrs=True):
 
         mean_vals = np.mean(arr_ma, axis=0).data
         sem_vals = sem(arr_ma, axis=0)
+        n_drop = 0
 
-    return mean_vals, sem_vals
+    return mean_vals, sem_vals, n_drop
 
 
 def process_results(df):
@@ -94,17 +97,15 @@ def process_results(df):
 
         # compute average accuracy
         proba_diffs = [np.array(x) for x in gf['proba_diff'].values]
-        mean_vals, sem_vals = mean_and_sem(proba_diffs)
+        mean_vals, sem_vals, n_drop = mean_and_sem(proba_diffs)
         main_result['proba_diff_mean'] = mean_vals
         main_result['proba_diff_sem'] = sem_vals
-        # main_result['proba_diff_mean'] = np.mean(proba_diffs, axis=0)
-        # main_result['proba_diff_sem'] = sem(proba_diffs, axis=0)
+        main_result['num_dropped'] = n_drop
 
         # get removed percentages
         remove_pcts = [np.array(x) for x in gf['remove_pct'].values]
-        mean_vals, _ = mean_and_sem(remove_pcts)
+        mean_vals, _, _ = mean_and_sem(remove_pcts)
         main_result['remove_pct'] = mean_vals
-        # main_result['remove_pct'] = np.mean(removed_pcts, axis=0)
 
         main_result_list.append(main_result)
 
@@ -196,7 +197,7 @@ if __name__ == '__main__':
     parser.add_argument('--model', type=int, nargs='+', default=['cb', 'rf'], help='model to extract the results for.')
     parser.add_argument('--preprocessing', type=int, nargs='+', default=['standard'], help='preprocessing directory.')
     parser.add_argument('--method', type=int, nargs='+',
-                        default=['random', 'klr', 'svm', 'maple', 'knn', 'leaf_influence'],
+                        default=['random', 'klr', 'svm', 'maple', 'knn', 'leaf_influence', 'fast_leaf_influence'],
                         help='method for sorting train data.')
     parser.add_argument('--rs', type=int, nargs='+', default=list(range(1, 21)), help='random state.')
 

@@ -89,6 +89,11 @@ def leaf_influence_method(args, model, test_ndx, X_train, y_train,
     NOTE: requires the label for the test instance.
     """
 
+    # LeafInfluence settings
+    if 'fast' in args.method:
+        k = 0
+        update_set = 'SinglePoint'
+
     # initialize Leaf Influence
     start = time.time()
 
@@ -98,10 +103,16 @@ def leaf_influence_method(args, model, test_ndx, X_train, y_train,
     os.makedirs(temp_dir, exist_ok=True)
     model.save_model(temp_fp, format='json')
 
-    explainer = CBLeafInfluenceEnsemble(temp_fp, X_train, y_train, k=k,
+    explainer = CBLeafInfluenceEnsemble(temp_fp,
+                                        X_train,
+                                        y_train,
+                                        k=k,
                                         learning_rate=model.learning_rate_,
-                                        update_set='SinglePoint')
+                                        update_set=update_set)
     train_time = time.time() - start
+
+    if logger:
+        logger.info('\ncomputing influence of each training instance on the test loss...')
 
     # compute influence of each training instance on the test instance
     with timeout(seconds=args.max_time):
@@ -248,7 +259,7 @@ def experiment(args, logger, out_dir):
         result = trex_method(args, model, test_ndx, X_train, y_train, X_test, logger=logger)
 
     # Leaf Influence
-    elif args.method == 'leaf_influence':
+    elif 'leaf_influence' in args.method and args.model == 'cb':
         result = leaf_influence_method(args, model, test_ndx, X_train, y_train, X_test, y_test, logger=logger)
 
     # MAPLE

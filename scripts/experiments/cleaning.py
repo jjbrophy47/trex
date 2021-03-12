@@ -204,9 +204,6 @@ def trex_method(args, model_noisy, y_train_noisy,
     else:
         train_indices = np.argsort(np.abs(surrogate.get_alpha()))[::-1]
 
-    # TEMPOARARY: reverse order
-    train_indices = train_indices[::-1]
-
     # fix noisy instances
     result = fix_noisy_instances(train_indices, noisy_indices, n_check, n_checkpoint,
                                  clf, X_train, y_train, X_test, y_test,

@@ -23,11 +23,12 @@ def main(args):
 
     # settings
     dataset_list = ['surgical', 'vaccine', 'amazon', 'bank_marketing', 'adult', 'census']
-    method_list = ['random', 'klr', 'maple', 'knn', 'leaf_influence']
-    color_list = ['red', 'blue', 'orange', 'purple', 'black']
-    label_list = ['Random', 'TREX-KLR', 'MAPLE', 'TEKNN', 'Leaf Influence']
-    marker_list = ['o', 'd', '^', 'x', '1']
-    zorder_list = [3, 4, 2, 1, 1]
+    method_list = ['klr', 'random', 'maple', 'knn', 'leaf_influence', 'fast_leaf_influence']
+    color_list = ['blue', 'red', 'orange', 'purple', 'black', 'brown']
+    label_list = ['TREX', 'Random', 'MAPLE', 'TEKNN', 'LeafInfluence', 'FastLeafInfluence']
+    marker_list = ['d', 'o', '^', 'x', '1', '2']
+    linestyle_list = ['-', '-', '-', '-', '-', '--']
+    zorder_list = [4, 3, 2, 1, 1, 1]
 
     # get results
     df = pd.read_csv(os.path.join(args.in_dir, 'results.csv'))
@@ -48,7 +49,11 @@ def main(args):
     # inches
     width = 4.8  # Machine Learning journal
     height = get_height(width=width, subplots=(2, 3))
-    fig, axs = plt.subplots(2, 3, figsize=(width * 1.75, height * 2.35))
+
+    if args.model == 'cb':
+        fig, axs = plt.subplots(2, 3, figsize=(width * 1.75, height * 2.5))
+    else:
+        fig, axs = plt.subplots(2, 3, figsize=(width * 1.75, height * 2.35))
 
     # legend containers
     lines = []
@@ -81,8 +86,8 @@ def main(args):
             ax.tick_params(axis='both', which='major')
 
             # plot each method
-            methods = list(zip(method_list, label_list, color_list, marker_list, zorder_list))
-            for method, label, color, marker, zorder in methods:
+            methods = list(zip(method_list, label_list, color_list, marker_list, linestyle_list, zorder_list))
+            for method, label, color, marker, linestyle, zorder in methods:
 
                 # get method results
                 temp_df2 = temp_df1[temp_df1['method'] == method]
@@ -102,8 +107,8 @@ def main(args):
                 removed_pcts = np.fromstring(removed_pcts[1: -1], dtype=np.float32, sep=' ')
 
                 # plot
-                line = ax.errorbar(removed_pcts, metric_mean, yerr=metric_sem,
-                                   marker=marker, color=color, label=label, zorder=zorder)
+                line = ax.errorbar(removed_pcts, metric_mean, yerr=metric_sem, marker=marker,
+                                   linestyle=linestyle, color=color, label=label, zorder=zorder)
 
                 # save for legend
                 if i == 0 and j == 0:
@@ -121,11 +126,15 @@ def main(args):
     os.makedirs(out_dir, exist_ok=True)
 
     # adjust legend
-    fig.legend(tuple(lines), tuple(labels), loc='center', ncol=6, bbox_to_anchor=(0.5, 0.04))
+    if len(lines) <= 4:
+        fig.legend(tuple(lines), tuple(labels), loc='center', ncol=6, bbox_to_anchor=(0.5, 0.04))
+        plt.tight_layout()
+        fig.subplots_adjust(bottom=0.225, wspace=0.35)
 
-    # adjust figure
-    plt.tight_layout()
-    fig.subplots_adjust(bottom=0.225, wspace=0.35)
+    else:
+        fig.legend(tuple(lines), tuple(labels), loc='center', ncol=3, bbox_to_anchor=(0.5, 0.065))
+        plt.tight_layout()
+        fig.subplots_adjust(bottom=0.25, wspace=0.3)
 
     # save figure
     fp = os.path.join(out_dir, 'all_datasets.pdf')
