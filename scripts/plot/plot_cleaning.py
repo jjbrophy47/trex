@@ -28,17 +28,18 @@ def main(args):
 
     method_list = ['klr', 'random', 'tree_loss', 'klr_loss',
                    'maple', 'leaf_influence', 'tree_prototype',
-                   'knn', 'knn_loss']
+                   'knn', 'knn_loss', 'klr_og', 'klr_loss_og']
 
     label_list = ['TREX-KLR', 'Random', 'GBDT Loss', 'KLR Loss',
-                  'MAPLE', 'LeafInfluence', 'TreeProto', 'TEKNN', 'KNN Loss']
+                  'MAPLE', 'LeafInfluence', 'TreeProto', 'TEKNN', 'KNN Loss',
+                  'KLR OG', 'KLR Loss OG']
 
     color_list = ['blue', 'red', 'green', 'purple', 'orange',
-                  'black', '#EEC64F', 'yellow', 'brown']
+                  'black', '#EEC64F', 'yellow', 'brown', 'cyan', 'magenta']
 
-    marker_list = ['1', 'o', 'v', '^', '>', '.', '*', 'h', 's']
+    marker_list = ['1', 'o', 'v', '^', '>', '.', '*', 'h', 's', '.', '.']
 
-    zorder_list = [11, 9, 3, 2, 7, 1, 6, 5, 8]
+    zorder_list = [11, 9, 3, 2, 7, 1, 6, 5, 8, 11, 11]
 
     # get results
     df = pd.read_csv(os.path.join(args.in_dir, 'results.csv'))

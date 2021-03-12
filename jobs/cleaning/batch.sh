@@ -1,9 +1,9 @@
 # all methods
-# NOTE: currently just KLR_OG and KLR_LOSS_OG
+# NOTE: currently just KLR_OG and KLR_LOSS_OG, both REVERSED!
 ./jobs/cleaning/primer.sh 'churn' 'cb' 'standard' 100 3 0.3 1.0 'leaf_path' 0.01 'leaf_path' 61 2 900 'short'
 ./jobs/cleaning/primer.sh 'surgical' 'cb' 'standard' 250 5 0.12 1.0 'tree_output' 1.0 'leaf_path' 15 10 900 'short'
 ./jobs/cleaning/primer.sh 'vaccine' 'cb' 'standard' 250 5 0.18 1.0 'tree_output' 1.0 'tree_output' 61 10 900 'short'
-./jobs/cleaning/primer.sh 'amazon' 'cb' 'standard' 250 7 0.1 1.0 'tree_output' 1.0 'feature_path' 7 35 1440 'short'
+./jobs/cleaning/primer.sh 'amazon' 'cb' 'standard' 250 7 0.1 1.0 'tree_output' 0.1 'leaf_path' 61 35 1440 'short'
 ./jobs/cleaning/primer.sh 'bank_marketing' 'cb' 'standard' 250 5 0.18 1.0 'tree_output' 1.0 'tree_output' 31 10 900 'short'
 ./jobs/cleaning/primer.sh 'adult' 'cb' 'standard' 250 5 0.15 1.0 'tree_output' 1.0 'tree_output' 61 10 900 'short'
 ./jobs/cleaning/primer.sh 'census' 'cb' 'standard' 250 5 0.1 1.0 'tree_output' 1.0 'tree_output' 31 30 900 'short'

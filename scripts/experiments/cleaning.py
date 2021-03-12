@@ -158,13 +158,13 @@ def fix_noisy_instances(train_indices, noisy_indices, n_check, n_checkpoint,
     return result
 
 
-def random_method(noisy_indices, n_check, n_checkpoint,
+def random_method(args, noisy_indices, n_check, n_checkpoint,
                   clf, X_train, y_train, X_test, y_test,
-                  acc_noisy, auc_noisy, seed=1, logger=None):
+                  acc_noisy, auc_noisy, logger=None):
     """
     Selects train instances to check uniformly at random.
     """
-    rng = np.random.default_rng(seed + 1)  # +1 to avoid choosing the same indices as the noisy labels
+    rng = np.random.default_rng(args.rs + 1)  # +1 to avoid choosing the same indices as the noisy labels
     train_indices = rng.choice(y_train.shape[0], size=n_check, replace=False)
     result = fix_noisy_instances(train_indices, noisy_indices, n_check, n_checkpoint,
                                  clf, X_train, y_train, X_test, y_test,
@@ -211,10 +211,10 @@ def trex_method(args, model_noisy, y_train_noisy,
     return result
 
 
-def tree_loss_method(model_noisy, y_train_noisy,
+def tree_loss_method(args, model_noisy, y_train_noisy,
                      noisy_indices, n_check, n_checkpoint,
                      clf, X_train, y_train, X_test, y_test,
-                     acc_noisy, auc_noisy, seed=1, logger=None):
+                     acc_noisy, auc_noisy, logger=None):
     """
     Orders training instances by largest loss.
     """
@@ -227,11 +227,12 @@ def tree_loss_method(model_noisy, y_train_noisy,
     return result
 
 
-def leaf_influence_method(model_noisy, y_train_noisy,
+def leaf_influence_method(args, model_noisy, y_train_noisy,
                           noisy_indices, n_check, n_checkpoint,
                           clf, X_train, y_train, X_test, y_test,
-                          acc_noisy, auc_noisy, seed=1, logger=None,
-                          k=-1, out_dir='.', frac_progress_update=0.1):
+                          acc_noisy, auc_noisy, logger=None,
+                          k=-1, update_set='AllPoints', out_dir='.',
+                          frac_progress_update=0.1):
     """
     Computes the influence on train instance i if train
     instance i were upweighted/removed. This uses the FastLeafInfluence
@@ -240,8 +241,12 @@ def leaf_influence_method(model_noisy, y_train_noisy,
     Reference:
     https://github.com/kohpangwei/influence-release/blob/master/influence/experiments.py
     """
-    assert k == -1, 'AllPoints method not used for k: {}'.format(k)
     assert args.model == 'cb', 'tree-ensemble is not a CatBoost model!'
+
+    # LeafInfluence settings
+    if 'fast' in args.method:
+        k = 0
+        update_set = 'SinglePoint'
 
     # save CatBoost model
     temp_dir = os.path.join('.catboost_info', 'leaf_influence_{}'.format(str(uuid.uuid4())))
@@ -255,7 +260,7 @@ def leaf_influence_method(model_noisy, y_train_noisy,
                                         y_train_noisy,
                                         k=k,
                                         learning_rate=model_noisy.learning_rate_,
-                                        update_set='AllPoints')
+                                        update_set=update_set)
 
     # display progress
     if logger:
@@ -292,10 +297,10 @@ def leaf_influence_method(model_noisy, y_train_noisy,
     return result
 
 
-def maple_method(model_noisy,
+def maple_method(args, model_noisy,
                  noisy_indices, n_check, n_checkpoint,
                  clf, X_train, y_train, X_test, y_test,
-                 acc_noisy, auc_noisy, seed=1, logger=None,
+                 acc_noisy, auc_noisy, logger=None,
                  frac_progress_update=0.1):
     """
     Orders instances by tree kernel similarity density.
@@ -332,10 +337,10 @@ def maple_method(model_noisy,
     return result
 
 
-def teknn_method(model_noisy, y_train_noisy,
+def teknn_method(args, model_noisy, y_train_noisy,
                  noisy_indices, n_check, n_checkpoint,
                  clf, X_train, y_train, X_test, y_test,
-                 acc_noisy, auc_noisy, seed=1, logger=None,
+                 acc_noisy, auc_noisy, logger=None,
                  frac_progress_update=0.1):
     """
     Count impact by the number of times a training sample shows up in
@@ -374,6 +379,9 @@ def teknn_method(model_noisy, y_train_noisy,
         attributions_sum = np.sum(attributions, axis=0)
         train_indices = np.argsort(attributions_sum)[::-1]
 
+    # TEMPOARARY: reverse order
+    train_indices = train_indices[::-1]
+
     # fix noisy instances
     result = fix_noisy_instances(train_indices, noisy_indices, n_check, n_checkpoint,
                                  clf, X_train, y_train, X_test, y_test,
@@ -381,10 +389,10 @@ def teknn_method(model_noisy, y_train_noisy,
     return result
 
 
-def tree_prototype_method(model_noisy, y_train_noisy,
+def tree_prototype_method(args, model_noisy, y_train_noisy,
                           noisy_indices, n_check, n_checkpoint,
                           clf, X_train, y_train, X_test, y_test,
-                          acc_noisy, auc_noisy, seed=1, logger=None,
+                          acc_noisy, auc_noisy, logger=None,
                           k=10, frac_progress_update=0.1):
     """
     Orders instances by using the GBT distance similarity formula.
@@ -461,10 +469,10 @@ def tree_prototype_method(model_noisy, y_train_noisy,
     return result
 
 
-def mmd_prototype_method(model_noisy, y_train_noisy,
+def mmd_prototype_method(args, model_noisy, y_train_noisy,
                          noisy_indices, n_check, n_checkpoint,
                          clf, X_train, y_train, X_test, y_test,
-                         acc_noisy, auc_noisy, seed=1, logger=None, n_prototypes=10):
+                         acc_noisy, auc_noisy, logger=None, n_prototypes=10):
     """
     Orders instances by prototypes and/or criticisms.
     """
@@ -562,9 +570,9 @@ def experiment(args, logger, out_dir):
 
     # random
     if args.method == 'random':
-        result = random_method(noisy_indices, n_check, n_checkpoint,
+        result = random_method(args, noisy_indices, n_check, n_checkpoint,
                                clf, X_train, y_train, X_test, y_test,
-                               acc_noisy, auc_noisy, seed=args.rs, logger=logger)
+                               acc_noisy, auc_noisy, logger=logger)
 
     # TREX
     elif 'klr' in args.method or 'svm' in args.method:
@@ -575,45 +583,45 @@ def experiment(args, logger, out_dir):
 
     # tree-esemble loss
     elif args.method == 'tree_loss':
-        result = tree_loss_method(model_noisy, y_train_noisy,
+        result = tree_loss_method(args, model_noisy, y_train_noisy,
                                   noisy_indices, n_check, n_checkpoint,
                                   clf, X_train, y_train, X_test, y_test,
-                                  acc_noisy, auc_noisy, seed=args.rs, logger=logger)
+                                  acc_noisy, auc_noisy, logger=logger)
 
     # Leaf Influence
-    elif args.method == 'leaf_influence' and args.model == 'cb':
-        result = leaf_influence_method(model_noisy, y_train_noisy,
+    elif 'leaf_influence' in args.method and args.model == 'cb':
+        result = leaf_influence_method(args, model_noisy, y_train_noisy,
                                        noisy_indices, n_check, n_checkpoint,
                                        clf, X_train, y_train, X_test, y_test,
-                                       acc_noisy, auc_noisy, seed=args.rs, logger=logger)
+                                       acc_noisy, auc_noisy, logger=logger)
 
     # MAPLE
     elif args.method == 'maple':
-        result = maple_method(model_noisy,
+        result = maple_method(args, model_noisy,
                               noisy_indices, n_check, n_checkpoint,
                               clf, X_train, y_train, X_test, y_test,
-                              acc_noisy, auc_noisy, seed=args.rs, logger=logger)
+                              acc_noisy, auc_noisy, logger=logger)
 
     # TEKNN
     elif 'knn' in args.method:
-        result = teknn_method(model_noisy, y_train_noisy,
+        result = teknn_method(args, model_noisy, y_train_noisy,
                               noisy_indices, n_check, n_checkpoint,
                               clf, X_train, y_train, X_test, y_test,
-                              acc_noisy, auc_noisy, seed=args.rs, logger=logger)
+                              acc_noisy, auc_noisy, logger=logger)
 
     # Tree Prototype
     elif args.method == 'tree_prototype':
-        result = tree_prototype_method(model_noisy, y_train_noisy,
+        result = tree_prototype_method(args, model_noisy, y_train_noisy,
                                        noisy_indices, n_check, n_checkpoint,
                                        clf, X_train, y_train, X_test, y_test,
-                                       acc_noisy, auc_noisy, seed=args.rs, logger=logger)
+                                       acc_noisy, auc_noisy, logger=logger)
 
     # MMD Prototype
     elif args.method == 'mmd_prototype':
-        result = mmd_prototype_method(model_noisy, y_train_noisy,
+        result = mmd_prototype_method(args, model_noisy, y_train_noisy,
                                       noisy_indices, n_check, n_checkpoint,
                                       clf, X_train, y_train, X_test, y_test,
-                                      acc_noisy, auc_noisy, seed=args.rs, logger=logger)
+                                      acc_noisy, auc_noisy, logger=logger)
 
     else:
         raise ValueError('unknown method {}'.format(args.method))

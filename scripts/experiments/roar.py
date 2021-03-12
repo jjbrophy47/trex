@@ -237,14 +237,19 @@ def maple_method(args, model, X_train, y_train, X_test, logger=None,
 
 
 def influence_method(args, model, X_train, y_train, X_test, y_test, logger=None,
-                     k=-1, frac_progress_update=0.1):
+                     k=-1, update_set='AllPoints', frac_progress_update=0.1):
     """
     Sort training instances based on their Leaf Influence on the test set.
 
     Reference:
     https://github.com/kohpangwei/influence-release/blob/master/influence/experiments.py
     """
-    assert k == -1, 'AllPoints method not used for k: {}'.format(k)
+
+    # LeafInfluence settings
+    if 'fast' in args.method:
+        k = 0
+        update_set = 'SinglePoint'
+
     assert args.model == 'cb', 'tree-ensemble is not a CatBoost model!'
 
     # save CatBoost model
@@ -254,9 +259,12 @@ def influence_method(args, model, X_train, y_train, X_test, y_test, logger=None,
     model.save_model(temp_fp, format='json')
 
     # initialize Leaf Influence
-    explainer = CBLeafInfluenceEnsemble(temp_fp, X_train, y_train, k=k,
+    explainer = CBLeafInfluenceEnsemble(temp_fp,
+                                        X_train,
+                                        y_train,
+                                        k=k,
                                         learning_rate=model.learning_rate_,
-                                        update_set='AllPoints')
+                                        update_set=update_set)
 
     # display status
     if logger:
@@ -339,7 +347,7 @@ def sort_train_instances(args, model, X_train, y_train, X_test, y_test, rng, log
         train_indices = maple_method(args, model, X_train, y_train, X_test, logger=logger)
 
     # Leaf Influence (NOTE: can only compute influence of the LOSS, requires label)
-    elif args.model == 'cb' and args.method == 'leaf_influence':
+    elif 'leaf_influence' in args.method and args.model == 'cb':
         train_indices = influence_method(args, model, X_train, y_train, X_test, y_test, logger=logger)
 
     # TEKNN

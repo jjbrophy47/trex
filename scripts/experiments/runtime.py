@@ -79,7 +79,7 @@ def trex_method(args, model, test_ndx, X_train, y_train, X_test,
 
 
 def leaf_influence_method(args, model, test_ndx, X_train, y_train,
-                          X_test, y_test, k=0,
+                          X_test, y_test, k=-1, update_set='AllPoints',
                           frac_progress_update=0.1, logger=None):
     """
     Computes the influence on each test instance if train
