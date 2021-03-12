@@ -17,10 +17,10 @@
 ./jobs/impact/primer.sh 'census' 'rf' 'standard' 250 7 'tree_output' 0.001 'leaf_path' 61 30 300 'short'
 
 # CB: Leaf Influence, needs much more time than the others
-./jobs/impact/primer_single.sh 'churn' 'cb' 'standard' 100 3 'leaf_influence' 2 4320 'long'
-./jobs/impact/primer_single.sh 'surgical' 'cb' 'standard' 250 5 'leaf_influence' 2 4320 'long'
-./jobs/impact/primer_single.sh 'vaccine' 'cb' 'standard' 250 5 'leaf_influence' 2 4320 'long'
-./jobs/impact/primer_single.sh 'amazon' 'cb' 'standard' 250 7 'leaf_influence' 25 1440 'short'
-./jobs/impact/primer_single.sh 'bank_marketing' 'cb' 'standard' 250 5 'leaf_influence' 15 4320 'long'
-./jobs/impact/primer_single.sh 'adult' 'cb' 'standard' 250 5 'leaf_influence' 15 4320 'long'
-# ./jobs/impact/primer_single.sh 'census' 'cb' 'standard' 250 5 'leaf_influence' 6 4320 'long'
+./jobs/impact/primer_single.sh 'churn' 'cb' 'standard' 100 3 'fast_leaf_influence' 2 4320 'long'
+./jobs/impact/primer_single.sh 'surgical' 'cb' 'standard' 250 5 'fast_leaf_influence' 2 4320 'long'
+./jobs/impact/primer_single.sh 'vaccine' 'cb' 'standard' 250 5 'fast_leaf_influence' 2 4320 'long'
+./jobs/impact/primer_single.sh 'amazon' 'cb' 'standard' 250 7 'fast_leaf_influence' 25 1440 'short'
+./jobs/impact/primer_single.sh 'bank_marketing' 'cb' 'standard' 250 5 'fast_leaf_influence' 15 4320 'long'
+./jobs/impact/primer_single.sh 'adult' 'cb' 'standard' 250 5 'fast_leaf_influence' 15 4320 'long'
+./jobs/impact/primer_single.sh 'census' 'cb' 'standard' 250 5 'fast_leaf_influence' 6 4320 'long'

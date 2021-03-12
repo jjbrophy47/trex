@@ -14,7 +14,7 @@ partition=${12}
 rs_list=(1 2 3 4 5 6 7 8 9 10)
 method_list=('klr-leaf_output' 'svm-leaf_output' \
              'leaf_influence' 'maple' 'knn-leaf_output')
-method_list=('klr' 'knn')
+method_list=('leaf_influence' 'fast_leaf_influence')
 
 for method in ${method_list[@]}; do
     for rs in ${rs_list[@]}; do
