@@ -25,3 +25,12 @@
 # ./jobs/cleaning/primer_single.sh 'amazon' 'cb' 'standard' 250 7 'leaf_influence' 0.10 1.0 10 2880 'long'
 # ./jobs/cleaning/primer_single.sh 'bank_marketing' 'cb' 'standard' 250 5 'leaf_influence' 0.18 1.0 10 4320 'long'
 # ./jobs/cleaning/primer_single.sh 'adult' 'cb' 'standard' 250 5 'leaf_influence' 0.15 1.0 10 4320 'long'
+
+# CB: fast_leaf_influence, needs more time
+./jobs/cleaning/primer_single.sh 'churn' 'cb' 'standard' 100 3 'fast_leaf_influence' 0.3 1.0 2 1440 'short'
+./jobs/cleaning/primer_single.sh 'surgical' 'cb' 'standard' 250 5 0.12 'fast_leaf_influence' 1.0 10 1440 'short'
+./jobs/cleaning/primer_single.sh 'vaccine' 'cb' 'standard' 250 5 0.18 'fast_leaf_influence' 1.0 10 1440 'short'
+./jobs/cleaning/primer_single.sh 'amazon' 'cb' 'standard' 250 7 0.1 'fast_leaf_influence' 1.0 35 1440 'short'
+./jobs/cleaning/primer_single.sh 'bank_marketing' 'cb' 'standard' 250 5 0.18 'fast_leaf_influence' 1.0 10 1440 'short'
+./jobs/cleaning/primer_single.sh 'adult' 'cb' 'standard' 250 5 0.15 'fast_leaf_influence' 1.0 10 1440 'short'
+./jobs/cleaning/primer_single.sh 'census' 'cb' 'standard' 250 5 0.1 'fast_leaf_influence' 1.0 30 1440 'short'
