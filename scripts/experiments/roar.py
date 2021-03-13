@@ -272,31 +272,29 @@ def influence_method(args, model, X_train, y_train, X_test, y_test, logger=None,
 
     # contributions container
     start = time.time()
-    contributions_sum = np.zeros(X_train.shape[0])
+    attributions = np.zeros((X_train.shape[0], X_test.shape[0]))
 
     # compute influence on each test instance
-    for i in range(X_test.shape[0]):
-
-        contributions = []
-        buf = deepcopy(explainer)
+    buf = deepcopy(explainer)
+    for i in range(X_train.shape[0]):
+        explainer.fit(removed_point_idx=i, destination_model=buf)
 
         # compute influence for each training instance
-        for j in range(X_train.shape[0]):
-            explainer.fit(removed_point_idx=j, destination_model=buf)
-            contributions.append(buf.loss_derivative(X_test[[i]], y_test[[i]])[0])
+        for j in range(X_test.shape[0]):
+            attributions[i][j] = buf.loss_derivative(X_test[[j]], y_test[[j]])[0]
 
-            # display progress
-            if logger and j % int(X_train.shape[0] * frac_progress_update) == 0:
-                elapsed = time.time() - start
-                train_frac_complete = j / X_train.shape[0] * 100
-                logger.info('[Test {}] train {:.1f}%...{:.3f}s'.format(i, train_frac_complete, elapsed))
+        # display progress
+        if logger and i % int(X_train.shape[0] * frac_progress_update) == 0:
+            elapsed = time.time() - start
+            train_frac_complete = i / X_train.shape[0] * 100
+            logger.info('train {:.1f}%...{:.3f}s'.format(train_frac_complete, elapsed))
 
-        contributions = np.array(contributions)
-        contributions_sum += contributions
+    # aggregate influences
+    attributions_sum = np.sum(attributions, axis=0)
 
     # sort by descending order; the most positive train instances
     # are the ones that decrease the log loss the most, and are the most helpful
-    train_indices = np.argsort(contributions_sum)[::-1]
+    train_indices = np.argsort(attributions_sum)[::-1]
 
     # clean up
     shutil.rmtree(temp_dir)

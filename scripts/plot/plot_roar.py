@@ -24,11 +24,11 @@ def main(args):
     # settings
     # dataset_list = ['churn', 'surgical', 'vaccine', 'amazon', 'bank_marketing', 'adult']
     dataset_list = ['surgical', 'vaccine', 'amazon', 'bank_marketing', 'adult', 'census']
-    method_list = ['random', 'klr', 'maple', 'knn']
-    color_list = ['red', 'blue', 'orange', 'purple']
-    label_list = ['Random', 'TREX-KLR', 'MAPLE', 'TEKNN']
-    marker_list = ['o', 'd', '^', 'x']
-    zorder_list = [3, 4, 2, 1]
+    method_list = ['random', 'klr', 'maple', 'knn', 'fast_leaf_influence']
+    color_list = ['red', 'blue', 'orange', 'purple', 'brown']
+    label_list = ['Random', 'TREX-KLR', 'MAPLE', 'TEKNN', 'FastLeafInfluence']
+    marker_list = ['o', 'd', '^', 'x', '2']
+    zorder_list = [3, 4, 2, 1, 1]
 
     # get results
     df = pd.read_csv(os.path.join(args.in_dir, 'results.csv'))

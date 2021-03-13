@@ -9,12 +9,12 @@ from itertools import product
 
 import numpy as np
 import pandas as pd
-from scipy.stats import sem
 from tqdm import tqdm
 
 here = os.path.abspath(os.path.dirname(__file__))
 sys.path.insert(0, here + '/../')
 import util
+from impact import mean_and_sem
 
 
 def get_result(template, in_dir):
@@ -56,27 +56,33 @@ def process_results(df):
 
         # compute average accuracy
         accs = [np.array(x) for x in gf['accs'].values]
-        main_result['accs_mean'] = np.mean(accs, axis=0)
-        main_result['accs_sem'] = sem(accs, axis=0)
+        mean_vals, sem_vals, n_drop = mean_and_sem(accs)
+        main_result['accs_mean'] = mean_vals
+        main_result['accs_sem'] = sem_vals
+        main_result['num_dropped'] = n_drop
 
         # compute average AUC
         aucs = [np.array(x) for x in gf['aucs'].values]
-        main_result['aucs_mean'] = np.mean(aucs, axis=0)
-        main_result['aucs_sem'] = sem(aucs, axis=0)
+        mean_vals, sem_vals, n_drop = mean_and_sem(aucs)
+        main_result['aucs_mean'] = mean_vals
+        main_result['aucs_sem'] = sem_vals
 
         # compute average of average prob. deltas
         avg_proba_deltas = [np.array(x) for x in gf['avg_proba_deltas'].values]
-        main_result['avg_proba_deltas_mean'] = np.mean(avg_proba_deltas, axis=0)
-        main_result['avg_proba_deltas_sem'] = sem(avg_proba_deltas, axis=0)
+        mean_vals, sem_vals, n_drop = mean_and_sem(avg_proba_deltas)
+        main_result['avg_proba_deltas_mean'] = mean_vals
+        main_result['avg_proba_deltas_sem'] = sem_vals
 
         # compute average of median prob. deltas
         median_proba_deltas = [np.array(x) for x in gf['median_proba_deltas'].values]
-        main_result['median_proba_deltas_mean'] = np.mean(median_proba_deltas, axis=0)
-        main_result['median_proba_deltas_sem'] = sem(median_proba_deltas, axis=0)
+        mean_vals, sem_vals, n_drop = mean_and_sem(median_proba_deltas)
+        main_result['median_proba_deltas_mean'] = mean_vals
+        main_result['median_proba_deltas_sem'] = sem_vals
 
         # get removed percentages
         removed_pcts = [np.array(x) for x in gf['remove_pcts'].values]
-        main_result['remove_pcts'] = np.mean(removed_pcts, axis=0)
+        mean_vals, sem_vals, n_drop = mean_and_sem(removed_pcts)
+        main_result['remove_pcts'] = mean_vals
 
         main_result_list.append(main_result)
 
@@ -168,7 +174,7 @@ if __name__ == '__main__':
     parser.add_argument('--model', type=int, nargs='+', default=['cb', 'rf'], help='model to extract results for.')
     parser.add_argument('--preprocessing', type=int, nargs='+', default=['standard'], help='preprocessing directory.')
     parser.add_argument('--method', type=int, nargs='+',
-                        default=['random', 'klr', 'svm', 'maple', 'knn', 'leaf_influence'],
+                        default=['random', 'klr', 'svm', 'maple', 'knn', 'leaf_influence', 'fast_leaf_influence'],
                         help='method for sorting train data.')
     parser.add_argument('--rs', type=int, nargs='+', default=list(range(1, 41)), help='random state.')
 
