@@ -232,6 +232,10 @@ def experiment(args, logger, out_dir):
     # sort train instances
     exc_indices, inh_indices = trex_method(args, model, X_train, y_train, X_test_sub, logger=logger)
     ran_indices = rng.choice(np.arange(X_train.shape[0]), size=X_train.shape[0], replace=False)
+    ran_pos_indices = np.where(y_train == 1)[0]
+    ran_neg_indices = np.where(y_train == 0)[0]
+    rng.shuffle(ran_pos_indices)
+    rng.shuffle(ran_neg_indices)
 
     # remove, retrain, and re-evaluate
     logger.info('\nremoving most excitatory train instances...')
@@ -243,6 +247,14 @@ def experiment(args, logger, out_dir):
     logger.info('\nremoving train instances uniformly at random...')
     ran_result = measure_performance(args, ran_indices, clf, X_train, y_train, X_test_sub, y_test_sub, logger=logger)
 
+    logger.info('\nremoving positive train instances at random...')
+    ran_pos_result = measure_performance(args, ran_pos_indices, clf, X_train, y_train, X_test_sub, y_test_sub,
+                                         logger=logger)
+
+    logger.info('\nremoving negative train instances at random...')
+    ran_neg_result = measure_performance(args, ran_neg_indices, clf, X_train, y_train, X_test_sub, y_test_sub,
+                                         logger=logger)
+
     # plot results
     fig, ax = plt.subplots()
     ax.plot(exc_result['remove_pct'], exc_result['proba'], color='blue', linestyle='--',
@@ -251,6 +263,10 @@ def experiment(args, logger, out_dir):
             marker='+', label='Most inhibitory')
     ax.plot(ran_result['remove_pct'], ran_result['proba'], color='red', linestyle='-',
             marker='*', label='Random')
+    ax.plot(ran_pos_result['remove_pct'], ran_pos_result['proba'], color='cyan', linestyle=':',
+            marker='1', label='Pos. random')
+    ax.plot(ran_neg_result['remove_pct'], ran_neg_result['proba'], color='orange', linestyle=':',
+            marker='2', label='Neg. random')
     ax.set_xlabel('Train data removed (%)')
     ax.set_ylabel('Predicted probability')
     ax.set_ylim(0, 1)
@@ -286,7 +302,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
 
     # I/O settings
-    parser.add_argument('--dataset', type=str, default='churn', help='dataset to explain.')
+    parser.add_argument('--dataset', type=str, default='bank_marketing', help='dataset to explain.')
     parser.add_argument('--data_dir', type=str, default='data', help='data directory.')
     parser.add_argument('--preprocessing', type=str, default='standard', help='preprocessing directory.')
     parser.add_argument('--out_dir', type=str, default='output/excite_vs_inhibit/', help='directory to save results.')
@@ -297,8 +313,8 @@ if __name__ == '__main__':
 
     # Tree-ensemble settings
     parser.add_argument('--model', type=str, default='cb', help='model to use.')
-    parser.add_argument('--n_estimators', type=int, default=10, help='no. of trees.')
-    parser.add_argument('--max_depth', type=int, default=3, help='max. depth in tree ensemble.')
+    parser.add_argument('--n_estimators', type=int, default=250, help='no. of trees.')
+    parser.add_argument('--max_depth', type=int, default=5, help='max. depth in tree ensemble.')
 
     # Method settings
     parser.add_argument('--method', type=str, default='klr', help='method.')
@@ -307,12 +323,12 @@ if __name__ == '__main__':
     # No tuning settings
     parser.add_argument('--C', type=float, default=1.0, help='penalty parameters for KLR or SVM.')
     parser.add_argument('--n_neighbors', type=int, default=5, help='no. neighbors to use for KNN.')
-    parser.add_argument('--tree_kernel', type=str, default='leaf_output', help='tree kernel.')
+    parser.add_argument('--tree_kernel', type=str, default='tree_output', help='tree kernel.')
 
     # Experiment settings
     parser.add_argument('--rs', type=int, default=1, help='random state.')
     parser.add_argument('--n_test', type=int, default=1, help='no. of test instances to evaluate.')
-    parser.add_argument('--train_frac_to_remove', type=float, default=0.5, help='fraction of train data to remove.')
+    parser.add_argument('--train_frac_to_remove', type=float, default=0.05, help='fraction of train data to remove.')
     parser.add_argument('--n_checkpoints', type=int, default=10, help='no. checkpoints to perform retraining.')
 
     # Additional settings

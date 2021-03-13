@@ -156,6 +156,7 @@ def maple_method(args, model, X_train, y_train, X_test, logger=None,
 
     # train a MAPLE explainer model
     train_label = model.predict(X_train)
+    pred_label = model.predict(X_test)
     maple_explainer = MAPLE(X_train, train_label, X_train, train_label,
                             verbose=args.verbose, dstump=False)
 
@@ -169,9 +170,14 @@ def maple_method(args, model, X_train, y_train, X_test, logger=None,
     # compute similarity of each training instance to the set set
     for i in range(X_test.shape[0]):
         contributions = maple_explainer.get_weights(X_test[i])
+
+        # consider train instances with the same label as the predicted label as excitatory, else inhibitory
+        if '+' in args.method:
+            contributions = np.where(train_label == pred_label[i], contributions, contributions * -1)
+
         contributions_sum += contributions
 
-    # sort training instances based on similarity to the test set
+    # sort train data based largest similarity (MAPLE) OR largest similarity-influence (MAPLE+) to test set
     train_indices = np.argsort(contributions_sum)[::-1]
 
     return train_indices
@@ -284,7 +290,7 @@ def sort_train_instances(args, model, X_train, y_train, X_test, y_test, rng, log
         train_indices = trex_method(args, model, X_train, y_train, X_test, logger=logger)
 
     # MAPLE
-    elif args.method == 'maple':
+    elif 'maple' in args.method:
         train_indices = maple_method(args, model, X_train, y_train, X_test, logger=logger)
 
     # Leaf Influence (NOTE: can only compute influence of the LOSS, requires label)
