@@ -68,6 +68,10 @@ def main(args):
             dataset = dataset_list[k]
             temp_df1 = df[df['dataset'] == dataset]
 
+            #  extract categorical preprocessing results for RF - Amazon
+            if args.model == 'rf' and dataset == 'amazon':
+                temp_df1 = temp_df1[temp_df1['preprocessing'] == 'categorical']
+
             # add y-axis
             if j == 0:
                 if args.metric in ['acc', 'auc']:
@@ -121,7 +125,7 @@ def main(args):
             # increment dataset
             k += 1
 
-            # aset x-axis limits
+            # set x-axis limits
             ax.set_xlim(left=0, right=None)
 
     # create output directory

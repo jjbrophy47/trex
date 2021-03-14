@@ -11,7 +11,7 @@ mem=${10}
 time=${11}
 partition=${12}
 
-method_list=('random' 'klr' 'knn' 'maple', 'maple+')
+method_list=('random' 'klr' 'knn' 'maple' 'maple+')
 # method_list=('maple+')
 
 for method in ${method_list[@]}; do

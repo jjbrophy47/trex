@@ -84,6 +84,13 @@ def process_results(df):
         mean_vals, sem_vals, n_drop = mean_and_sem(removed_pcts)
         main_result['remove_pcts'] = mean_vals
 
+        # extract one run of special checkpoint results
+        if 'ckpt_model_proba' in gf:
+            main_result['ckpt_model_proba'] = gf['ckpt_model_proba'].values[0]
+            main_result['ckpt_new_model_proba'] = gf['ckpt_new_model_proba'].values[0]
+            main_result['ckpt_remove_pct'] = gf['ckpt_remove_pct'].values[0]
+            main_result['ckpt_y_test'] = gf['ckpt_y_test'].values[0]
+
         main_result_list.append(main_result)
 
     main_df = pd.DataFrame(main_result_list)
@@ -172,7 +179,8 @@ if __name__ == '__main__':
     parser.add_argument('--dataset', type=str, nargs='+', help='dataset.',
                         default=['churn', 'surgical', 'vaccine', 'amazon', 'bank_marketing', 'adult', 'census'])
     parser.add_argument('--model', type=int, nargs='+', default=['cb', 'rf'], help='model to extract results for.')
-    parser.add_argument('--preprocessing', type=int, nargs='+', default=['standard'], help='preprocessing directory.')
+    parser.add_argument('--preprocessing', type=int, nargs='+', default=['categorical', 'standard'],
+                        help='preprocessing directory.')
     parser.add_argument('--method', type=int, nargs='+',
                         default=['random', 'klr', 'svm', 'maple', 'maple+',
                                  'knn', 'leaf_influence', 'fast_leaf_influence'],
