@@ -23,12 +23,12 @@ def main(args):
 
     # settings
     dataset_list = ['surgical', 'vaccine', 'amazon', 'bank_marketing', 'adult', 'census']
-    method_list = ['klr', 'random', 'maple', 'knn', 'leaf_influence', 'fast_leaf_influence']
-    color_list = ['blue', 'red', 'orange', 'purple', 'black', 'brown']
-    label_list = ['TREX', 'Random', 'MAPLE', 'TEKNN', 'LeafInfluence', 'FastLeafInfluence']
-    marker_list = ['d', 'o', '^', 'x', '1', '2']
-    linestyle_list = ['-', '-', '-', '-', '-', '--']
-    zorder_list = [4, 3, 2, 1, 1, 1]
+    method_list = ['klr', 'random', 'maple', 'knn', 'leaf_influence', 'fast_leaf_influence', 'maple+']
+    color_list = ['blue', 'red', 'orange', 'purple', 'black', 'brown', 'orange']
+    label_list = ['TREX', 'Random', 'MAPLE', 'TEKNN', 'LeafInfluence', 'FastLeafInfluence', 'MAPLE+']
+    marker_list = ['d', 'o', '^', 'x', '1', '2', '^']
+    linestyle_list = ['-', '-', '-', '-', '-', '--', '--']
+    zorder_list = [4, 3, 2, 1, 1, 1, 2]
 
     # get results
     df = pd.read_csv(os.path.join(args.in_dir, 'results.csv'))
@@ -51,7 +51,7 @@ def main(args):
     height = get_height(width=width, subplots=(2, 3))
 
     if args.model == 'cb':
-        fig, axs = plt.subplots(2, 3, figsize=(width * 1.75, height * 2.5))
+        fig, axs = plt.subplots(2, 3, figsize=(width * 1.85, height * 2.65))
     else:
         fig, axs = plt.subplots(2, 3, figsize=(width * 1.75, height * 2.35))
 
@@ -82,7 +82,7 @@ def main(args):
                 ax.set_xlabel('Train data removed (%)')
 
             # add title
-            ax.set_title('Census (10%)' if dataset == 'census_0p1' else dataset.capitalize())
+            ax.set_title('Bank Marketing' if dataset == 'bank_marketing' else dataset.capitalize())
             ax.tick_params(axis='both', which='major')
 
             # plot each method
@@ -129,10 +129,10 @@ def main(args):
     if len(lines) <= 4:
         fig.legend(tuple(lines), tuple(labels), loc='center', ncol=6, bbox_to_anchor=(0.5, 0.04))
         plt.tight_layout()
-        fig.subplots_adjust(bottom=0.225, wspace=0.35)
+        fig.subplots_adjust(bottom=0.225, wspace=0.3)
 
     else:
-        fig.legend(tuple(lines), tuple(labels), loc='center', ncol=3, bbox_to_anchor=(0.5, 0.065))
+        fig.legend(tuple(lines), tuple(labels), loc='center', ncol=3, bbox_to_anchor=(0.5, 0.06))
         plt.tight_layout()
         fig.subplots_adjust(bottom=0.25, wspace=0.3)
 

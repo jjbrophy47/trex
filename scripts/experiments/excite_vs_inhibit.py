@@ -28,6 +28,15 @@ import trex
 import util
 
 
+def get_height(width, subplots=(1, 1)):
+    """
+    Set figure dimensions to avoid scaling in LaTeX.
+    """
+    golden_ratio = 1.618
+    height = (width / golden_ratio) * (subplots[0] / subplots[1])
+    return height
+
+
 def measure_performance(args, train_indices, clf, X_train, y_train, X_test, y_test,
                         logger=None):
     """
@@ -247,30 +256,59 @@ def experiment(args, logger, out_dir):
     logger.info('\nremoving train instances uniformly at random...')
     ran_result = measure_performance(args, ran_indices, clf, X_train, y_train, X_test_sub, y_test_sub, logger=logger)
 
-    logger.info('\nremoving positive train instances at random...')
-    ran_pos_result = measure_performance(args, ran_pos_indices, clf, X_train, y_train, X_test_sub, y_test_sub,
-                                         logger=logger)
+    if args.extra_methods:
+        logger.info('\nremoving positive train instances at random...')
+        ran_pos_result = measure_performance(args, ran_pos_indices, clf, X_train, y_train, X_test_sub, y_test_sub,
+                                             logger=logger)
 
-    logger.info('\nremoving negative train instances at random...')
-    ran_neg_result = measure_performance(args, ran_neg_indices, clf, X_train, y_train, X_test_sub, y_test_sub,
-                                         logger=logger)
+        logger.info('\nremoving negative train instances at random...')
+        ran_neg_result = measure_performance(args, ran_neg_indices, clf, X_train, y_train, X_test_sub, y_test_sub,
+                                             logger=logger)
+
+    # plot settings
+    plt.rc('xtick', labelsize=13)
+    plt.rc('ytick', labelsize=13)
+    plt.rc('axes', labelsize=13)
+    plt.rc('axes', titlesize=13)
+    plt.rc('legend', fontsize=13)
+    plt.rc('legend', title_fontsize=13)
+    # plt.rc('lines', linewidth=1)
+    plt.rc('lines', markersize=5)
+
+    # inches
+    width = 4.8  # Machine Learning journal
+    height = get_height(width=width, subplots=(1, 1))
+    fig, ax = plt.subplots(figsize=(width * 1.65, height * 1.0))
 
     # plot results
-    fig, ax = plt.subplots()
-    ax.plot(exc_result['remove_pct'], exc_result['proba'], color='blue', linestyle='--',
-            marker='.', label='Most excitatory')
-    ax.plot(inh_result['remove_pct'], inh_result['proba'], color='green', linestyle='--',
-            marker='+', label='Most inhibitory')
-    ax.plot(ran_result['remove_pct'], ran_result['proba'], color='red', linestyle='-',
-            marker='*', label='Random')
-    ax.plot(ran_pos_result['remove_pct'], ran_pos_result['proba'], color='cyan', linestyle=':',
-            marker='1', label='Pos. random')
-    ax.plot(ran_neg_result['remove_pct'], ran_neg_result['proba'], color='orange', linestyle=':',
-            marker='2', label='Neg. random')
+    l1 = ax.errorbar(exc_result['remove_pct'], exc_result['proba'], color='blue', linestyle='--',
+                     marker='.', label='Most excitatory')
+    l2 = ax.errorbar(inh_result['remove_pct'], inh_result['proba'], color='green', linestyle='--',
+                     marker='+', label='Most inhibitory')
+    l3 = ax.errorbar(ran_result['remove_pct'], ran_result['proba'], color='red', linestyle='-',
+                     marker='*', label='Random')
+    lines = [l1, l2, l3]
+    labels = ['Most excitatory', 'Most inhibitory', 'Random']
+
+    if args.extra_methods:
+        l4 = ax.errorbar(ran_pos_result['remove_pct'], ran_pos_result['proba'], color='cyan', linestyle=':',
+                         marker='1', label='Pos. random')
+        l5 = ax.errorbar(ran_neg_result['remove_pct'], ran_neg_result['proba'], color='orange', linestyle=':',
+                         marker='2', label='Neg. random')
+        lines += [l4, l5]
+        labels += ['Random (pos. only)', 'Random (neg. only)']
+
     ax.set_xlabel('Train data removed (%)')
     ax.set_ylabel('Predicted probability')
     ax.set_ylim(0, 1)
-    ax.legend(title='Ordering')
+
+    # adjust legend
+    fig.legend(tuple(lines), tuple(labels), loc='left', ncol=1,
+               bbox_to_anchor=(1.0, 0.85), title='Removal Ordering')
+    plt.tight_layout()
+    fig.subplots_adjust(right=0.65)
+
+    # save plot
     plt.savefig(os.path.join(out_dir, 'probas.pdf'), bbox_inches='tight')
 
     # display results
@@ -318,6 +356,7 @@ if __name__ == '__main__':
 
     # Method settings
     parser.add_argument('--method', type=str, default='klr', help='method.')
+    parser.add_argument('--extra_methods', action='store_true', default=False, help='random pos. and random neg.')
     parser.add_argument('--metric', type=str, default='mse', help='metric for tuning surrogate models.')
 
     # No tuning settings

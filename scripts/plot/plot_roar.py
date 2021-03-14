@@ -24,11 +24,12 @@ def main(args):
     # settings
     # dataset_list = ['churn', 'surgical', 'vaccine', 'amazon', 'bank_marketing', 'adult']
     dataset_list = ['surgical', 'vaccine', 'amazon', 'bank_marketing', 'adult', 'census']
-    method_list = ['random', 'klr', 'maple', 'knn', 'fast_leaf_influence']
-    color_list = ['red', 'blue', 'orange', 'purple', 'brown']
-    label_list = ['Random', 'TREX-KLR', 'MAPLE', 'TEKNN', 'FastLeafInfluence']
-    marker_list = ['o', 'd', '^', 'x', '2']
-    zorder_list = [3, 4, 2, 1, 1]
+    method_list = ['random', 'klr', 'maple', 'knn', 'fast_leaf_influence', 'maple+']
+    color_list = ['red', 'blue', 'orange', 'purple', 'brown', 'orange']
+    label_list = ['Random', 'TREX-KLR', 'MAPLE', 'TEKNN', 'FastLeafInfluence', 'MAPLE+']
+    marker_list = ['o', 'd', '^', 'x', '2', '^']
+    linestyle_list = ['-', '-', '-', '-', '--', '--']
+    zorder_list = [3, 4, 2, 1, 1, 2]
 
     # get results
     df = pd.read_csv(os.path.join(args.in_dir, 'results.csv'))
@@ -84,12 +85,12 @@ def main(args):
                 ax.set_xlabel('Train data removed (%)')
 
             # add title
-            ax.set_title('Census (10%)' if dataset == 'census_0p1' else dataset.capitalize())
+            ax.set_title('Bank Marketing' if dataset == 'bank_marketing' else dataset.capitalize())
             ax.tick_params(axis='both', which='major')
 
             # plot each method
-            methods = list(zip(method_list, label_list, color_list, marker_list, zorder_list))
-            for method, label, color, marker, zorder in methods:
+            methods = list(zip(method_list, label_list, color_list, marker_list, linestyle_list, zorder_list))
+            for method, label, color, marker, linestyle, zorder in methods:
 
                 # get method results
                 temp_df2 = temp_df1[temp_df1['method'] == method]
@@ -109,8 +110,8 @@ def main(args):
                 removed_pcts = np.fromstring(removed_pcts[1: -1], dtype=np.float32, sep=' ')
 
                 # plot
-                line = ax.errorbar(removed_pcts, metric_mean, yerr=metric_sem,
-                                   marker=marker, color=color, label=label, zorder=zorder)
+                line = ax.errorbar(removed_pcts, metric_mean, yerr=metric_sem, marker=marker,
+                                   linestyle=linestyle, color=color, label=label, zorder=zorder)
 
                 # save for legend
                 if i == 0 and j == 0:
@@ -146,7 +147,8 @@ if __name__ == '__main__':
     parser.add_argument('--in_dir', type=str, default='output/roar/csv/', help='input directory.')
     parser.add_argument('--out_dir', type=str, default='output/plots/roar/', help='output directory.')
     parser.add_argument('--model', type=str, default='cb', help='tree-ensemble model.')
-    parser.add_argument('--metric', type=str, default='acc', help='acc, auc, avg_proba_delta, or median_proba_delta')
+    parser.add_argument('--metric', type=str, default='avg_proba_delta',
+                        help='acc, auc, avg_proba_delta, or median_proba_delta')
 
     args = parser.parse_args()
     main(args)

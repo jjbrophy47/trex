@@ -195,9 +195,11 @@ if __name__ == '__main__':
     parser.add_argument('--dataset', type=str, nargs='+', help='dataset.',
                         default=['churn', 'surgical', 'vaccine', 'amazon', 'bank_marketing', 'adult', 'census'])
     parser.add_argument('--model', type=int, nargs='+', default=['cb', 'rf'], help='model to extract the results for.')
-    parser.add_argument('--preprocessing', type=int, nargs='+', default=['standard'], help='preprocessing directory.')
+    parser.add_argument('--preprocessing', type=int, nargs='+', default=['categorical', 'standard'],
+                        help='preprocessing directory.')
     parser.add_argument('--method', type=int, nargs='+',
-                        default=['random', 'klr', 'svm', 'maple', 'knn', 'leaf_influence', 'fast_leaf_influence'],
+                        default=['random', 'klr', 'svm', 'maple', 'maple+',
+                                 'knn', 'leaf_influence', 'fast_leaf_influence'],
                         help='method for sorting train data.')
     parser.add_argument('--rs', type=int, nargs='+', default=list(range(1, 21)), help='random state.')
 
