@@ -37,6 +37,7 @@ def main(args):
     df = df[df['model'] == args.model]
 
     # plot settings
+    plt.rc('font', family='serif')
     plt.rc('xtick', labelsize=13)
     plt.rc('ytick', labelsize=13)
     plt.rc('axes', labelsize=13)

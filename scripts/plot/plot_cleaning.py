@@ -2,6 +2,7 @@
 This script plots the cleaning experiment results.
 """
 import os
+import sys
 import argparse
 import warnings
 import pandas as pd
@@ -9,6 +10,10 @@ warnings.simplefilter(action='ignore', category=RuntimeWarning)  # true divide
 
 import numpy as np
 import matplotlib.pyplot as plt
+
+here = os.path.abspath(os.path.dirname(__file__))
+sys.path.insert(0, here + '/../')
+import util
 
 
 def get_height(width, subplots=(1, 1)):
@@ -28,18 +33,20 @@ def main(args):
 
     method_list = ['klr', 'random', 'tree_loss', 'klr_loss',
                    'maple', 'leaf_influence', 'tree_prototype',
-                   'knn', 'knn_loss', 'klr_og', 'klr_loss_og']
+                   'knn', 'knn_loss', 'klr_og', 'klr_loss_og', 'fast_leaf_influence']
 
-    label_list = ['TREX-KLR', 'Random', 'GBDT Loss', 'KLR Loss',
+    label_list = ['TREX', 'Random', 'GBDT Loss', 'KLR Loss',
                   'MAPLE', 'LeafInfluence', 'TreeProto', 'TEKNN', 'KNN Loss',
-                  'KLR OG', 'KLR Loss OG']
+                  'KLR OG', 'KLR Loss OG', 'FastLeafInfluence']
 
     color_list = ['blue', 'red', 'green', 'purple', 'orange',
-                  'black', '#EEC64F', 'yellow', 'brown', 'cyan', 'magenta']
+                  'black', '#EEC64F', 'yellow', 'brown', 'cyan', 'magenta', 'black']
 
-    marker_list = ['1', 'o', 'v', '^', '>', '.', '*', 'h', 's', '.', '.']
+    marker_list = ['1', 'o', 'v', '^', '>', '.', '*', 'h', 's', '.', '.', '2']
 
-    zorder_list = [11, 9, 3, 2, 7, 1, 6, 5, 8, 11, 11]
+    linestyle_list = ['-', '-', '-', '-', '-', '-', '-', '-', '-', '-', '-', '-', '--']
+
+    zorder_list = [11, 9, 3, 2, 7, 1, 6, 5, 8, 11, 11, 11]
 
     # get results
     df = pd.read_csv(os.path.join(args.in_dir, 'results.csv'))
@@ -48,15 +55,7 @@ def main(args):
     df = df[df['model'] == args.model]
 
     # matplotlib settings
-    plt.rc('font', family='arial')
-    plt.rc('xtick', labelsize=13)
-    plt.rc('ytick', labelsize=13)
-    plt.rc('axes', labelsize=13)
-    plt.rc('axes', titlesize=13)
-    plt.rc('legend', fontsize=12)
-    # plt.rc('legend', title_fontsize=11)
-    # plt.rc('lines', linewidth=1)
-    # plt.rc('lines', markersize=6)
+    util.plot_settings(fontsize=13)
 
     # inches
     width = 4.8  # Machine Learning journal
@@ -104,8 +103,8 @@ def main(args):
             ax.tick_params(axis='both', which='major')
 
             # plot each method
-            methods = list(zip(method_list, label_list, color_list, marker_list, zorder_list))
-            for method, label, color, marker, zorder in methods:
+            methods = list(zip(method_list, label_list, color_list, marker_list, zorder_list, linestyle_list))
+            for method, label, color, marker, zorder, linestyle in methods:
 
                 # get method results
                 temp_df2 = temp_df1[temp_df1['method'] == method]
@@ -125,8 +124,8 @@ def main(args):
                 checked_pcts = np.fromstring(checked_pcts[1: -1], dtype=np.float32, sep=' ')
 
                 # plot
-                line = ax.errorbar(checked_pcts, metric_mean, yerr=metric_sem,
-                                   marker=marker, color=color, zorder=zorder)
+                line = ax.errorbar(checked_pcts, metric_mean, yerr=metric_sem, marker=marker,
+                                   linestyle=linestyle, color=color, zorder=zorder)
 
                 # save for legend
                 if i == 0 and j == 0:

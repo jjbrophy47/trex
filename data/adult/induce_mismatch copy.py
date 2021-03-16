@@ -18,9 +18,6 @@ from utility import util
 
 def main(args):
 
-    # create random number generator
-    rng = np.random.default_rng(args.rs)
-
     # create_logger
     assert os.path.exists(args.in_dir)
     logger = util.get_logger(os.path.join(args.in_dir, 'log_mismatch.txt'))
@@ -34,15 +31,23 @@ def main(args):
     train = np.load(os.path.join(args.in_dir, 'train.npy'), allow_pickle=True)
     test = np.load(os.path.join(args.in_dir, 'test.npy'), allow_pickle=True)
 
-    age17_indices = np.where(train[:, age_col] <= 17)[0]
+    indices = np.where(train[:, age_col] <= 17)[0]
     logger.info('\nTrain:')
-    logger.info('no. instances in which age <= 17: {:,}'.format(len(age17_indices)))
-    logger.info('  -->no. pos. instances: {:,}'.format(np.sum(train[age17_indices][:, -1])))
+    logger.info('no. instances in which age <= 17: {:,}'.format(len(indices)))
+    logger.info('  -->no. pos. instances: {:,}'.format(np.sum(train[indices][:, -1])))
 
-    # randomly flip the labels of a percentage of instances in which their age <= 17
-    sub_indices = rng.choice(age17_indices, size=int(len(age17_indices) * args.flip_frac), replace=False)
+    # randomly sample a subset of people whose age <= 17
+    np.random.seed(args.seed)
+    subset_indices = np.random.choice(indices, size=int(len(indices) * args.subset_frac), replace=False)
 
-    train[sub_indices, -1] = 1
+    # of the above subset, randomly flip a percentage of their labels
+    np.random.seed(args.seed)
+    subsubset_indices = np.random.choice(subset_indices, size=int(len(subset_indices) * args.flip_frac),
+                                         replace=False)
+
+    remove_indices = np.setdiff1d(indices, subset_indices)
+    train[subsubset_indices, -1] = 1
+    train = np.delete(train, remove_indices, axis=0)
 
     indices = np.where(train[:, 0] <= 17)[0]
     logger.info('\nNew Train:')
@@ -62,8 +67,8 @@ def main(args):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--in_dir', type=str, default='categorical', help='input data directory.')
-    # parser.add_argument('--subset_frac', type=float, default=0.25, help='subset size of age <= 17 samples.')
-    parser.add_argument('--flip_frac', type=float, default=0.9, help='percentage of samples to flip labels.')
-    parser.add_argument('--rs', type=int, default=1, help='random state.')
+    parser.add_argument('--subset_frac', type=float, default=0.25, help='subset size of age <= 17 samples.')
+    parser.add_argument('--flip_frac', type=float, default=0.85, help='percentage of samples to flip labels.')
+    parser.add_argument('--seed', type=int, default=1, help='random state.')
     args = parser.parse_args()
     main(args)

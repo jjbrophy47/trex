@@ -2,11 +2,16 @@
 Plots the ROAR special checkpoint results.
 """
 import os
+import sys
 import argparse
 
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+
+here = os.path.abspath(os.path.dirname(__file__))
+sys.path.insert(0, here + '/../')
+import util
 
 
 def get_height(width, subplots=(1, 1)):
@@ -32,14 +37,7 @@ def main(args):
     df = df[df['model'] == args.model]
 
     # plot settings
-    plt.rc('xtick', labelsize=14)
-    plt.rc('ytick', labelsize=14)
-    plt.rc('axes', labelsize=14)
-    plt.rc('axes', titlesize=14)
-    plt.rc('legend', fontsize=14)
-    # plt.rc('legend', title_fontsize=11)
-    # plt.rc('lines', linewidth=1)
-    plt.rc('lines', markersize=9)
+    util.plot_settings(fontsize=15, markersize=9)
 
     # inches
     width = 4.8  # Machine Learning journal

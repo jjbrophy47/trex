@@ -7,523 +7,315 @@ import time
 import argparse
 import warnings
 warnings.simplefilter(action='ignore', category=UserWarning)  # lgb compiler warning
+from datetime import datetime
+
+import numpy as np
+import matplotlib.pyplot as plt
+from sklearn.base import clone
+from scipy.interpolate import interpn
+from matplotlib.colors import Normalize
+from matplotlib import cm
+
 here = os.path.abspath(os.path.dirname(__file__))
 sys.path.insert(0, here + '/../')  # for utility
-sys.path.insert(0, here + '/../../')  # for libliner
-
-import shap
-import numpy as np
-import seaborn as sns
-import matplotlib.pyplot as plt
-from scipy.stats import gaussian_kde
-from sklearn.base import clone
-
+sys.path.insert(0, here + '/../../')  # for trex
 import trex
-from utility import model_util
-from utility import data_util
-from utility import print_util
+import util
 
 
-def set_size(width, fraction=1, subplots=(1, 1)):
+def density_scatter(x, y, fig, ax, sort=True, bins=20, **kwargs):
+    """
+    Scatter plot colored by 2d histogram
+    """
+    assert fig is not None
+    assert ax is not None
+
+    data, x_e, y_e = np.histogram2d(x, y, bins=bins, density=True)
+    z = interpn((0.5 * (x_e[1:] + x_e[:-1]),
+                0.5 * (y_e[1:] + y_e[:-1])),
+                data,
+                np.vstack([x, y]).T, method="splinef2d", bounds_error=False)
+
+    # To be sure to plot all data
+    z[np.where(np.isnan(z))] = 0.0
+
+    # Sort the points by density, so that the densest points are plotted last
+    if sort:
+        idx = z.argsort()
+        x, y, z = x[idx], y[idx], z[idx]
+
+    ax.scatter(x, y, c=z, **kwargs)
+
+    norm = Normalize(vmin=np.min(z), vmax=np.max(z))
+    cbar = fig.colorbar(cm.ScalarMappable(norm=norm), ax=ax)
+    cbar.ax.set_ylabel('Density')
+
+    return ax
+
+
+def show_instances(args, X_train, alpha, sim, attribution, y_train, indices, k, logger):
+    """
+    Display train instance weight, similarity, attribution, label and `age` value
+    ordered by `indices`.
+    """
+    s = '[{:5}] label: {}, alpha: {:.3f}, sim: {:.3f} attribution: {:.3f}, age: {:.0f}'
+    for ndx in indices[:k]:
+        logger.info(s.format(ndx, y_train[ndx], alpha[ndx], sim[ndx],
+                    attribution[ndx], X_train[ndx][args.age_ndx]))
+
+
+def get_height(width, subplots=(1, 1)):
     """
     Set figure dimensions to avoid scaling in LaTeX.
     """
     golden_ratio = 1.618
     height = (width / golden_ratio) * (subplots[0] / subplots[1])
-    return width, height
+    return height
 
 
-def _get_top_features(x, shap_vals, feature_list, k=1, normalize=False):
+def plot_similarity(args, alpha, sim, out_dir, logger):
     """
-    Parameters
-    ----------
-    x: 1d array like
-        Feature values for this instance.
-    shap_vals: 1d array like
-        Feature contributions to the prediction.
-    feature: 1d array like
-        Feature names.
-    k: int (default=5)
-        Only keep the top k features.
-
-    Returns a list of (feature_name, feature_value, feature_shap) tuples.
+    Plot similarity of training instances against their instance weights.
     """
-    assert len(x) == len(shap_vals) == len(feature_list)
-    shap_sort_ndx = np.argsort(np.abs(shap_vals))[::-1]
-
-    if normalize:
-        shap_vals /= np.sum(np.abs(shap_vals))
-
-    return list(zip(feature_list[shap_sort_ndx], x[shap_sort_ndx],
-                    shap_vals[shap_sort_ndx]))[:k]
-
-
-def _plot_feature_histograms(args, results, test_val, out_dir, plot_instances=False):
-    """
-    Plot the density of the most important feature weighted
-    by training instance importance and similarity to the test instance.
-    """
-
-    train_feature_vals = results['train_feature_vals']
-    train_feature_bins = results['train_feature_bins']
-    train_pos_ndx = results['train_pos_ndx']
-    train_neg_ndx = results['train_neg_ndx']
-    train_weight = results['train_weight']
-    train_sim = results['train_sim']
-    feature_name = results['target_feature']
-
-    train_sim_weight = train_weight * train_sim
-
-    # plot contributions
-    width = 5.5  # Neurips 2020
-    width, height = set_size(width=width * 3, fraction=1, subplots=(1, 4))
-    fig, axs = plt.subplots(1, 4, figsize=(width, height * 1.25))
-    axs = axs.flatten()
-
-    # gamma vs alpha
-    if plot_instances:
-        ax = axs[0]
-        xy = np.vstack([train_weight, train_sim])
-        z = gaussian_kde(xy)(xy)
-        ax.scatter(train_weight, train_sim, c=z, s=20, edgecolor='', rasterized=args.rasterize)
-        ax.axhline(0, color='k')
-        ax.axvline(0, color='k')
-        ax.set_ylabel(r'$\gamma$')
-        ax.set_xlabel(r'$\alpha$')
-
-    # unweighted
-    ax = axs[1]
-    ax.hist(train_feature_vals[train_pos_ndx], bins=train_feature_bins,
-            color='g', hatch='.', alpha=args.alpha, label='positive instances')
-    ax.hist(train_feature_vals[train_neg_ndx], bins=train_feature_bins,
-            color='r', hatch='\\', alpha=args.alpha, label='negative instances')
-    ax.axvline(test_val, color='k', linestyle='--')
-    ax.set_xlabel(feature_name.capitalize())
-    ax.set_ylabel('density')
-    ax.set_title('Unweighted')
-    ax.ticklabel_format(style='sci', axis='y', scilimits=(0, 0))
-    ax.tick_params(axis='both', which='major')
-
-    # weighted by TREX's global weights
-    ax = axs[2]
-    ax.hist(train_feature_vals[train_pos_ndx], bins=train_feature_bins,
-            color='g', hatch='.', alpha=args.alpha,
-            weights=train_weight[train_pos_ndx])
-
-    ax.hist(train_feature_vals[train_neg_ndx], bins=train_feature_bins,
-            color='r', hatch='\\', alpha=args.alpha,
-            weights=train_weight[train_neg_ndx])
-    ax.axvline(test_val, color='k', linestyle='--')
-    ax.set_ylabel('density')
-    ax.set_xlabel(feature_name.capitalize())
-    ax.set_title(r'Weighted by $\alpha$',)
-    ax.tick_params(axis='both', which='major')
-
-    # weighted by TREX's global weights * similarity to the test instance
-    train_sim_weight = train_weight * train_sim
-    ax = axs[3]
-    ax.hist(train_feature_vals[train_pos_ndx], bins=train_feature_bins,
-            color='g', hatch='.', alpha=args.alpha,
-            weights=train_sim_weight[train_pos_ndx],
-            label='pos samples')
-
-    ax.hist(train_feature_vals[train_neg_ndx], bins=train_feature_bins,
-            color='r', hatch='\\', alpha=args.alpha,
-            weights=train_sim_weight[train_neg_ndx],
-            label='neg samples')
-    ax.axvline(test_val, color='k', linestyle='--')
-    ax.legend()
-    ax.set_ylabel('density')
-    ax.set_xlabel(feature_name.capitalize())
-    ax.set_title(r'Weighted by $\alpha * \gamma$')
-    ax.tick_params(axis='both', which='major')
-
-    plt.tight_layout()
-    plt.savefig(os.path.join(out_dir, '{}.{}'.format(feature_name, args.ext)))
-
-
-def _plot_instance_histograms(args, logger, results, out_dir):
-    """
-    Plot TREX's:
-      weight distribution and
-      similarity * weight distribution.
-    """
-    train_weight = results['train_weight']
-    train_sim = results['train_sim']
-
-    train_sim_weight = train_sim * train_weight
-
-    s = '[{:15}] mean: {:>12.7f}, median: {:>12.7f}, sum: {:>12.7f}'
-    logger.info(s.format('weight', np.mean(train_weight),
-                np.median(train_weight), np.sum(train_weight)))
-    logger.info(s.format('sim', np.mean(train_sim),
-                np.median(train_sim), np.sum(train_sim)))
-    logger.info(s.format('sim * weight', np.mean(train_sim_weight),
-                np.median(train_sim_weight), np.sum(train_sim_weight)))
-
-    all_vals = np.concatenate([train_weight, train_sim_weight])
-    bins = np.histogram(all_vals, bins=args.max_bins)[1]
-    bins = None
-
-    # choose indices to show
-    indices = np.arange(len(train_weight))
-    v1 = train_weight[indices]
-    v2 = train_sim[indices]
-
-    # plot contributions
-    width = 5.5  # Neurips 2020
-    width, height = set_size(width=width * 3, fraction=1, subplots=(1, 4))
-    fig = plt.figure(figsize=(width, height * 1.25))
-
-    axs = []
-    axs.append(plt.subplot(141))
-    axs.append(plt.subplot(142, sharey=axs[0]))
-    axs.append(plt.subplot(143))
-    axs.append(plt.subplot(144))
-
-    # plot weight distribution for the training samples
-    ax = axs[0]
-    sns.distplot(v1, color='orange', ax=axs[0], kde=args.kde, bins=bins)
-    ax.set_xlabel(r'$\alpha$')
-    ax.set_ylabel('density')
-    ax.tick_params(axis='both', which='major')
-
-    # plot similarity x weight for the training samples
-    i = 0 if args.overlay else 1
-    ax = axs[i]
-    sns.distplot(v2, color='green', ax=ax, kde=args.kde, bins=bins)
-    ax.set_xlabel(r'$\alpha * \gamma$')
-    ax.set_ylabel('density')
-    ax.tick_params(axis='both', which='major')
-
-    ax = axs[2]
-
-    # alpha vs gamma
-    xy = np.vstack([train_weight[indices], train_sim[indices]])
-    z = gaussian_kde(xy)(xy)
-    ax.scatter(train_weight[indices], train_sim[indices], c=z, s=20, edgecolor='')
-    ax.axhline(0, color='k')
-    ax.axvline(0, color='k')
-    ax.set_ylabel(r'$\gamma$')
-    ax.set_xlabel(r'$\alpha$')
-
-    # alpha vs alpha * gamma
-    ax = axs[3]
-    xy = np.vstack([train_weight[indices], train_sim_weight[indices]])
-    z = gaussian_kde(xy)(xy)
-    ax.scatter(train_weight[indices], train_sim_weight[indices], c=z, s=20, edgecolor='')
-    ax.axhline(0, color='k')
-    ax.axvline(0, color='k')
-    ax.set_xlabel(r'$\alpha$')
-    ax.set_ylabel(r'$\alpha * \gamma$')
-
-    # cum sum of alpha * gamma
-    train_weight_sorted_ndx = np.argsort(train_weight[indices])
-    train_weight_sorted = train_weight[indices][train_weight_sorted_ndx]
-    train_sim_weight_sorted = train_sim_weight[indices][train_weight_sorted_ndx]
-    train_sim_weight_sorted_cumsum = np.cumsum(train_sim_weight_sorted)
-
-    ax2 = ax.twinx()
-    ax2.plot(train_weight_sorted, train_sim_weight_sorted_cumsum,
-             label='contribution', color='k', linestyle='--')
-    ax2.set_ylabel(r'$\sum \alpha * \gamma$')
-
-    plt.tight_layout()
-    fig.tight_layout(rect=[0, 0.03, 1, 0.95])
-
-    plt.savefig(os.path.join(out_dir, 'instances.{}'.format(args.ext)))
-
-
-def experiment(args, logger, out_dir, seed):
-
-    # get model and data
-    clf = model_util.get_classifier(args.tree_type,
-                                    n_estimators=args.n_estimators,
-                                    max_depth=args.max_depth,
-                                    random_state=seed)
-
-    data = data_util.get_data(args.dataset,
-                              random_state=seed,
-                              data_dir=args.data_dir,
-                              return_feature=True,
-                              mismatch=True)
-
-    X_train, X_test, y_train, y_test, label, feature = data
-
-    logger.info('train shape: {}'.format(X_train.shape))
-    logger.info('test shape: {}'.format(X_test.shape))
-    logger.info('no. features: {:,}'.format(len(feature)))
-
-    logger.info('y_train label1: {:,}'.format(np.sum(y_train)))
-    logger.info('y_test label1: {:,}'.format(np.sum(y_test)))
-
-    # train a tree ensemble
-    logger.info('training the tree ensemble...')
-    tree = clone(clf).fit(X_train, y_train)
-    model_util.performance(tree, X_train, y_train, X_test, y_test, logger=logger)
-
-    # train TREX
-    logger.info('training TREX...')
-    explainer = trex.TreeExplainer(tree, X_train, y_train,
-                                   tree_kernel=args.tree_kernel,
-                                   random_state=seed,
-                                   kernel_model=args.kernel_model,
-                                   true_label=args.true_label,
-                                   val_frac=args.val_frac,
-                                   logger=logger)
-
-    # extract predictions
-    start = time.time()
-    logger.info('\ngenerating tree predictions...')
-    y_test_pred_tree = tree.predict(X_test)
-    logger.info('time: {:.3f}s'.format(time.time() - start))
-
-    start = time.time()
-    logger.info('generating tree probabilities...')
-    y_test_proba_tree = tree.predict_proba(X_test)[:, 1]
-    logger.info('time: {:.3f}s'.format(time.time() - start))
-
-    wrong_label0 = np.where((y_test_pred_tree == 1) & (y_test == 0))[0]
-    wrong_label1 = np.where((y_test_pred_tree == 0) & (y_test == 1))[0]
-    total_wrong = len(wrong_label0) + len(wrong_label1)
-    logger.info('wrong - label0: {}, label1: {}, total: {}'.format(
-                len(wrong_label0), len(wrong_label1), total_wrong))
-
-    # choose a test instance to explain
-
-    # instances where pred=1 and label=1
-    if args.test_type == 'pos_correct':
-        correct_indices = np.where((y_test_pred_tree == 1) & (y_test == 1))[0]
-        np.random.seed(seed)
-        test_ndx = np.random.choice(correct_indices)
-
-    # instances where pred=0 and label=0
-    elif args.test_type == 'neg_correct':
-        correct_indices = np.where((y_test_pred_tree == 0) & (y_test == 0))[0]
-        np.random.seed(seed)
-        test_ndx = np.random.choice(correct_indices)
-
-    # instances where pred=1 but label=0
-    elif args.test_type == 'pos_incorrect':
-        missed_indices = np.where((y_test_pred_tree == 1) & (y_test == 0))[0]
-        np.random.seed(seed)
-        test_ndx = np.random.choice(missed_indices)
-
-    # instances where pred=0 but label=1
-    elif args.test_type == 'neg_incorrect':
-        missed_indices = np.where((y_test_pred_tree == 0) & (y_test == 1))[0]
-        np.random.seed(seed)
-        test_ndx = np.random.choice(missed_indices)
-
-    else:
-        raise ValueError('unknown test_type!')
-
-    # pick an instance where the person is <= 17 from the adult dataset
-    indices = np.where(X_test[:, 0] <= 17)[0]
-    np.random.seed(seed)
-    test_ndx = np.random.choice(indices, size=1)[0]
-
-    x_test = X_test[[test_ndx]]
-
-    # show predictions for this test instance
-    logger.info('\ntest index: {}, label: {}'.format(test_ndx, y_test[test_ndx]))
-    logger.info('tree pred: {} ({:.3f})'.format(y_test_pred_tree[test_ndx],
-                                                y_test_proba_tree[test_ndx]))
-    if args.kernel_model == 'lr':
-        logger.info('TREX pred: {} ({:.3f})'.format(explainer.predict(x_test)[0],
-                                                    explainer.predict_proba(x_test)[:, 1][0]))
-    else:
-        logger.info('TREX pred: {}'.format(explainer.predict(x_test)[0]))
-
-    # obtain most important features
-    shap_explainer = shap.TreeExplainer(tree)
-    logger.info('\ncomputing SHAP values for x_test...')
-    test_shap = shap_explainer.shap_values(x_test)
-    top_features = _get_top_features(x_test[0], test_shap[0], feature,
-                                     k=args.topk, normalize=args.normalize_shap)
-
-    # get positive and negative training samples
-    train_pos_ndx = np.where(y_train == 1)[0]
-    train_neg_ndx = np.where(y_train == 0)[0]
-
-    # get global weights and similarity to the test instance
-    train_weight = explainer.get_weight()[0]
-    train_sim = explainer.similarity(X_test[[test_ndx]])[0]
-    contributions = train_weight * train_sim
-
-    # how many age 17 instances have high similarity?
-    sim_thresh = 2.25
-    high_sim_indices = np.where(train_sim >= sim_thresh)[0]
-    age17_indices = np.where(X_train[:, 0] == 17)[0]
-    high_sim_age17_indices = np.intersect1d(age17_indices, high_sim_indices)
-
-    logger.info('no. samples with sim >= {}: {}'.format(sim_thresh, len(high_sim_indices)))
-    logger.info('no. age=17 samples w/ sim >= {}: {}'.format(sim_thresh, len(high_sim_age17_indices)))
-
-    logger.info('\ncollecting results...')
-    results = explainer.get_params()
-    results['test_ndx'] = test_ndx
-    results['train_pos_ndx'] = train_pos_ndx
-    results['train_neg_ndx'] = train_neg_ndx
-    results['train_weight'] = train_weight
-    results['train_sim'] = train_sim
-    results['trex_x_test_pred'] = explainer.predict(x_test)[0]
-
-    if args.summary_plot:
-
-        # shap values for train and test
-        logger.info('\ncomputing SHAP values for X_train...')
-        X_train_shap = shap_explainer.shap_values(X_train)
-
-        logger.info('computing SHAP values for X_test...')
-        X_test_shap = shap_explainer.shap_values(X_test)
-
-        shap.summary_plot(X_train_shap, X_train, feature_names=feature)
-        shap.summary_plot(X_test_shap, X_test, feature_names=feature)
-
-    # feature-based explanation for test instance
-    logger.info('test {}'.format(test_ndx))
-    logger.info('{}'.format(dict(zip(feature, X_test[test_ndx]))))
-
-    if args.summary_plot:
-        shap.summary_plot(test_shap, x_test, feature_names=feature)
-
-    contributions_sum = np.sum(np.abs(contributions))
-    indices = np.argsort(contributions)[::-1]
-
-    # feature-based explanations for the most influential training instances
-    for ndx in indices[:args.topk]:
-        w = train_weight[ndx]
-        s = train_sim[ndx]
-        c = contributions[ndx] / contributions_sum
-        my_str = 'train {}, label: {}, weight: {}, sim: {}, contribution (normalized): {}'
-        logger.info(my_str.format(ndx, y_train[ndx], w, s, c))
-
-        if args.summary_plot:
-            shap.summary_plot(X_train_shap[[ndx]], X_train[[ndx]], feature_names=feature)
-        else:
-            for name, val in list(zip(feature, X_train[ndx])):
-                logger.info('  {}: {}'.format(name, val))
 
     # matplotlib settings
     plt.rc('font', family='serif')
-    plt.rc('xtick', labelsize=18)
-    plt.rc('ytick', labelsize=18)
-    plt.rc('axes', labelsize=21)
-    plt.rc('axes', titlesize=21)
-    plt.rc('legend', fontsize=19)
+    plt.rc('xtick', labelsize=11)
+    plt.rc('ytick', labelsize=11)
+    plt.rc('axes', labelsize=11)
+    plt.rc('axes', titlesize=11)
+    plt.rc('legend', fontsize=11)
     plt.rc('legend', title_fontsize=11)
     plt.rc('lines', linewidth=1)
     plt.rc('lines', markersize=6)
 
-    # explain features and instances
-    for target_feature, test_val, shap_val in top_features:
-        feat_ndx = np.where(target_feature == feature)[0][0]
+    width = 4.8  # Machine Learning journal
+    height = get_height(width=width, subplots=(1, 1))
+    fig, ax = plt.subplots(figsize=(width * 1.65, height * 1.25))
 
-        train_feature_bins = np.histogram(X_train[:, feat_ndx], bins=args.max_bins)[1]
+    density_scatter(alpha, sim, fig, ax, bins=args.n_bins, rasterized=args.rasterize)
+    ax.axhline(0, color='k', linestyle='--')
+    ax.axvline(0, color='k', linestyle='--')
+    ax.set_ylabel(r'Similarity ($\gamma$)')
+    ax.set_xlabel(r'Weight ($\alpha$)')
 
-        plot_instances = False
-        if target_feature == 'age':
-            plot_instances = True
-            results['test_val'] = test_val
-            results['target_feature'] = target_feature
-            results['train_feature_vals'] = X_train[:, feat_ndx]
-            results['train_feature_bins'] = train_feature_bins
+    plt.tight_layout()
+    plt.savefig(os.path.join(out_dir, 'similarity.pdf'), bbox_inches='tight', dpi=200)
+    logger.info('saving plot to {}/...'.format(os.path.join(out_dir)))
 
-        _plot_feature_histograms(args, results, test_val, out_dir,
-                                 plot_instances=plot_instances)
 
-    _plot_instance_histograms(args, logger, results, out_dir)
-    np.save(os.path.join(out_dir, 'results.npy'), results)
+def experiment(args, logger, out_dir):
+
+    # start timer
+    begin = time.time()
+
+    # create random number generator
+    rng = np.random.default_rng(args.rs)
+
+    # get data
+    data = util.get_data(args.dataset,
+                         data_dir=args.data_dir,
+                         preprocessing=args.preprocessing,
+                         mismatch=True)
+    X_train, X_test, y_train, y_test, feature, cat_indices = data
+
+    # get tree-ensemble
+    clf = util.get_model(args.model,
+                         n_estimators=args.n_estimators,
+                         max_depth=args.max_depth,
+                         random_state=args.rs,
+                         cat_indices=cat_indices)
+
+    # display dataset statistics
+    logger.info('\nno. train instances: {:,}'.format(X_train.shape[0]))
+    logger.info('no. test instances: {:,}'.format(X_test.shape[0]))
+    logger.info('no. features: {:,}'.format(X_train.shape[1]))
+    logger.info('\npos. label % (train): {:.1f}%'.format(np.sum(y_train) / y_train.shape[0] * 100))
+    logger.info('pos. label % (test): {:.1f}%\n'.format(np.sum(y_test) / y_test.shape[0] * 100))
+
+    # train tree ensemble
+    model = clone(clf).fit(X_train, y_train)
+    util.performance(model, X_train, y_train, logger=logger, name='Train')
+    util.performance(model, X_test, y_test, logger=logger, name='Test')
+
+    # train surrogate model
+    params = {'C': args.C, 'n_neighbors': args.n_neighbors, 'tree_kernel': args.tree_kernel}
+    surrogate = trex.train_surrogate(model=model,
+                                     surrogate=args.surrogate,
+                                     X_train=X_train,
+                                     y_train=y_train,
+                                     val_frac=args.tune_frac,
+                                     metric=args.metric,
+                                     seed=args.rs,
+                                     params=params,
+                                     logger=logger)
+
+    # extract predictions
+    start = time.time()
+    model_pred = model.predict(X_test)
+    model_proba = model.predict_proba(X_test)[:, 1]
+    logger.info('predicting...{:.3f}s'.format(time.time() - start))
+
+    # pick a test instance in which the person is <= 17 from the Adult dataset
+    indices = np.where(X_test[:, args.age_ndx] <= 17)[0]
+    test_ndx = rng.choice(indices)
+    age_test_val = X_test[test_ndx][args.age_ndx]
+    x_test = X_test[[test_ndx]]
+
+    # show prediction for this test instance
+    s = '\ntest: {}, actual: {}, proba.: {:.3f}, age: {:.0f}'
+    logger.info(s.format(test_ndx, y_test[test_ndx], model_proba[test_ndx], age_test_val))
+
+    # sort training instances by most influential to the predicted label
+    attribution = surrogate.pred_influence(x_test, model_pred[[test_ndx]])[0]
+    attribution_indices = np.argsort(attribution)[::-1]
+
+    # sort training instances by most similar to the test instance
+    sim = surrogate.similarity(x_test)[0]
+    sim_indices = np.argsort(sim)[::-1]
+
+    # get instance weights
+    alpha = surrogate.get_alpha()
+
+    # 1. show most influential training instances
+    logger.info('\nTop {:,} most influential samples to the predicted label...'.format(args.topk_inf))
+    show_instances(args, X_train, alpha, sim, attribution, y_train, attribution_indices, args.topk_inf, logger)
+
+    # 2a. compute aggregate surrogate contribution of most influential train instances
+    attr_all = np.sum(np.abs(attribution))
+    attr_pos = np.sum(np.where(attribution > 0, attribution, 0))  # sum of pos. attributions only
+    attr_topk_inf = np.sum(np.abs(attribution[attribution_indices][:args.topk_inf]))
+    attr_topk_inf_pct = attr_topk_inf / attr_all * 100
+    attr_topk_inf_pos_pct = attr_topk_inf / attr_pos * 100
+
+    # 2b. display aggregate attributions
+    s1 = '\nattribution % of top {:,} infuential instances: {:.2f}%'
+    s2 = 'attribution % of top {:,} infuential instances for pos. attributions: {:.2f}%'
+    logger.info(s1.format(args.topk_inf, attr_topk_inf_pct))
+    logger.info(s2.format(args.topk_inf, attr_topk_inf_pos_pct))
+
+    # 3. compute change in predicted probability after REMOVING the most influential instances
+    s = 'test: {}, actual: {}, proba.: {:.3f}, age: {:.0f}'
+    logger.info('\nRemoving top {:,} influential instances..'.format(args.topk_inf))
+    new_X_train = np.delete(X_train, attribution_indices[:args.topk_inf], axis=0)
+    new_y_train = np.delete(y_train, attribution_indices[:args.topk_inf])
+    new_model = clone(clf).fit(new_X_train, new_y_train)
+    util.performance(model, new_X_train, new_y_train, logger=logger, name='Train')
+    util.performance(model, X_test, y_test, logger=logger, name='Test')
+    logger.info(s.format(test_ndx, y_test[test_ndx], new_model.predict_proba(X_test)[:, 1][test_ndx], age_test_val))
+
+    # 4a. compute change in predicted probability after FLIPPING the labels of the most influential instances
+    s1 = 'test: {}, actual: {}, proba.: {:.3f}, age: {:.0f}'
+    s2 = '\n{:,} out of the top {:,} most influential instances have age <= 17'
+    logger.info('\nFixing ONLY corrupted labels of the top {:,} influential instances..'.format(args.topk_inf))
+    new_X_train = X_train.copy()
+    new_y_train = y_train.copy()
+
+    # 4b. fixing a portion of the corrupted training instances
+    temp_indices = np.where(X_train[attribution_indices][:args.topk_inf][:, args.age_ndx] <= 17)[0]
+    age17_topk_inf_indices = attribution_indices[temp_indices]
+    new_y_train[age17_topk_inf_indices] = 0
+
+    # 4c. fit new model and re-evaluate
+    new_model = clone(clf).fit(new_X_train, new_y_train)
+    util.performance(new_model, new_X_train, new_y_train, logger=logger, name='Train')
+    util.performance(new_model, X_test, y_test, logger=logger, name='Test')
+    logger.info(s1.format(test_ndx, y_test[test_ndx], new_model.predict_proba(X_test)[:, 1][test_ndx], age_test_val))
+    logger.info(s2.format(age17_topk_inf_indices.shape[0], args.topk_inf))
+
+    # 5. show most similar training instances
+    logger.info('\nTop {:,} most similar samples to the predicted label...'.format(args.topk_sim))
+    show_instances(args, X_train, alpha, sim, attribution, y_train, sim_indices, args.topk_sim, logger)
+
+    # 6. of the most similar train instances, compute how many have age <= 17
+    num_age17_topk = np.where(X_train[sim_indices][:args.topk_sim][:, args.age_ndx] <= 17)[0].shape[0]
+    logger.info('\nTop {:,} most similar train instances with age <= 17: {:,}'.format(args.topk_sim, num_age17_topk))
+
+    # 7. plot similarity of train instances against their instance weights
+    logger.info('\nplotting similarity vs. weights...')
+    plot_similarity(args, alpha, sim, out_dir, logger)
+
+    # 8. no. train instances with age <= 17 and an alpha coefficient < 0
+    neg_alpha_indices = np.where(attribution < 0)[0]
+    num_age17_neg_alpha = np.where(X_train[neg_alpha_indices][:, args.age_ndx] <= 17)[0].shape[0]
+    logger.info('\nno. instances with age <= 17 and alpha < 0: {:,}'.format(num_age17_neg_alpha))
+
+    # 9. no. train instances with age <= 17 and an alpha coefficient >= 0
+    pos_alpha_indices = np.where(attribution >= 0)[0]
+    num_age17_pos_alpha = np.where(X_train[pos_alpha_indices][:, args.age_ndx] <= 17)[0].shape[0]
+    logger.info('no. instances with age <= 17 and alpha >= 0: {:,}'.format(num_age17_pos_alpha))
+
+    # 10. no. train instances with age <= 17, similarity > thershold and an alpha coefficient < 0
+    s = 'no. instances with age <= 17, sim > {:.2f} and alpha >= 0: {:,}'
+    neg_alpha_indices = np.where((attribution < 0) & (sim > args.sim_thresh))[0]
+    num_age17_sim_neg_alpha = np.where(X_train[neg_alpha_indices][:, args.age_ndx] <= 17)[0].shape[0]
+    logger.info(s.format(args.sim_thresh, num_age17_sim_neg_alpha))
+
+    # 11. no. train instances with age <= 17, similarity > thershold and an alpha coefficient >= 0
+    s = 'no. instances with age <= 17, sim > {:.2f} and alpha >= 0: {:,}'
+    pos_alpha_indices = np.where((attribution >= 0) & (sim > args.sim_thresh))[0]
+    num_age17_sim_pos_alpha = np.where(X_train[pos_alpha_indices][:, args.age_ndx] <= 17)[0].shape[0]
+    logger.info(s.format(args.sim_thresh, num_age17_sim_pos_alpha))
+
+    # display total time
+    logger.info('\ntotal time: {:.3f}s'.format(time.time() - begin))
 
 
 def main(args):
 
-    # make logger
-    dataset = args.dataset
+    # define output directory
+    out_dir = os.path.join(args.out_dir,
+                           args.dataset,
+                           args.model,
+                           'rs_{}'.format(args.rs))
 
-    out_dir = os.path.join(args.out_dir, dataset, args.tree_type,
-                           args.tree_kernel, 'rs{}'.format(args.rs))
+    # create output directory
     os.makedirs(out_dir, exist_ok=True)
+    util.clear_dir(out_dir)
 
-    logger = print_util.get_logger(os.path.join(out_dir, 'log.txt'))
+    # create logger
+    logger = util.get_logger(os.path.join(out_dir, 'log.txt'))
     logger.info(args)
+    logger.info('\ntimestamp: {}'.format(datetime.now()))
 
-    experiment(args, logger, out_dir, seed=args.rs)
-    print_util.remove_logger(logger)
+    # run experiment
+    experiment(args, logger, out_dir)
 
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='Feature representation extractions for tree ensembles',
-                                     formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    parser = argparse.ArgumentParser()
 
     # I/O settings
     parser.add_argument('--dataset', type=str, default='adult', help='dataset to explain.')
     parser.add_argument('--data_dir', type=str, default='data', help='dataset to explain.')
+    parser.add_argument('--preprocessing', type=str, default='standard', help='preprocessing directory.')
     parser.add_argument('--out_dir', type=str, default='output/misclassification/', help='output directory.')
 
-    # plot settings
-    parser.add_argument('--max_bins', type=int, default=40, help='number of bins for feature values.')
-    parser.add_argument('--alpha', type=float, default=0.5, help='transparency value.')
-    parser.add_argument('--kde', action='store_true', default=False, help='plot kde on weight distribution.')
-    parser.add_argument('--overlay', action='store_true', default=False, help='overlay weight distributions.')
-    parser.add_argument('--summary_plot', action='store_true', default=False, help='show summary plot for SHAP.')
-    parser.add_argument('--rasterize', action='store_true', default=False, help='rasterize dense instance plots.')
+    # Experiment settings
+    parser.add_argument('--age_ndx', type=int, default=0, help='index of the `age` attribute.')
+    parser.add_argument('--sim_thresh', type=float, default=0.75, help='similairity threshold.')
+    parser.add_argument('--rs', type=int, default=1, help='random state.')
 
-    # explanation settings
-    parser.add_argument('--topk', type=int, default=1, help='number of features to show.')
-    parser.add_argument('--test_type', type=str, default='pos_incorrect', help='instance to try and explain.')
-    parser.add_argument('--load_trex', action='store_true', default=False, help='load TREX.')
-    parser.add_argument('--load_shap', action='store_true', default=False, help='load SHAP values.')
-    parser.add_argument('--normalize_shap', action='store_true', default=False, help='normalize SHAP values.')
+    # Explanation settings
+    parser.add_argument('--topk_inf', type=int, default=100, help='no. top influential train instances to show.')
+    parser.add_argument('--topk_sim', type=int, default=400, help='no. most similar train instances to show.')
 
-    # tree ensemble settings
-    parser.add_argument('--tree_type', type=str, default='cb', help='model to use.')
-    parser.add_argument('--n_estimators', type=int, default=100, help='number of trees.')
+    # Tree-ensemble settings
+    parser.add_argument('--model', type=str, default='cb', help='model to use.')
+    parser.add_argument('--n_estimators', type=int, default=250, help='number of trees.')
     parser.add_argument('--max_depth', type=int, default=5, help='maximum depth.')
 
-    # TREX settings
-    parser.add_argument('--tree_kernel', type=str, default='leaf_output', help='type of encoding.')
-    parser.add_argument('--kernel_model', type=str, default='klr', help='kernel model to use.')
-    parser.add_argument('--val_frac', type=float, default=0.1, help='amount of validation data.')
-    parser.add_argument('--true_label', action='store_true', default=False, help='train TREX on the true labels.')
+    # Surrogate settings
+    parser.add_argument('--tune_frac', type=float, default=0.0, help='amount of data for validation.')
+    parser.add_argument('--surrogate', type=str, default='klr', help='surrogate model.')
+    parser.add_argument('--C', type=float, default=1.0, help='penalty parameters for KLR or SVM.')
+    parser.add_argument('--n_neighbors', type=int, default=5, help='no. neighbors to use for KNN.')
+    parser.add_argument('--tree_kernel', type=str, default='tree_output', help='tree kernel.')
+    parser.add_argument('--metric', type=str, default='mse', help='fidelity metric.')
 
-    # extra settings
-    parser.add_argument('--ext', type=str, default='png', help='output image format.')
-    parser.add_argument('--rs', type=int, default=4, help='random state.')
-    parser.add_argument('--verbose', type=int, default=0, help='Verbosity level.')
+    # Plot settings
+    parser.add_argument('--n_bins', type=int, default=50, help='number of bins similarity plot.')
+    parser.add_argument('--rasterize', action='store_true', default=False, help='rasterize dense instance plots.')
 
     args = parser.parse_args()
     main(args)
-
-
-class Args:
-    dataset = 'adult'
-    data_dir = 'data'
-    out_dir = 'output/misclassification/'
-
-    max_bins = 40
-    alpha = 0.5
-    kde = False
-    overlay = False
-    summary_plot = False
-    rasterize = False
-
-    topk = 1
-    test_type = 'pos_incorrect'
-    load_trex = False
-    load_shap = False
-    normalize_shap = False
-
-    tree_type = 'cb'
-    n_estimators = 100
-    max_depth = 5
-    val_frac = 0.1
-
-    tree_kernel = 'tree_output'
-    kernel_model = 'klr'
-    true_label = False
-
-    ext = 'pdf'
-    rs = 1
-    verbose = 0

@@ -6,7 +6,7 @@ import os
 import numpy as np
 
 
-def get_data(dataset, data_dir='data', preprocessing='categorical'):
+def get_data(dataset, data_dir='data', preprocessing='categorical', mismatch=False):
     """
     Returns a train and test set from the desired dataset.
     """
@@ -15,10 +15,11 @@ def get_data(dataset, data_dir='data', preprocessing='categorical'):
     # append processing directory
     assert preprocessing in ['categorical', 'standard']
     in_dir = os.path.join(in_dir, preprocessing)
+    assert os.path.exists(in_dir)
 
     # load in data
-    assert os.path.exists(in_dir)
-    train = np.load(os.path.join(in_dir, 'train.npy'), allow_pickle=True)
+    train_fn = 'train_mismatch.npy' if (dataset == 'adult' and mismatch) else 'train.npy'
+    train = np.load(os.path.join(in_dir, train_fn), allow_pickle=True)
     test = np.load(os.path.join(in_dir, 'test.npy'), allow_pickle=True)
     feature = np.load(os.path.join(in_dir, 'feature.npy'))
 

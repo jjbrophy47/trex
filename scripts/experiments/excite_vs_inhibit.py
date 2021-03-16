@@ -118,15 +118,6 @@ def trex_method(args, model, X_train, y_train, X_test, logger=None,
     if logger:
         logger.info('\ncomputing influence of each training sample on the test set...')
 
-    # print(X_test.shape[0])
-    # excite_attributions = surrogate.pred_influence(X_test, pred=np.array([1]))
-    # excite_attributions_sum = np.sum(excite_attributions, axis=0)
-    # excitatory_train_indices = np.argsort(excite_attributions_sum)
-
-    # inhib_attributions = surrogate.pred_influence(X_test, pred=np.array([0]))
-    # inhib_attributions_sum = np.sum(inhib_attributions, axis=0)
-    # inhibitory_train_indices = np.argsort(inhib_attributions_sum)
-
     # sort instances by most excitatory or most inhibitory
     attributions = surrogate.compute_attributions(X_test)
     attributions_sum = np.sum(attributions, axis=0)
@@ -265,15 +256,8 @@ def experiment(args, logger, out_dir):
         ran_neg_result = measure_performance(args, ran_neg_indices, clf, X_train, y_train, X_test_sub, y_test_sub,
                                              logger=logger)
 
-    # plot settings
-    plt.rc('xtick', labelsize=13)
-    plt.rc('ytick', labelsize=13)
-    plt.rc('axes', labelsize=13)
-    plt.rc('axes', titlesize=13)
-    plt.rc('legend', fontsize=13)
-    plt.rc('legend', title_fontsize=13)
-    # plt.rc('lines', linewidth=1)
-    plt.rc('lines', markersize=5)
+    # matplotlib settings
+    util.plot_settings(fontsize=13)
 
     # inches
     width = 4.8  # Machine Learning journal
@@ -313,6 +297,7 @@ def experiment(args, logger, out_dir):
 
     # display results
     logger.info('\nsaving results to {}/...'.format(os.path.join(out_dir)))
+    logger.info('total time: {:.3f}s'.format(time.time() - begin))
 
 
 def main(args):
@@ -340,7 +325,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
 
     # I/O settings
-    parser.add_argument('--dataset', type=str, default='bank_marketing', help='dataset to explain.')
+    parser.add_argument('--dataset', type=str, default='vaccine', help='dataset to explain.')
     parser.add_argument('--data_dir', type=str, default='data', help='data directory.')
     parser.add_argument('--preprocessing', type=str, default='standard', help='preprocessing directory.')
     parser.add_argument('--out_dir', type=str, default='output/excite_vs_inhibit/', help='directory to save results.')
@@ -356,7 +341,7 @@ if __name__ == '__main__':
 
     # Method settings
     parser.add_argument('--method', type=str, default='klr', help='method.')
-    parser.add_argument('--extra_methods', action='store_true', default=False, help='random pos. and random neg.')
+    parser.add_argument('--extra_methods', action='store_true', default=True, help='random pos. and random neg.')
     parser.add_argument('--metric', type=str, default='mse', help='metric for tuning surrogate models.')
 
     # No tuning settings
@@ -367,7 +352,7 @@ if __name__ == '__main__':
     # Experiment settings
     parser.add_argument('--rs', type=int, default=1, help='random state.')
     parser.add_argument('--n_test', type=int, default=1, help='no. of test instances to evaluate.')
-    parser.add_argument('--train_frac_to_remove', type=float, default=0.05, help='fraction of train data to remove.')
+    parser.add_argument('--train_frac_to_remove', type=float, default=0.1, help='fraction of train data to remove.')
     parser.add_argument('--n_checkpoints', type=int, default=10, help='no. checkpoints to perform retraining.')
 
     # Additional settings

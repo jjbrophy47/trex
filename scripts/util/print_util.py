@@ -5,6 +5,7 @@ import os
 import sys
 import shutil
 import logging
+import matplotlib.pyplot as plt
 
 
 # private
@@ -102,3 +103,20 @@ def reset_stdout_stderr(logfile, stdout, stderr):
     sys.stdout = stdout
     sys.stderr = stderr
     logfile.close()
+
+
+def plot_settings(family='serif', fontsize=11,
+                  markersize=5, linewidth=None):
+    """
+    Matplotlib settings.
+    """
+    plt.rc('font', family=family)
+    plt.rc('xtick', labelsize=fontsize)
+    plt.rc('ytick', labelsize=fontsize)
+    plt.rc('axes', labelsize=fontsize)
+    plt.rc('axes', titlesize=fontsize)
+    plt.rc('legend', fontsize=fontsize)
+    plt.rc('legend', title_fontsize=fontsize)
+    plt.rc('lines', markersize=markersize)
+    if linewidth is not None:
+        plt.rc('lines', linewidth=linewidth)

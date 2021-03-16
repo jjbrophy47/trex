@@ -368,6 +368,7 @@ def experiment(args, logger, out_dir):
 
 def main(args):
 
+    # define output directory
     out_dir = os.path.join(args.out_dir,
                            args.dataset,
                            args.model,

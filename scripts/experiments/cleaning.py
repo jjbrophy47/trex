@@ -692,13 +692,13 @@ if __name__ == '__main__':
     parser.add_argument('--max_depth', type=int, default=5, help='maximum depth in tree ensemble.')
 
     # Method settings
-    parser.add_argument('--method', type=str, default='klr-leaf_output', help='explanation method.')
+    parser.add_argument('--method', type=str, default='klr', help='explanation method.')
     parser.add_argument('--metric', type=str, default='mse', help='fidelity metric to use for TREX.')
 
     # No tuning settings
-    parser.add_argument('--C', type=float, default=0.1, help='penalty parameters for KLR or SVM.')
+    parser.add_argument('--C', type=float, default=1.0, help='penalty parameters for KLR or SVM.')
     parser.add_argument('--n_neighbors', type=int, default=5, help='no. neighbors to use for KNN.')
-    parser.add_argument('--tree_kernel', type=str, default='leaf_output', help='tree kernel.')
+    parser.add_argument('--tree_kernel', type=str, default='tree_output', help='tree kernel.')
 
     # Experiment settings
     parser.add_argument('--rs', type=int, default=1, help='random state.')

@@ -22,11 +22,10 @@ def main(args):
     print(args)
 
     # settings
-    # dataset_list = ['churn', 'surgical', 'vaccine', 'amazon', 'bank_marketing', 'adult']
     dataset_list = ['surgical', 'vaccine', 'amazon', 'bank_marketing', 'adult', 'census']
     method_list = ['random', 'klr', 'maple', 'knn', 'fast_leaf_influence', 'maple+']
     color_list = ['red', 'blue', 'orange', 'purple', 'brown', 'orange']
-    label_list = ['Random', 'TREX-KLR', 'MAPLE', 'TEKNN', 'FastLeafInfluence', 'MAPLE+']
+    label_list = ['Random', 'TREX', 'MAPLE', 'TEKNN', 'FastLeafInfluence', 'MAPLE+']
     marker_list = ['o', 'd', '^', 'x', '2', '^']
     linestyle_list = ['-', '-', '-', '-', '--', '--']
     zorder_list = [3, 4, 2, 1, 1, 2]
@@ -38,6 +37,7 @@ def main(args):
     df = df[df['model'] == args.model]
 
     # plot settings
+    plt.rc('font', family='serif')
     plt.rc('xtick', labelsize=13)
     plt.rc('ytick', labelsize=13)
     plt.rc('axes', labelsize=13)
