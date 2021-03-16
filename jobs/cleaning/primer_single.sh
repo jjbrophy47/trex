@@ -22,6 +22,6 @@ for rs in ${rs_list[@]}; do
            --output=jobs/logs/cleaning/$job_name \
            --error=jobs/errors/cleaning/$job_name \
            jobs/cleaning/runner.sh $dataset $model $preprocessing \
-           $n_estimators $max_depth $method 'tree_output' 1.0 'tree_output' 61 \
+           $n_estimators $max_depth $method 'tree_output' 1.0 'leaf_path' 61 \
            $check_pct $train_frac $rs
 done

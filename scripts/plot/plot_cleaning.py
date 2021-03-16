@@ -31,22 +31,19 @@ def main(args):
     # settings
     dataset_list = ['surgical', 'vaccine', 'amazon', 'bank_marketing', 'adult', 'census']
 
-    method_list = ['klr', 'random', 'tree_loss', 'klr_loss',
-                   'maple', 'leaf_influence', 'tree_prototype',
-                   'knn', 'knn_loss', 'klr_og', 'klr_loss_og', 'fast_leaf_influence']
-
-    label_list = ['TREX', 'Random', 'GBDT Loss', 'KLR Loss',
-                  'MAPLE', 'LeafInfluence', 'TreeProto', 'TEKNN', 'KNN Loss',
-                  'KLR OG', 'KLR Loss OG', 'FastLeafInfluence']
-
-    color_list = ['blue', 'red', 'green', 'purple', 'orange',
-                  'black', '#EEC64F', 'yellow', 'brown', 'cyan', 'magenta', 'black']
-
-    marker_list = ['1', 'o', 'v', '^', '>', '.', '*', 'h', 's', '.', '.', '2']
-
-    linestyle_list = ['-', '-', '-', '-', '-', '-', '-', '-', '-', '-', '-', '-', '--']
-
-    zorder_list = [11, 9, 3, 2, 7, 1, 6, 5, 8, 11, 11, 11]
+    methods = {}
+    methods['klr'] = ['TREX', 'blue', '1', '-', 11]  # label, color, marker, linestyle, zorder
+    methods['random'] = ['Random', 'red', 'o', '-', 9]
+    methods['tree_loss'] = ['GBDT Loss', 'green', 'v', '-', 3]
+    methods['klr_loss'] = ['KLR Loss', 'purple', '^', '-', 2]
+    methods['maple'] = ['MAPLE', 'orange', '>', '-', 7]
+    methods['leaf_influence'] = ['LeafInfluence', 'black', '.', '-', 1]
+    methods['fast_leaf_influence'] = ['FastLeafInfluence', 'black', '.', '--', 1]
+    methods['tree_prototype'] = ['TreeProto', '#EEC64F', '*', '-', 6]
+    methods['knn'] = ['TEKNN', 'yellow', 'h', '-', 5]
+    methods['knn_loss'] = ['KNN Loss', 'brown', 's', '-', 8]
+    methods['klr_og'] = ['TREX OG', 'cyan', '.', '-', 11]
+    methods['klr_loss_og'] = ['KLR Loss OG', 'magenta', '.', '-', 11]
 
     # get results
     df = pd.read_csv(os.path.join(args.in_dir, 'results.csv'))
@@ -103,13 +100,13 @@ def main(args):
             ax.tick_params(axis='both', which='major')
 
             # plot each method
-            methods = list(zip(method_list, label_list, color_list, marker_list, zorder_list, linestyle_list))
-            for method, label, color, marker, zorder, linestyle in methods:
+            for method, (label, color, marker, linestyle, zorder) in methods.items():
 
                 # get method results
                 temp_df2 = temp_df1[temp_df1['method'] == method]
 
                 if len(temp_df2) == 0:
+                    print('[Missing] {}: {}'.format(dataset, method))
                     continue
 
                 # extract performance results
