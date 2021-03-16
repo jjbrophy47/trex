@@ -12,8 +12,8 @@ time=${11}
 partition=${12}
 rs_start=${13}
 
-method_list=('random' 'klr' 'knn' 'maple' 'maple+')
-# method_list=('maple+')
+# method_list=('random' 'klr' 'knn' 'maple' 'maple+')
+method_list=('random_pos' 'random_neg' 'random_pred' 'maple+')
 
 for method in ${method_list[@]}; do
     for (( rs = $rs_start; rs < $rs_start + 20; rs++ )); do

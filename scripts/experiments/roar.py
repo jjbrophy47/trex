@@ -25,6 +25,7 @@ from copy import deepcopy
 from datetime import datetime
 
 import numpy as np
+from scipy.stats import mode
 from sklearn.base import clone
 from sklearn.metrics import accuracy_score
 from sklearn.metrics import roc_auc_score
@@ -149,11 +150,35 @@ def measure_performance(train_indices, n_checkpoint, n_checkpoints,
     return result
 
 
-def random_method(X_train, rng):
+def random_method(args, model, X_train, y_train, X_test, rng):
     """
     Randomly orders the training intances to be removed.
     """
-    return rng.choice(np.arange(X_train.shape[0]), size=X_train.shape[0], replace=False)
+
+    # remove training instances at random
+    if args.method == 'random':
+        result = rng.choice(np.arange(X_train.shape[0]), size=X_train.shape[0], replace=False)
+
+    # remove ONLY positive training instances
+    elif args.method == 'random_pos':
+        pos_indices = np.where(y_train == 1)[0]
+        result = rng.choice(pos_indices, size=pos_indices.shape[0], replace=False)
+
+    # remove ONLY negative training instances
+    elif args.method == 'random_neg':
+        neg_indices = np.where(y_train == 0)[0]
+        result = rng.choice(neg_indices, size=neg_indices.shape[0], replace=False)
+
+    # removes samples ONLY from the majority predicted label class
+    elif args.method == 'random_pred':
+        model_pred = mode(model.predict(X_test)).mode[0]
+        pred_indices = np.where(y_train == model_pred)[0]
+        result = rng.choice(pred_indices, size=pred_indices.shape[0], replace=False)
+
+    else:
+        raise ValueError('unknown method {}'.format(args.method))
+
+    return result
 
 
 def trex_method(args, model, X_train, y_train, X_test, logger=None,
@@ -340,8 +365,8 @@ def sort_train_instances(args, model, X_train, y_train, X_test, y_test, rng, log
     """
 
     # random method
-    if args.method == 'random':
-        train_indices = random_method(X_train, rng)
+    if 'random' in args.method:
+        train_indices = random_method(args, model, X_train, y_train, X_test, rng)
 
     # TREX method
     elif 'klr' in args.method or 'svm' in args.method:

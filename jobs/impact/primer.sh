@@ -11,8 +11,8 @@ mem=${10}
 time=${11}
 partition=${12}
 
-method_list=('random' 'klr' 'knn' 'maple' 'maple+')
-# method_list=('maple+')
+# method_list=('random' 'klr' 'knn' 'maple' 'maple+')
+method_list=('random_pred')
 
 for method in ${method_list[@]}; do
     for rs in {1..20}; do

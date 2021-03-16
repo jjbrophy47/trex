@@ -43,7 +43,7 @@ def main(args):
     methods['knn'] = ['TEKNN', 'yellow', 'h', '-', 5]
     methods['knn_loss'] = ['KNN Loss', 'brown', 's', '-', 8]
     methods['klr_og'] = ['TREX OG', 'cyan', '.', '-', 11]
-    methods['klr_loss_og'] = ['KLR Loss OG', 'magenta', '.', '-', 11]
+    methods['klr_loss_og'] = ['KLR Loss OG', 'magenta', '.', '-', 10]
 
     # get results
     df = pd.read_csv(os.path.join(args.in_dir, 'results.csv'))
