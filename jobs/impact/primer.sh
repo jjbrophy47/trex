@@ -14,11 +14,11 @@ time=${13}
 partition=${14}
 
 # method_list=('random' 'klr' 'knn' 'maple' 'maple+')
-method_list=('random_pred', 'klr')
+method_list=('random_pred' 'klr')
 
 for method in ${method_list[@]}; do
     for rs in {1..20}; do
-        job_name="I_${dataset}_${model}_${method}"
+        job_name="I_${dataset}_${model}_${method}_${desired_pred}_${n_test}"
 
         sbatch --mem=${mem}G \
                --time=$time \
