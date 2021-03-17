@@ -49,8 +49,6 @@ class DShap(object):
 
     def tmc_shap(self, check_every=10, err_tol=0.1):
         """
-        TODO: only save the last 100 runs of marginals
-
         Runs TMC-Shapley algorithm.
 
         Args:
@@ -80,6 +78,12 @@ class DShap(object):
             if (iteration + 1) % check_every == 0:
                 error = self.compute_error(self.mem_tmc_)
                 print('[ITER {:,}], max. error: {:.3f}'.format(iteration + 1, error))
+
+                # delete old marginals to avoid memory explosion
+                if (iteration + 1) > 100:
+                    self.mem_tmc_ = self.mem_tmc_[check_every:].copy()
+
+                print(self.mem_tmc_.shape)
 
                 if error < err_tol:
                     break
@@ -112,7 +116,6 @@ class DShap(object):
 
     def compute_score(self, model, X, y):
         """
-        TODO: add predicted probability as the score.
         Computes the values of the given model.
 
         Args:
@@ -127,7 +130,9 @@ class DShap(object):
             result = roc_auc_score(model_proba, y)
 
         elif self.metric == 'proba':
-            model_proba = model.predict_proba(X)[:, 1]
+            model_proba = model.predict_proba(X)
+            if model_proba.shape[1] == 1:
+                model_proba = model_proba[0]
             result = np.mean(model_proba)
 
         else:
@@ -200,7 +205,7 @@ class DShap(object):
 
             # train and re-evaluate
             model = clone(self.model)
-            model.fit(X_batch, y_batch)
+            model = model.fit(X_batch, y_batch)
             new_score = self.compute_score(model,
                                            X=self.X_test,
                                            y=self.y_test)

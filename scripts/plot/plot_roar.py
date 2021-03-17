@@ -23,8 +23,8 @@ def main(args):
     methods = {}
     methods['klr'] = ['TREX', 'blue', '1', '-', 11]  # label, color, marker, linestyle, zorder
     methods['random'] = ['Random', 'red', 'o', '-', 9]
-    methods['random_pos'] = ['Random (pos. label)', 'cyan', 'o', '--', 9]
-    methods['random_neg'] = ['Random (neg. label)', 'magenta', 'o', '--', 9]
+    methods['random_minority'] = ['Random (minority class)', 'cyan', 'o', '--', 9]
+    methods['random_majority'] = ['Random (majority label)', 'magenta', 'o', '--', 9]
     methods['random_pred'] = ['Random (pred. label)', 'green', 'o', '--', 9]
     methods['maple'] = ['MAPLE', 'orange', '>', '-', 7]
     methods['maple+'] = ['MAPLE+', 'orange', '^', '--', 7]

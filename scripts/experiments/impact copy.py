@@ -1,13 +1,13 @@
 """
 Experiment:
-    1) Generate an instance-attribution explanation for a set of test instances.
-    2) Sort training instances by influence on the selected test instnces.
-    3) Create new datasets by removing increasing fractions of the sorted training instances.
-    4) Train new tree ensembles for each level of data removal.
-    5) Evaluate predictive performance on the test set using each model.
+    1) Select a test instance uniformly at random.
+    2) Sort training instances by absolute difference on the test instance probability OR loss.
+    3) Training samples in equal increments.
+    4) Train a new tree-ensemble on the reduced training dataset.
+    5) Measure absolute change in predicted probability.
 
-If the instances removed are highly influential, than performance should decrease sharply,
-and / or the average change in test prediction should be significant.
+The best methods choose samples to be removed that have the highest change
+in absolute predicted probabiltiy on the test sample.
 """
 import os
 import sys
@@ -18,82 +18,61 @@ import resource
 import argparse
 import warnings
 warnings.simplefilter(action='ignore', category=UserWarning)  # lgb compiler warning
-import matplotlib
-matplotlib.use('Agg')
-import matplotlib.pyplot as plt
 from copy import deepcopy
 from datetime import datetime
 
 import numpy as np
-from scipy.stats import mode
 from sklearn.base import clone
-from sklearn.metrics import accuracy_score
-from sklearn.metrics import roc_auc_score
-from sklearn.model_selection import train_test_split
+from scipy.stats import mode
 
 here = os.path.abspath(os.path.dirname(__file__))
 sys.path.insert(0, here + '/../../')  # for influence_boosting
 sys.path.insert(0, here + '/../')  # for utility
 import trex
 import util
-from baselines.influence_boosting.influence.leaf_influence import CBLeafInfluenceEnsemble
-from baselines.maple.MAPLE import MAPLE
+from baselines import CBLeafInfluenceEnsemble
+from baselines import MAPLE
+from baselines import DShap
 
 
-def score(model, X_test, y_test):
-    """
-    Evaluates the model the on test set and returns metric scores.
-    """
-
-    # 1 test sample
-    if y_test.shape[0] == 1:
-        result = (-1, -1)
-
-    # >1 test sample
-    else:
-        acc = accuracy_score(y_test, model.predict(X_test))
-        auc = roc_auc_score(y_test, model.predict_proba(X_test)[:, 1])
-        return (acc, auc)
-
-    return result
-
-
-def measure_performance(train_indices, n_checkpoint, n_checkpoints,
-                        clf, X_train, y_train, X_test, y_test,
+def measure_performance(args, train_indices, clf, X_train, y_train, X_test, y_test,
                         logger=None):
     """
     Measures the change in predictions as training instances are removed.
     """
 
-    # compute baseline statistics
+    # baseline predicted probability
     model = clone(clf).fit(X_train, y_train)
-    acc, auc = score(model, X_test, y_test)
     base_proba = model.predict_proba(X_test)[:, 1]
 
-    # result container
-    result = {}
-    result['accs'] = [acc]
-    result['aucs'] = [auc]
-    result['avg_proba_deltas'] = [0]
-    result['median_proba_deltas'] = [0]
-    result['remove_pcts'] = [0]
+    base_proba_avg = base_proba.mean()
+    label_avg = y_test.sum() / y_test.shape[0]
 
-    # result containers
-    start = time.time()
-    s = '[Checkpoint {:,}] removed: {:.1f}%; Acc.: {:.3f}; AUC: {:.3f}'
-    s += '; Prob. delta, avg.: {:.3f}, median: {:.3f}; cum. time: {:.3f}s'
+    print(base_proba)
+    print(y_test)
 
     # display status
     if logger:
-        logger.info('\nremoving and re-evaluting at different levels of data removal...')
+        logger.info('\nremoving, retraining, and remeasuring predicted probability...')
+        # logger.info('test label: {}, before prob.: {:.5f}'.format(int(y_test[0]), base_proba[0]))
+        logger.info('test label (avg.): {:.2f}, before prob.: {:.5f}'.format(label_avg, base_proba_avg))
+
+    # result container
+    result = {}
+    result['proba_diff'] = [0]
+    result['remove_pct'] = [0]
+
+    # compute no. samples to remove between each checkpoint
+    n_checkpoint = int(X_train.shape[0] * args.train_frac_to_remove / args.n_checkpoints)
 
     # remove percentages of training samples and retrain
-    for i in range(n_checkpoints):
+    for i in range(args.n_checkpoints):
+        start = time.time()
 
         # compute how many samples should be removed
         n_remove = (i + 1) * n_checkpoint
         remove_indices = train_indices[:n_remove]
-        remove_pct = n_remove / X_train.shape[0] * 100
+        pct_remove = n_remove / X_train.shape[0] * 100
 
         # remove most influential training samples
         new_X_train = np.delete(X_train, remove_indices, axis=0)
@@ -104,48 +83,26 @@ def measure_performance(train_indices, n_checkpoint, n_checkpoints,
             logger.info('Only samples from one class remain!')
             break
 
-        # remeasure test instance predictive performance
+        # measure change in test instance probability
         new_model = clone(clf).fit(new_X_train, new_y_train)
-        acc, auc = score(new_model, X_test, y_test)
         proba = new_model.predict_proba(X_test)[:, 1]
+        # proba_diff = np.abs(base_proba - proba)[0]
+
+        proba_avg = proba.mean()
+        proba_avg_diff = np.abs(base_proba_avg - proba_avg)
 
         # add to results
-        result['accs'].append(acc)
-        result['aucs'].append(auc)
-        result['avg_proba_deltas'].append(np.mean(np.abs(base_proba - proba)))
-        result['median_proba_deltas'].append(np.median(np.abs(base_proba - proba)))
-        result['remove_pcts'].append(remove_pct)
+        # result['proba_diff'].append(np.abs(base_proba - proba)[0])
+        result['proba_diff'].append(np.abs(base_proba_avg - proba_avg))
+        result['remove_pct'].append(pct_remove)
 
         # display progress
         if logger:
-            logger.info(s.format(i + 1, remove_pct, result['accs'][-1], result['aucs'][-1],
-                                 result['avg_proba_deltas'][-1], result['median_proba_deltas'][-1],
-                                 time.time() - start))
+            s = '[{:.1f}% removed] after prob.: {:.5f}, delta: {:.5f}...{:.3f}s'
+            # logger.info(s.format(n_remove / X_train.shape[0] * 100, proba[0], proba_diff, time.time() - start))
+            logger.info(s.format(n_remove / X_train.shape[0] * 100, proba_avg, proba_avg_diff, time.time() - start))
 
-        # plot original model and new model predictions on the test set
-        if (i + 1) == args.special_checkpoint and logger:
-            logger.info('special checkpoint, plotting predictions...')
-
-            pos_indices = np.where(y_test == 1)[0]
-            neg_indices = np.where(y_test == 0)[0]
-
-            fig, ax = plt.subplots()
-            ax.scatter(base_proba[pos_indices], proba[pos_indices], marker='+', label='pos. label', color='green')
-            ax.scatter(base_proba[neg_indices], proba[neg_indices], marker='.', label='neg. label', color='red',
-                       facecolors='none')
-            ax.plot([0, 1], [0, 1], transform=ax.transAxes, linestyle='--', color='black')
-            ax.set_xlabel('Original model prob.')
-            ax.set_ylabel('Updated model prob.')
-            ax.set_title('{:.0f}% Train Data Removed'.format(remove_pct))
-            ax.set_xlim(0, 1)
-            ax.set_ylim(0, 1)
-            ax.legend()
-
-            # add to results
-            result['ckpt_model_proba'] = base_proba
-            result['ckpt_new_model_proba'] = proba
-            result['ckpt_remove_pct'] = remove_pct
-            result['ckpt_y_test'] = y_test
+    print(proba)
 
     return result
 
@@ -174,8 +131,8 @@ def random_method(args, model, X_train, y_train, X_test, rng):
 
     # removes samples ONLY from the majority predicted label class
     elif args.method == 'random_pred':
-        model_pred = mode(model.predict(X_test)).mode[0]
-        pred_indices = np.where(y_train == model_pred)[0]
+        majority_pred = mode(model.predict(X_test)).mode[0]
+        pred_indices = np.where(y_train == majority_pred)[0]
         result = rng.choice(pred_indices, size=pred_indices.shape[0], replace=False)
 
     else:
@@ -188,6 +145,11 @@ def trex_method(args, model, X_train, y_train, X_test, logger=None,
                 frac_progress_update=0.1):
     """
     Sort training instances by largest 'excitatory' influnce on the test set.
+
+    There is a difference between
+    1) the trainnig instances with the largest excitatory (or inhibitory) attributions, and
+    2) the training instances with the largest influence on the PREDICTED labels
+       (i.e. excitatory or inhibitory attributions w.r.t. the predicted label).
     """
 
     # train surrogate model
@@ -208,19 +170,32 @@ def trex_method(args, model, X_train, y_train, X_test, logger=None,
 
     # sort instances with the larget influence on the predicted labels of the test set
     pred = model.predict(X_test)
-    attributions = surrogate.pred_influence(X_test, pred)
-    attributions_sum = np.sum(attributions, axis=0)
-    train_indices = np.argsort(attributions_sum)[::-1]
+    attributions = surrogate.pred_influence(X_test, pred).sum(axis=0)
+    train_indices = np.argsort(attributions)[::-1]
 
-    # display k most influential training samples
+    # only remove maj. pred. label indices
+    maj_pred_label = mode(model.predict(X_test)).mode[0]
+    pos_indices = np.where(y_train == maj_pred_label)[0]
+    new_train_indices = []
+    for ndx in train_indices:
+        if ndx in pos_indices:
+            new_train_indices.append(ndx)
+    train_indices = np.array(new_train_indices)
+
+    # # order by most excitatory if maj. pred. label is 1 otherwise most inhibitory
+    # maj_pred_label = mode(model.predict(X_test)).mode[0]
+    # attributions = surrogate.compute_attributions(X_test).sum(axis=0)
+    # train_indices = np.argsort(attributions)[::-1] if maj_pred_label == 1 else np.argsort(attributions)
+
+    # display attributions from the top k train instances
     if logger:
         k = 20
-        sim_s = surrogate.similarity(X_test)[0][train_indices]
+        sim_s = surrogate.similarity(X_test).sum(axis=0)[train_indices]
         alpha_s = surrogate.get_alpha()[train_indices]
-        attributions_sum_s = attributions_sum[train_indices]
+        attributions_s = attributions[train_indices]
         y_train_s = y_train[train_indices]
 
-        train_info = list(zip(train_indices, attributions_sum_s, y_train_s, alpha_s, sim_s))
+        train_info = list(zip(train_indices, attributions_s, y_train_s, alpha_s, sim_s))
         s = '[{:5}] label: {}, alpha: {:.3f}, sim: {:.3f} attribution sum: {:.3f}'
 
         for ndx, atr, lab, alpha, sim in train_info[:k]:
@@ -243,10 +218,9 @@ def maple_method(args, model, X_train, y_train, X_test, logger=None,
 
     # display status
     if logger:
-        logger.info('\ncomputing influence of each training sample on the test set...')
+        logger.info('\ncomputing influence of each training sample on the test instance...')
 
     # contributions container
-    start = time.time()
     contributions_sum = np.zeros(X_train.shape[0])
 
     # compute similarity of each training instance to the set set
@@ -257,13 +231,7 @@ def maple_method(args, model, X_train, y_train, X_test, logger=None,
         if '+' in args.method:
             contributions = np.where(train_label == pred_label[i], contributions, contributions * -1)
 
-        # aggregate contributions
         contributions_sum += contributions
-
-        # display progress
-        if logger and i % int(X_test.shape[0] * frac_progress_update) == 0:
-            elapsed = time.time() - start
-            logger.info('finished {:.1f}% test instances...{:.3f}s'.format((i / X_test.shape[0]) * 100, elapsed))
 
     # sort train data based largest similarity (MAPLE) OR largest similarity-influence (MAPLE+) to test set
     train_indices = np.argsort(contributions_sum)[::-1]
@@ -303,33 +271,34 @@ def influence_method(args, model, X_train, y_train, X_test, y_test, logger=None,
 
     # display status
     if logger:
-        logger.info('\ncomputing influence of each training sample on the test set...')
+        logger.info('\ncomputing influence of each training sample on the test instance...')
 
     # contributions container
     start = time.time()
-    attributions = np.zeros((X_train.shape[0], X_test.shape[0]))
+    contributions_sum = np.zeros(X_train.shape[0])
 
     # compute influence on each test instance
-    buf = deepcopy(explainer)
-    for i in range(X_train.shape[0]):
-        explainer.fit(removed_point_idx=i, destination_model=buf)
+    for i in range(X_test.shape[0]):
+
+        contributions = []
+        buf = deepcopy(explainer)
 
         # compute influence for each training instance
-        for j in range(X_test.shape[0]):
-            attributions[i][j] = buf.loss_derivative(X_test[[j]], y_test[[j]])[0]
+        for j in range(X_train.shape[0]):
+            explainer.fit(removed_point_idx=j, destination_model=buf)
+            contributions.append(buf.loss_derivative(X_test[[i]], y_test[[i]])[0])
 
-        # display progress
-        if logger and i % int(X_train.shape[0] * frac_progress_update) == 0:
-            elapsed = time.time() - start
-            train_frac_complete = i / X_train.shape[0] * 100
-            logger.info('train {:.1f}%...{:.3f}s'.format(train_frac_complete, elapsed))
+            # display progress
+            if logger and j % int(X_train.shape[0] * frac_progress_update) == 0:
+                elapsed = time.time() - start
+                train_frac_complete = j / X_train.shape[0] * 100
+                logger.info('train {:.1f}%...{:.3f}s'.format(train_frac_complete, elapsed))
 
-    # aggregate influences
-    attributions_sum = np.sum(attributions, axis=0)
+        contributions = np.array(contributions)
+        contributions_sum += contributions
 
-    # sort by descending order; the most positive train instances
-    # are the ones that decrease the log loss the most, and are the most helpful
-    train_indices = np.argsort(attributions_sum)[::-1]
+    # sort by decreasing absolute influence
+    train_indices = np.argsort(np.abs(contributions_sum))[::-1]
 
     # clean up
     shutil.rmtree(temp_dir)
@@ -362,12 +331,38 @@ def teknn_method(args, model, X_train, y_train, X_test, logger=None):
     return train_indices
 
 
+def dshap_method(args, model, X_train, y_train, X_test, logger=None):
+    """
+    Data Shapley method, with the evaluation as predicted probability.
+    """
+    ds = DShap(model,
+               X_train=X_train,
+               y_train=y_train,
+               X_test=X_test,
+               y_test=np.random.randint(2, size=X_test.shape[0]),  # not used since evaluation='proba'
+               metric='proba',
+               random_state=args.rs)
+
+    # compute marginals of training instances, pos. means excitatory, neg. means inhibitory
+    marginals = ds.tmc_shap()
+
+    # flip marginals if predicted label is negative
+    model_pred = model.predict(X_test)[0]
+    if model_pred == 0:
+        marginals *= -1
+
+    # sort by largest positive value, meaning most contributory to the PREDICTED label
+    train_indices = np.argsort(marginals)[::-1]
+
+    return train_indices
+
+
 def sort_train_instances(args, model, X_train, y_train, X_test, y_test, rng, logger=None):
     """
     Sorts training instance to be removed using one of several methods.
     """
 
-    # random method
+    # random
     if 'random' in args.method:
         train_indices = random_method(args, model, X_train, y_train, X_test, rng)
 
@@ -386,6 +381,10 @@ def sort_train_instances(args, model, X_train, y_train, X_test, y_test, rng, log
     # TEKNN
     elif 'knn' in args.method:
         train_indices = teknn_method(args, model, X_train, y_train, X_test, logger=logger)
+
+    # Data Shapley
+    elif args.method == 'dshap':
+        train_indices = dshap_method(args, model, X_train, y_train, X_test, logger=logger)
 
     else:
         raise ValueError('method {} unknown!'.format(args.method))
@@ -425,43 +424,42 @@ def experiment(args, logger, out_dir):
         train_indices = rng.choice(X_train.shape[0], size=n_train_samples, replace=False)
         X_train, y_train = X_train[train_indices], y_train[train_indices]
 
-    # select a (stratified) subset of test instances uniformly at random
-    _, X_test_sub, _, y_test_sub = train_test_split(X_test, y_test,
-                                                    test_size=args.n_test,
-                                                    random_state=args.rs,
-                                                    stratify=y_test)
+    # select a subset of test instances uniformly at random
+    test_indices = rng.choice(X_test.shape[0], size=args.n_test, replace=False)
+    X_test_sub, y_test_sub = X_test[test_indices], y_test[test_indices]
 
     # display dataset statistics
     logger.info('\nno. train instances: {:,}'.format(X_train.shape[0]))
     logger.info('no. test instances: {:,}'.format(X_test_sub.shape[0]))
-    logger.info('no. features: {:,}'.format(X_train.shape[1]))
-    logger.info('pos. label % (test): {:.1f}%\n'.format(np.sum(y_test) / y_test.shape[0] * 100))
+    logger.info('no. features: {:,}\n'.format(X_train.shape[1]))
 
     # train a tree ensemble
     model = clone(clf).fit(X_train, y_train)
     util.performance(model, X_train, y_train, logger=logger, name='Train')
-    util.performance(model, X_test_sub, y_test_sub, logger=logger, name='Test')
 
-    # compute how many samples to remove before a checkpoint
-    if args.train_frac_to_remove >= 1.0:
-        n_checkpoint = int(args.train_frac_to_remove)
+    # # select a subset of test instances FROM THE SAME PREDICTED CLASS uniformly at random
+    # model_pred_test = model.predict(X_test)
+    # pos_test_indices = np.where(model_pred_test == 0)[0]
+    # test_indices = rng.choice(pos_test_indices, size=args.n_test, replace=False)
+    # X_test_sub, y_test_sub = X_test[test_indices], y_test[test_indices]
 
-    elif args.train_frac_to_remove > 0:
-        n_checkpoint = int(args.train_frac_to_remove * X_train.shape[0] / args.n_checkpoints)
-
-    else:
-        raise ValueError('invalid train_frac_to_remove: {}'.format(args.train_frac_to_remove))
+    # select a subset of test instances, half from the neg. class and half from the pos. class
+    # model_pred_test = model.predict(X_test)
+    # neg_test_indices = np.where(model_pred_test == 0)[0]
+    # pos_test_indices = np.where(model_pred_test == 1)[0]
+    # neg_test_indices = rng.choice(neg_test_indices, size=int(args.n_test / 2), replace=False)
+    # pos_test_indices = rng.choice(pos_test_indices, size=int(args.n_test / 2), replace=False)
+    # test_indices = np.concatenate([neg_test_indices, pos_test_indices])
+    # X_test_sub, y_test_sub = X_test[test_indices], y_test[test_indices]
 
     # sort train instances, then remove, retrain, and re-evaluate
     train_indices = sort_train_instances(args, model, X_train, y_train, X_test_sub, y_test_sub, rng, logger=logger)
-    result = measure_performance(train_indices, n_checkpoint, args.n_checkpoints,
-                                 clf, X_train, y_train, X_test_sub, y_test_sub, logger=logger)
+    result = measure_performance(args, train_indices, clf, X_train, y_train, X_test_sub, y_test_sub, logger=logger)
 
     # save results
     result['max_rss'] = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
     result['total_time'] = time.time() - begin
     np.save(os.path.join(out_dir, 'results.npy'), result)
-    plt.savefig(os.path.join(out_dir, 'special_ckpt.pdf'), bbox_inches='tight')
 
     # display results
     logger.info('\nResults:\n{}'.format(result))
@@ -470,6 +468,7 @@ def experiment(args, logger, out_dir):
 
 def main(args):
 
+    # define output directory
     out_dir = os.path.join(args.out_dir,
                            args.dataset,
                            args.model,
@@ -497,7 +496,7 @@ if __name__ == '__main__':
     parser.add_argument('--dataset', type=str, default='churn', help='dataset to explain.')
     parser.add_argument('--data_dir', type=str, default='data', help='data directory.')
     parser.add_argument('--preprocessing', type=str, default='standard', help='preprocessing directory.')
-    parser.add_argument('--out_dir', type=str, default='output/roar/', help='directory to save results.')
+    parser.add_argument('--out_dir', type=str, default='output/impact/', help='directory to save results.')
 
     # Data settings
     parser.add_argument('--train_frac', type=float, default=1.0, help='fraction of train data to evaluate.')
@@ -519,10 +518,9 @@ if __name__ == '__main__':
 
     # Experiment settings
     parser.add_argument('--rs', type=int, default=1, help='random state.')
-    parser.add_argument('--n_test', type=int, default=100, help='no. test instances.')
+    parser.add_argument('--n_test', type=int, default=1, help='no. of test instances to evaluate.')
     parser.add_argument('--train_frac_to_remove', type=float, default=0.5, help='fraction of train data to remove.')
     parser.add_argument('--n_checkpoints', type=int, default=10, help='no. checkpoints to perform retraining.')
-    parser.add_argument('--special_checkpoint', type=int, default=5, help='checkpoint to plot model predictions.')
 
     # Additional settings
     parser.add_argument('--verbose', type=int, default=0, help='verbosity level.')

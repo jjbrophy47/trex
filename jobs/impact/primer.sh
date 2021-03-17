@@ -3,16 +3,18 @@ model=$2
 preprocessing=$3
 n_estimators=$4
 max_depth=$5
-klr_tree_kernel=$6
-klr_C=$7
-knn_tree_kernel=$8
-knn_n_neighbors=$9
-mem=${10}
-time=${11}
-partition=${12}
+desired_pred=$6
+n_test=$7
+klr_tree_kernel=$8
+klr_C=$9
+knn_tree_kernel=${10}
+knn_n_neighbors=${11}
+mem=${12}
+time=${13}
+partition=${14}
 
 # method_list=('random' 'klr' 'knn' 'maple' 'maple+')
-method_list=('random_minority' 'random_majority')
+method_list=('random_pred', 'klr')
 
 for method in ${method_list[@]}; do
     for rs in {1..20}; do

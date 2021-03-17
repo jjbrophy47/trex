@@ -136,7 +136,7 @@ class Surrogate(BaseEstimator, ClassifierMixin):
         # compute attributions
         attributions = self.compute_attributions(X)
 
-        # flip attributions if predictd label is negative
+        # flip attributions if predicted label is negative
         for i in range(pred.shape[0]):
             if pred[i] == 0:
                 attributions[i] *= -1
