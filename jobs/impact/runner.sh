@@ -10,11 +10,13 @@ preprocessing=$3
 n_estimators=$4
 max_depth=$5
 method=$6
-klr_tree_kernel=$7
-klr_C=$8
-knn_tree_kernel=$9
-knn_n_neighbors=${10}
-rs=${11}
+desired_pred=$7
+n_test=$8
+klr_tree_kernel=$9
+klr_C=${10}
+knn_tree_kernel=${11}
+knn_n_neighbors=${12}
+rs=${13}
 
 if [ $method = 'klr' ]; then
     tree_kernel=$klr_tree_kernel
@@ -29,6 +31,8 @@ python3 scripts/experiments/impact.py \
   --n_estimators $n_estimators \
   --max_depth $max_depth \
   --method $method \
+  --desired_pred $desired_pred \
+  --n_test $n_test \
   --tree_kernel $tree_kernel \
   --C $klr_C \
   --n_neighbors $knn_n_neighbors \

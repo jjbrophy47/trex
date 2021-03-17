@@ -85,7 +85,7 @@ def process_results(df):
     Averages utility results over different random states.
     """
 
-    groups = ['dataset', 'model', 'preprocessing', 'method']
+    groups = ['dataset', 'model', 'preprocessing', 'method', 'desired_pred', 'n_test']
 
     main_result_list = []
 
@@ -95,12 +95,18 @@ def process_results(df):
         main_result['max_rss'] = gf['max_rss'].mean()
         main_result['total_time'] = gf['total_time'].mean()
 
-        # compute average accuracy
+        # compute average
         proba_diffs = [np.array(x) for x in gf['proba_diff'].values]
         mean_vals, sem_vals, n_drop = mean_and_sem(proba_diffs)
         main_result['proba_diff_mean'] = mean_vals
         main_result['proba_diff_sem'] = sem_vals
         main_result['num_dropped'] = n_drop
+
+        # get average probas
+        proba = [np.array(x) for x in gf['proba'].values]
+        mean_vals, sem_vals, n_drop = mean_and_sem(proba)
+        main_result['proba_mean'] = mean_vals
+        main_result['proba_sem'] = sem_vals
 
         # get removed percentages
         remove_pcts = [np.array(x) for x in gf['remove_pct'].values]
@@ -123,17 +129,21 @@ def create_csv(args, out_dir, logger):
                                          args.model,
                                          args.preprocessing,
                                          args.method,
+                                         args.desired_pred,
+                                         args.n_test,
                                          args.rs]))
 
     # organize results
     results = []
-    for dataset, model, preprocessing, method, rs in tqdm(experiment_settings):
+    for dataset, model, preprocessing, method, desired_pred, n_test, rs in tqdm(experiment_settings):
 
         # create result
         template = {'dataset': dataset,
                     'model': model,
                     'preprocessing': preprocessing,
                     'method': method,
+                    'desired_pred': desired_pred,
+                    'n_test': n_test,
                     'rs': rs}
 
         # get results directory
@@ -142,6 +152,8 @@ def create_csv(args, out_dir, logger):
                                       model,
                                       preprocessing,
                                       method,
+                                      'pred_{}'.format(desired_pred),
+                                      'n_test_{}'.format(n_test),
                                       'rs_{}'.format(rs))
 
         # skip empty experiments
@@ -202,6 +214,8 @@ if __name__ == '__main__':
                                  'klr', 'svm', 'maple', 'maple+',
                                  'knn', 'leaf_influence', 'fast_leaf_influence'],
                         help='method for sorting train data.')
+    parser.add_argument('--desired_pred', type=int, nargs='+', default=[0, 1], help='desired prediction.')
+    parser.add_argument('--n_test', type=int, nargs='+', default=[1, 100], help='no. test.')
     parser.add_argument('--rs', type=int, nargs='+', default=list(range(1, 21)), help='random state.')
 
     args = parser.parse_args()

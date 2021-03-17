@@ -27,7 +27,7 @@ for method in ${method_list[@]}; do
                --output=jobs/logs/impact/$job_name \
                --error=jobs/errors/impact/$job_name \
                jobs/impact/runner.sh $dataset $model $preprocessing \
-               $n_estimators $max_depth $method \
+               $n_estimators $max_depth $method $desired_pred $n_test \
                $klr_tree_kernel $klr_C $knn_tree_kernel $knn_n_neighbors $rs
     done
 done

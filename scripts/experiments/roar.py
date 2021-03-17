@@ -440,6 +440,16 @@ def experiment(args, logger, out_dir):
     # train a tree ensemble
     model = clone(clf).fit(X_train, y_train)
     util.performance(model, X_train, y_train, logger=logger, name='Train')
+
+    # select a subset of test instances, half from the neg. class and half from the pos. class
+    model_pred_test = model.predict(X_test)
+    neg_test_indices = np.where(model_pred_test == 0)[0]
+    pos_test_indices = np.where(model_pred_test == 1)[0]
+    neg_test_indices = rng.choice(neg_test_indices, size=int(args.n_test / 2), replace=False)
+    pos_test_indices = rng.choice(pos_test_indices, size=int(args.n_test / 2), replace=False)
+    test_indices = np.concatenate([neg_test_indices, pos_test_indices])
+    X_test_sub, y_test_sub = X_test[test_indices], y_test[test_indices]
+
     util.performance(model, X_test_sub, y_test_sub, logger=logger, name='Test')
 
     # compute how many samples to remove before a checkpoint

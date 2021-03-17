@@ -37,6 +37,8 @@ def main(args):
 
     # filter results
     df = df[df['model'] == args.model]
+    df = df[df['desired_pred'] == args.desired_pred]
+    df = df[df['n_test'] == args.n_test]
 
     # plot settings
     util.plot_settings(fontsize=13, markersize=5)
@@ -75,6 +77,9 @@ def main(args):
 
                 if args.metric == 'proba_diff':
                     ax.set_ylabel(r'|Test prob. $\Delta$|')
+
+                if args.metric == 'proba':
+                    ax.set_ylabel(r'Test prob.')
 
             # add x-axis
             if i == 1:
@@ -135,7 +140,7 @@ def main(args):
         fig.subplots_adjust(bottom=0.265, wspace=0.3)
 
     # save figure
-    fp = os.path.join(out_dir, 'all_datasets.pdf')
+    fp = os.path.join(out_dir, 'pred_{}_n_test_{}.pdf'.format(args.desired_pred, args.n_test))
     plt.savefig(fp)
     print('saving to {}...'.format(fp))
 
@@ -146,7 +151,9 @@ if __name__ == '__main__':
     parser.add_argument('--in_dir', type=str, default='output/impact/csv/', help='input directory.')
     parser.add_argument('--out_dir', type=str, default='output/plots/impact/', help='output directory.')
     parser.add_argument('--model', type=str, default='cb', help='tree-ensemble model.')
-    parser.add_argument('--metric', type=str, default='proba_diff', help='peformance metric.')
+    parser.add_argument('--metric', type=str, default='proba', help='peformance metric.')
+    parser.add_argument('--desired_pred', type=int, default=1, help='starting label.')
+    parser.add_argument('--n_test', type=int, default=1, help='no. test instances.')
 
     args = parser.parse_args()
     main(args)
