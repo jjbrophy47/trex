@@ -1,4 +1,4 @@
-# CatBoost: currently random_pos, random_neg, random_pred, and maple+
+# CatBoost: currently random_minority and random_majority
 ./jobs/roar/primer.sh 'churn' 'cb' 'standard' 100 3 'leaf_path' 0.01 'leaf_path' 61 2 300 'short' 1
 ./jobs/roar/primer.sh 'surgical' 'cb' 'standard' 250 5 'tree_output' 1.0 'leaf_path' 15 2 300 'short' 1
 ./jobs/roar/primer.sh 'vaccine' 'cb' 'standard' 250 5 'tree_output' 1.0 'tree_output' 61 2 300 'short' 1
@@ -7,7 +7,7 @@
 ./jobs/roar/primer.sh 'adult' 'cb' 'standard' 250 5 'tree_output' 1.0 'tree_output' 61 2 300 'short' 1
 ./jobs/roar/primer.sh 'census' 'cb' 'standard' 250 5 'tree_output' 1.0 'tree_output' 31 6 300 'short' 1
 
-# RF: currently random_pos, random_neg, random_pred, and maple+
+# RF: currently random_minority and random_majority
 ./jobs/roar/primer.sh 'churn' 'rf' 'standard' 100 3 'leaf_output' 0.01 'leaf_path' 61 2 300 'short' 1
 ./jobs/roar/primer.sh 'surgical' 'rf' 'standard' 250 7 'leaf_path' 0.001 'feature_output' 61 10 300 'short' 1
 ./jobs/roar/primer.sh 'vaccine' 'rf' 'standard' 250 7 'leaf_output' 0.001 'feature_output' 61 15 300 'short' 1

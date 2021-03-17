@@ -182,7 +182,8 @@ if __name__ == '__main__':
     parser.add_argument('--preprocessing', type=int, nargs='+', default=['categorical', 'standard'],
                         help='preprocessing directory.')
     parser.add_argument('--method', type=int, nargs='+',
-                        default=['random', 'klr', 'svm', 'maple', 'maple+',
+                        default=['random', 'random_neg', 'random_pos', 'random_pred',
+                                 'klr', 'svm', 'maple', 'maple+',
                                  'knn', 'leaf_influence', 'fast_leaf_influence'],
                         help='method for sorting train data.')
     parser.add_argument('--rs', type=int, nargs='+', default=list(range(1, 41)), help='random state.')

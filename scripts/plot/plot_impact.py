@@ -2,20 +2,16 @@
 Plots the ROAR results.
 """
 import os
+import sys
 import argparse
 
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 
-
-def get_height(width, subplots=(1, 1)):
-    """
-    Set figure dimensions to avoid scaling in LaTeX.
-    """
-    golden_ratio = 1.618
-    height = (width / golden_ratio) * (subplots[0] / subplots[1])
-    return height
+here = os.path.abspath(os.path.dirname(__file__))
+sys.path.insert(0, here + '/../')
+import util
 
 
 def main(args):
@@ -23,12 +19,18 @@ def main(args):
 
     # settings
     dataset_list = ['surgical', 'vaccine', 'amazon', 'bank_marketing', 'adult', 'census']
-    method_list = ['klr', 'random', 'maple', 'knn', 'leaf_influence', 'fast_leaf_influence', 'maple+']
-    color_list = ['blue', 'red', 'orange', 'purple', 'black', 'brown', 'orange']
-    label_list = ['TREX', 'Random', 'MAPLE', 'TEKNN', 'LeafInfluence', 'FastLeafInfluence', 'MAPLE+']
-    marker_list = ['d', 'o', '^', 'x', '1', '2', '^']
-    linestyle_list = ['-', '-', '-', '-', '-', '--', '--']
-    zorder_list = [4, 3, 2, 1, 1, 1, 2]
+
+    methods = {}
+    methods['klr'] = ['TREX', 'blue', '1', '-', 11]  # label, color, marker, linestyle, zorder
+    methods['random'] = ['Random', 'red', 'o', '-', 9]
+    methods['random_pos'] = ['Random (pos. label)', 'cyan', 'o', '--', 9]
+    methods['random_neg'] = ['Random (neg. label)', 'magenta', 'o', '--', 9]
+    methods['random_pred'] = ['Random (pred. label)', 'green', 'o', '--', 9]
+    methods['maple'] = ['MAPLE', 'orange', '>', '-', 7]
+    methods['maple+'] = ['MAPLE+', 'orange', '^', '--', 7]
+    methods['leaf_influence'] = ['LeafInfluence', 'black', '.', '-', 1]
+    methods['fast_leaf_influence'] = ['FastLeafInfluence', 'black', '.', '--', 1]
+    methods['knn'] = ['TEKNN', 'yellow', 'h', '-', 5]
 
     # get results
     df = pd.read_csv(os.path.join(args.in_dir, 'results.csv'))
@@ -37,22 +39,14 @@ def main(args):
     df = df[df['model'] == args.model]
 
     # plot settings
-    plt.rc('font', family='serif')
-    plt.rc('xtick', labelsize=13)
-    plt.rc('ytick', labelsize=13)
-    plt.rc('axes', labelsize=13)
-    plt.rc('axes', titlesize=13)
-    plt.rc('legend', fontsize=13)
-    # plt.rc('legend', title_fontsize=11)
-    # plt.rc('lines', linewidth=1)
-    plt.rc('lines', markersize=5)
+    util.plot_settings(fontsize=13, markersize=5)
 
     # inches
     width = 4.8  # Machine Learning journal
-    height = get_height(width=width, subplots=(2, 3))
+    height = util.get_height(width=width, subplots=(2, 3))
 
     if args.model == 'cb':
-        fig, axs = plt.subplots(2, 3, figsize=(width * 1.85, height * 2.65))
+        fig, axs = plt.subplots(2, 3, figsize=(width * 1.85, height * 2.95))
     else:
         fig, axs = plt.subplots(2, 3, figsize=(width * 1.75, height * 2.35))
 
@@ -91,8 +85,7 @@ def main(args):
             ax.tick_params(axis='both', which='major')
 
             # plot each method
-            methods = list(zip(method_list, label_list, color_list, marker_list, linestyle_list, zorder_list))
-            for method, label, color, marker, linestyle, zorder in methods:
+            for method, (label, color, marker, linestyle, zorder) in methods.items():
 
                 # get method results
                 temp_df2 = temp_df1[temp_df1['method'] == method]
@@ -137,9 +130,9 @@ def main(args):
         fig.subplots_adjust(bottom=0.225, wspace=0.3)
 
     else:
-        fig.legend(tuple(lines), tuple(labels), loc='center', ncol=3, bbox_to_anchor=(0.5, 0.06))
+        fig.legend(tuple(lines), tuple(labels), loc='center', ncol=3, bbox_to_anchor=(0.5, 0.075))
         plt.tight_layout()
-        fig.subplots_adjust(bottom=0.25, wspace=0.3)
+        fig.subplots_adjust(bottom=0.265, wspace=0.3)
 
     # save figure
     fp = os.path.join(out_dir, 'all_datasets.pdf')

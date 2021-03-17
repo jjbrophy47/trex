@@ -159,15 +159,18 @@ def random_method(args, model, X_train, y_train, X_test, rng):
     if args.method == 'random':
         result = rng.choice(np.arange(X_train.shape[0]), size=X_train.shape[0], replace=False)
 
-    # remove ONLY positive training instances
-    elif args.method == 'random_pos':
-        pos_indices = np.where(y_train == 1)[0]
-        result = rng.choice(pos_indices, size=pos_indices.shape[0], replace=False)
+    # remove ONLY minority class training instances
+    elif args.method == 'random_minority':
+        majority_label = mode(y_train).mode[0]
+        minority_label = 1 if majority_label == 0 else 0
+        minority_indices = np.where(y_train == minority_label)[0]
+        result = rng.choice(minority_indices, size=minority_indices.shape[0], replace=False)
 
-    # remove ONLY negative training instances
+    # remove ONLY majority class training instances
     elif args.method == 'random_neg':
-        neg_indices = np.where(y_train == 0)[0]
-        result = rng.choice(neg_indices, size=neg_indices.shape[0], replace=False)
+        majority_label = mode(y_train).mode[0]
+        majority_indices = np.where(y_train == majority_label)[0]
+        result = rng.choice(majority_indices, size=majority_indices.shape[0], replace=False)
 
     # removes samples ONLY from the majority predicted label class
     elif args.method == 'random_pred':

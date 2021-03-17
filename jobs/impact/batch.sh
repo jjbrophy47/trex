@@ -1,4 +1,4 @@
-# CB: currently only random_pred
+# CB: currently random_minority and random_majority
 ./jobs/impact/primer.sh 'churn' 'cb' 'standard' 100 3 'leaf_path' 0.01 'leaf_path' 61 2 300 'short'
 ./jobs/impact/primer.sh 'surgical' 'cb' 'standard' 250 5 'tree_output' 1.0 'leaf_path' 15 2 300 'short'
 ./jobs/impact/primer.sh 'vaccine' 'cb' 'standard' 250 5 'tree_output' 1.0 'tree_output' 61 2 300 'short'
@@ -7,7 +7,7 @@
 ./jobs/impact/primer.sh 'adult' 'cb' 'standard' 250 5 'tree_output' 1.0 'tree_output' 61 2 300 'short'
 ./jobs/impact/primer.sh 'census' 'cb' 'standard' 250 5 'tree_output' 1.0 'tree_output' 31 6 300 'short'
 
-# RF: currently only random_pred
+# RF: currently random_minority and random_majority
 ./jobs/impact/primer.sh 'churn' 'rf' 'standard' 100 3 'leaf_output' 0.01 'leaf_path' 61 2 300 'short'
 ./jobs/impact/primer.sh 'surgical' 'rf' 'standard' 250 7 'leaf_path' 0.001 'feature_output' 61 10 300 'short'
 ./jobs/impact/primer.sh 'vaccine' 'rf' 'standard' 250 7 'leaf_output' 0.001 'feature_output' 61 15 300 'short'

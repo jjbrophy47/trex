@@ -12,7 +12,7 @@ time=${11}
 partition=${12}
 
 # method_list=('random' 'klr' 'knn' 'maple' 'maple+')
-method_list=('random_pred')
+method_list=('random_minority' 'random_majority')
 
 for method in ${method_list[@]}; do
     for rs in {1..20}; do

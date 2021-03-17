@@ -120,3 +120,12 @@ def plot_settings(family='serif', fontsize=11,
     plt.rc('lines', markersize=markersize)
     if linewidth is not None:
         plt.rc('lines', linewidth=linewidth)
+
+
+def get_height(width, subplots=(1, 1)):
+    """
+    Set figure dimensions to avoid scaling in LaTeX.
+    """
+    golden_ratio = 1.618
+    height = (width / golden_ratio) * (subplots[0] / subplots[1])
+    return height
