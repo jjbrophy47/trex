@@ -193,7 +193,7 @@ def trex_method(args, model, X_train, y_train, X_test, logger=None,
     # train surrogate model
     params = {'C': args.C, 'n_neighbors': args.n_neighbors, 'tree_kernel': args.tree_kernel}
     surrogate = trex.train_surrogate(model=model,
-                                     surrogate=args.method,
+                                     surrogate='klr',
                                      X_train=X_train,
                                      y_train=y_train,
                                      val_frac=args.tune_frac,

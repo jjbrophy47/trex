@@ -35,6 +35,27 @@ from baselines import MAPLE
 from baselines import DShap
 
 
+def filter_out_non_pred_label_indices(model, X_test, y_train, train_indices):
+    """
+    Removes train indices that do not match the majority predicted label.
+    """
+
+    # compute the majority predicted label
+    maj_pred_label = mode(model.predict(X_test)).mode[0]
+    maj_pred_indices = np.where(y_train == maj_pred_label)[0]
+
+    # result container
+    new_train_indices = []
+
+    # filter
+    for ndx in train_indices:
+        if ndx in maj_pred_indices:
+            new_train_indices.append(ndx)
+
+    train_indices = np.array(new_train_indices)
+    return train_indices
+
+
 def measure_performance(args, train_indices, clf, X_train, y_train, X_test, y_test,
                         logger=None):
     """
@@ -159,10 +180,16 @@ def trex_method(args, model, X_train, y_train, X_test, logger=None,
        (i.e. excitatory or inhibitory attributions w.r.t. the predicted label).
     """
 
+    # extract tree kernel
+    for tree_kernel in ['feature_path', 'feature_output', 'leaf_path', 'leaf_output', 'tree_output']:
+        if tree_kernel in args.method:
+            break
+
     # train surrogate model
-    params = {'C': args.C, 'n_neighbors': args.n_neighbors, 'tree_kernel': args.tree_kernel}
+    params = {'C': args.C, 'n_neighbors': args.n_neighbors, 'tree_kernel': tree_kernel}
+    print(params)
     surrogate = trex.train_surrogate(model=model,
-                                     surrogate=args.method,
+                                     surrogate='klr',
                                      X_train=X_train,
                                      y_train=y_train,
                                      val_frac=args.tune_frac,
@@ -175,24 +202,19 @@ def trex_method(args, model, X_train, y_train, X_test, logger=None,
     if logger:
         logger.info('\ncomputing influence of each training sample on the test set...')
 
+    # sort by similarity
+    if 'sim' in args.method:
+        attributions = surrogate.similarity(X_test).sum(axis=0)
+        train_indices = np.argsort(attributions)[::-1]
+
     # sort instances with the larget influence on the predicted labels of the test set
-    pred = model.predict(X_test)
-    attributions = surrogate.pred_influence(X_test, pred).sum(axis=0)
-    train_indices = np.argsort(attributions)[::-1]
+    else:
+        pred = model.predict(X_test)
+        attributions = surrogate.pred_influence(X_test, pred).sum(axis=0)
+        train_indices = np.argsort(attributions)[::-1]
 
-    # only remove maj. pred. label indices
-    maj_pred_label = mode(model.predict(X_test)).mode[0]
-    pos_indices = np.where(y_train == maj_pred_label)[0]
-    new_train_indices = []
-    for ndx in train_indices:
-        if ndx in pos_indices:
-            new_train_indices.append(ndx)
-    train_indices = np.array(new_train_indices)
-
-    # # order by most excitatory if maj. pred. label is 1 otherwise most inhibitory
-    # maj_pred_label = mode(model.predict(X_test)).mode[0]
-    # attributions = surrogate.compute_attributions(X_test).sum(axis=0)
-    # train_indices = np.argsort(attributions)[::-1] if maj_pred_label == 1 else np.argsort(attributions)
+    # restrict removals to the majority predicted label
+    train_indices = filter_out_non_pred_label_indices(model, X_test, y_train, train_indices)
 
     # display attributions from the top k train instances
     if logger:
@@ -242,6 +264,8 @@ def maple_method(args, model, X_train, y_train, X_test, logger=None,
 
     # sort train data based largest similarity (MAPLE) OR largest similarity-influence (MAPLE+) to test set
     train_indices = np.argsort(contributions_sum)[::-1]
+
+    train_indices = filter_out_non_pred_label_indices(model, X_test, y_train, train_indices)
 
     return train_indices
 
