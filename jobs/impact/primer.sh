@@ -10,11 +10,11 @@ mem=$9
 time=${10}
 partition=${11}
 
-# method_list=('random' 'klr_tree_output' 'klr_leaf_path_sim' 'maple+')
-method_list=('maple+')
-setting_list=('static' 'dynamic')
-n_test_list=(1)
-start_pred_list=(0 1)
+method_list=('random' 'klr_tree_output' 'klr_leaf_path_sim' 'maple+')
+# method_list=('maple+')
+setting_list=('dynamic')
+n_test_list=(100)
+start_pred_list=(-1)
 
 for setting in ${setting_list[@]}; do
     for n_test in ${n_test_list[@]}; do
