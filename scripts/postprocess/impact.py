@@ -220,7 +220,7 @@ if __name__ == '__main__':
                         help='method for sorting train data.')
     parser.add_argument('--setting', type=str, nargs='+', default=['static', 'dynamic'], help='setting.')
     parser.add_argument('--start_pred', type=int, nargs='+', default=[0, 1, -1], help='start prediction.')
-    parser.add_argument('--n_test', type=int, nargs='+', default=[1, 100], help='no. test.')
+    parser.add_argument('--n_test', type=int, nargs='+', default=[1, 50, 100], help='no. test.')
     parser.add_argument('--rs', type=int, nargs='+', default=list(range(1, 21)), help='random state.')
 
     args = parser.parse_args()

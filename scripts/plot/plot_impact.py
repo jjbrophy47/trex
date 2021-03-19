@@ -42,6 +42,7 @@ def main(args):
     # filter results
     df = df[df['model'] == args.model]
     df = df[df['setting'] == args.setting]
+    df = df[df['start_pred'] == args.start_pred]
     df = df[df['n_test'] == args.n_test]
 
     # plot settings
@@ -120,7 +121,8 @@ def main(args):
                     removed_pcts = removed_pcts[:10]
 
                 # plot
-                line = ax.errorbar(removed_pcts, metric_mean, yerr=None, marker=marker,
+                yerr = metric_sem if args.view == 'normal' else None
+                line = ax.errorbar(removed_pcts, metric_mean, yerr=yerr, marker=marker,
                                    linestyle=linestyle, color=color, label=label, zorder=zorder)
 
                 # save for legend
@@ -135,7 +137,11 @@ def main(args):
             ax.set_xlim(left=0, right=None)
 
     # create output directory
-    out_dir = os.path.join(args.out_dir, args.model, args.view, args.setting, args.metric)
+    out_dir = os.path.join(args.out_dir,
+                           args.model,
+                           args.setting,
+                           'start_pred_{}'.format(args.start_pred),
+                           args.metric)
     os.makedirs(out_dir, exist_ok=True)
 
     # adjust legend
@@ -150,7 +156,7 @@ def main(args):
         fig.subplots_adjust(bottom=0.265, wspace=0.3)
 
     # save figure
-    fp = os.path.join(out_dir, 'n_test_{}.pdf'.format(args.n_test))
+    fp = os.path.join(out_dir, 'n_test_{}_{}.pdf'.format(args.n_test, args.view))
     plt.savefig(fp)
     print('saving to {}...'.format(fp))
 
@@ -163,6 +169,7 @@ if __name__ == '__main__':
     parser.add_argument('--model', type=str, default='cb', help='tree-ensemble model.')
     parser.add_argument('--metric', type=str, default='proba', help='peformance metric.')
     parser.add_argument('--setting', type=str, default='dynamic', help='evaluation setting.')
+    parser.add_argument('--start_pred', type=int, default=1, help='starting prediction.')
     parser.add_argument('--view', type=str, default='normal', help='normal or zoom.')
     parser.add_argument('--n_test', type=int, default=1, help='no. test instances.')
 

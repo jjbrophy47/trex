@@ -26,6 +26,9 @@ from datetime import datetime
 
 import numpy as np
 from sklearn.base import clone
+from sklearn.metrics import roc_auc_score
+from sklearn.metrics import accuracy_score
+from sklearn.model_selection import train_test_split
 from scipy.stats import mode
 
 here = os.path.abspath(os.path.dirname(__file__))
@@ -36,6 +39,24 @@ import util
 from baselines import CBLeafInfluenceEnsemble
 from baselines import MAPLE
 from baselines import DShap
+
+
+def score(model, X_test, y_test):
+    """
+    Evaluates the model the on test set and returns metric scores.
+    """
+
+    # 1 test sample
+    if y_test.shape[0] == 1:
+        result = (-1, -1)
+
+    # >1 test sample
+    else:
+        acc = accuracy_score(y_test, model.predict(X_test))
+        auc = roc_auc_score(y_test, model.predict_proba(X_test)[:, 1])
+        return (acc, auc)
+
+    return result
 
 
 def sort_by_distribution(train_indices, y_train):
@@ -112,10 +133,11 @@ def measure_performance(args, clf, X_train, y_train, X_test, y_test, rng,
     model = clone(clf).fit(X_train, y_train)
     base_proba = model.predict_proba(X_test)[:, 1]
     base_proba_avg = base_proba.mean()
-    label_avg = y_test.sum() / y_test.shape[0]
+    acc, auc = score(model, X_test, y_test)
 
     # display status
     if logger:
+        label_avg = y_test.sum() / y_test.shape[0]
         logger.info('\nremoving, retraining, and remeasuring predicted probability...')
         logger.info('test label (avg.): {:.2f}, before prob.: {:.5f}'.format(label_avg, base_proba_avg))
 
@@ -124,6 +146,8 @@ def measure_performance(args, clf, X_train, y_train, X_test, y_test, rng,
     result['proba_diff'] = [0]
     result['remove_pct'] = [0]
     result['proba'] = [base_proba_avg]
+    result['acc'] = [acc]
+    result['auc'] = [auc]
 
     # construct list of removed percentages
     ckpt_list = np.linspace(0, args.train_frac_to_remove, 10 + 1)[1:]
@@ -144,6 +168,7 @@ def measure_performance(args, clf, X_train, y_train, X_test, y_test, rng,
     # sort, remove, retrain, remeasure, repeat
     for frac_remove in frac_remove_list:
         start = time.time()
+        ckpt = False
         pct_remove = frac_remove * 100
 
         # compute how many samples should be removed in terms of the original train data
@@ -162,23 +187,23 @@ def measure_performance(args, clf, X_train, y_train, X_test, y_test, rng,
 
         # measure change in test instance probability
         new_model = clone(clf).fit(new_X_train, new_y_train)
-        proba = new_model.predict_proba(X_test)[:, 1]
 
+        # compute metrics
+        proba = new_model.predict_proba(X_test)[:, 1]
         proba_avg = proba.mean()
         proba_avg_diff = np.abs(base_proba_avg - proba_avg)
+        acc, auc = score(new_model, X_test, y_test)
 
         # add to results
+        result['acc'].append(acc)
+        result['auc'].append(auc)
         result['proba_diff'].append(np.abs(base_proba_avg - proba_avg))
         result['proba'].append(proba_avg)
         result['remove_pct'].append(pct_remove)
 
-        # display progress
-        if logger:
-            s = '[{:.1f}% removed] after prob.: {:.5f}, delta: {:.5f}...{:.3f}s'
-            logger.info(s.format(pct_remove, proba_avg, proba_avg_diff, time.time() - start))
-
         # checkpoint! recompute influence on new dataset and resort train indices
         if frac_remove in ckpt_list and args.setting == 'dynamic':
+            ckpt = True
             # logger.info('Checkpoint! Recomputing influence on new training set...')
 
             # use updated dataset from here on
@@ -190,6 +215,13 @@ def measure_performance(args, clf, X_train, y_train, X_test, y_test, rng,
                                                  X_test, y_test, rng, logger=logger)
 
             frac_deleted_data = frac_remove
+
+        # display progress
+        if logger:
+            s = '[{:.1f}% removed] after prob.: {:.5f}, delta: {:.5f}, acc: {:.3f}, auc: {:.3f}...{:.3f}s'
+            if ckpt:
+                s += ', ckpt!'
+            logger.info(s.format(pct_remove, proba_avg, proba_avg_diff, acc, auc, time.time() - start))
 
     return result
 
@@ -260,19 +292,18 @@ def trex_method(args, model, X_train, y_train, X_test, logger=None,
     if not logger:
         logger.info('\ncomputing influence of each training sample on the test set...')
 
-    # random test instances
-    if args.start_pred == -1:
+    # sort by similarity
+    if 'sim' in args.method:
+        attributions = surrogate.similarity(X_test).sum(axis=0)
+        train_indices = np.argsort(attributions)[::-1]
 
-        # sort by similarity
-        if 'sim' in args.method:
-            attributions = surrogate.similarity(X_test).sum(axis=0)
-            train_indices = np.argsort(attributions)[::-1]
+    # random test instances
+    elif args.start_pred == -1:
 
         # sort instances with the larget influence on the predicted labels of the test set
-        else:
-            pred = model.predict(X_test)
-            attributions = surrogate.pred_influence(X_test, pred).sum(axis=0)
-            train_indices = np.argsort(attributions)[::-1]
+        pred = model.predict(X_test)
+        attributions = surrogate.pred_influence(X_test, pred).sum(axis=0)
+        train_indices = np.argsort(attributions)[::-1]
 
     # drive predictions toward 0 if `args.start_pred` is 1, otherwise 1
     else:
@@ -532,8 +563,18 @@ def experiment(args, logger, out_dir):
 
     # select a subset of test instances uniformly at random
     if args.start_pred == -1:
-        test_indices = rng.choice(X_test.shape[0], size=args.n_test, replace=False)
-        X_test_sub, y_test_sub = X_test[test_indices], y_test[test_indices]
+
+        # select a random stratified subset
+        if args.n_test > 1:
+            _, X_test_sub, _, y_test_sub = train_test_split(X_test, y_test,
+                                                            test_size=args.n_test,
+                                                            random_state=args.rs,
+                                                            stratify=y_test)
+
+        # select an instance at random
+        else:
+            test_indices = rng.choice(X_test.shape[0], size=args.n_test, replace=False)
+            X_test_sub, y_test_sub = X_test[test_indices], y_test[test_indices]
 
     # select a subset of test instances of the desired predicted label uniformly at random
     elif args.start_pred in [0, 1]:

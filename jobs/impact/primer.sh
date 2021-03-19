@@ -10,15 +10,16 @@ mem=$9
 time=${10}
 partition=${11}
 
-method_list=('random' 'klr_tree_output' 'klr_tree_output_sim' 'klr_leaf_path' 'klr_leaf_path_sim' 'maple')
+# method_list=('random' 'klr_tree_output' 'klr_leaf_path_sim' 'maple+')
+method_list=('maple+')
 setting_list=('static' 'dynamic')
-n_test_list=(1 50)
+n_test_list=(1)
 start_pred_list=(0 1)
 
-for method in ${method_list[@]}; do
-    for setting in ${setting_list[@]}; do
+for setting in ${setting_list[@]}; do
+    for n_test in ${n_test_list[@]}; do
         for start_pred in ${start_pred_list[@]}; do
-            for n_test in ${n_test_list[@]}; do
+            for method in ${method_list[@]}; do
                 for rs in {1..20}; do
                     job_name="I_${dataset}_${model}_${method}_${setting}_${n_test}"
 
