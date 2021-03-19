@@ -5,7 +5,7 @@
 ./jobs/impact/primer.sh 'amazon'         'cb' 'standard' 250 7 1.0  'feature_path' 7 15 1440 'short'
 ./jobs/impact/primer.sh 'bank_marketing' 'cb' 'standard' 250 5 1.0  'tree_output'  31 2 300  'short'
 ./jobs/impact/primer.sh 'adult'          'cb' 'standard' 250 5 1.0  'tree_output'  61 2 300  'short'
-./jobs/impact/primer.sh 'census'         'cb' 'standard' 250 5 1.0  'tree_output'  31 6 300  'short'
+./jobs/impact/primer.sh 'census'         'cb' 'standard' 250 5 1.0  'tree_output'  31 20 300 'short'
 
 # RF: currently random_minority and random_majority
 ./jobs/impact/primer.sh 'churn'          'rf' 'standard'    100 3 0.01  'leaf_path'      61 2 300 'short'
