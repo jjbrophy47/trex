@@ -85,7 +85,7 @@ def process_results(df):
     Averages utility results over different random states.
     """
 
-    groups = ['dataset', 'model', 'preprocessing', 'method', 'setting', 'n_test']
+    groups = ['dataset', 'model', 'preprocessing', 'method', 'setting', 'start_pred', 'n_test']
 
     main_result_list = []
 
@@ -130,12 +130,13 @@ def create_csv(args, out_dir, logger):
                                          args.preprocessing,
                                          args.method,
                                          args.setting,
+                                         args.start_pred,
                                          args.n_test,
                                          args.rs]))
 
     # organize results
     results = []
-    for dataset, model, preprocessing, method, setting, n_test, rs in tqdm(experiment_settings):
+    for dataset, model, preprocessing, method, setting, start_pred, n_test, rs in tqdm(experiment_settings):
 
         # create result
         template = {'dataset': dataset,
@@ -143,6 +144,7 @@ def create_csv(args, out_dir, logger):
                     'preprocessing': preprocessing,
                     'method': method,
                     'setting': setting,
+                    'start_pred': start_pred,
                     'n_test': n_test,
                     'rs': rs}
 
@@ -153,6 +155,7 @@ def create_csv(args, out_dir, logger):
                                       preprocessing,
                                       method,
                                       setting,
+                                      'start_pred_{}'.format(start_pred),
                                       'n_test_{}'.format(n_test),
                                       'rs_{}'.format(rs))
 
@@ -216,6 +219,7 @@ if __name__ == '__main__':
                                  'knn', 'leaf_influence', 'fast_leaf_influence'],
                         help='method for sorting train data.')
     parser.add_argument('--setting', type=str, nargs='+', default=['static', 'dynamic'], help='setting.')
+    parser.add_argument('--start_pred', type=int, nargs='+', default=[0, 1, -1], help='start prediction.')
     parser.add_argument('--n_test', type=int, nargs='+', default=[1, 100], help='no. test.')
     parser.add_argument('--rs', type=int, nargs='+', default=list(range(1, 21)), help='random state.')
 
