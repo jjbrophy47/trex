@@ -211,7 +211,8 @@ if __name__ == '__main__':
                         help='preprocessing directory.')
     parser.add_argument('--method', type=int, nargs='+',
                         default=['random', 'random_minority', 'random_majority', 'random_pred',
-                                 'klr', 'svm', 'maple', 'maple+',
+                                 'klr', 'klr_tree_output', 'klr_tree_output_sim',
+                                 'klr_leaf_path', 'klr_leaf_path_sim', 'svm', 'maple', 'maple+',
                                  'knn', 'leaf_influence', 'fast_leaf_influence'],
                         help='method for sorting train data.')
     parser.add_argument('--desired_pred', type=int, nargs='+', default=[0, 1], help='desired prediction.')

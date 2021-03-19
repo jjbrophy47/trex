@@ -1,13 +1,10 @@
 """
 Experiment:
-    1) Select test instance(s) uniformly at random.
-    2) Sort training instances by most influential to the test set.
-    3) Remove training samples keeping the removals the same as the train data distribution.
+    1) Select a test instance uniformly at random.
+    2) Sort training instances by absolute difference on the test instance probability OR loss.
+    3) Training samples in equal increments.
     4) Train a new tree-ensemble on the reduced training dataset.
-    4a) Measure absolute change in predicted probability.
-    5) Repeat steps 2-4a for equal increments up to 50% of the train data.
-
-Perform steps 3-4a X times (equally spaced) between 0 and 10%.
+    5) Measure absolute change in predicted probability.
 
 The best methods choose samples to be removed that have the highest change
 in absolute predicted probabiltiy on the test sample.
@@ -38,49 +35,6 @@ from baselines import MAPLE
 from baselines import DShap
 
 
-def sort_by_distribution(train_indices, y_train):
-    """
-    Orders `train_indices` based on the distribution in `y_train`.
-
-    I.e. If the distrubtion is 70% positive, then every 100 samples,
-         add the 70 most influential positive instances,
-         then the 30 most influential negative instances.
-    """
-    assert train_indices.shape == y_train.shape
-
-    # separate ordering into most sorted most influential positive and negative instances
-    indices_pos = train_indices[np.isin(train_indices, np.where(y_train == 1))]
-    indices_neg = train_indices[np.isin(train_indices, np.where(y_train == 0))]
-
-    # zipper ordering back together, making sure every 100 samples represents the `y_train` distribution
-    pos_count = 0
-    neg_count = 0
-
-    # no. instances to add for each class
-    pos_frac = y_train.sum() / y_train.shape[0]
-    n_add_pos = int(pos_frac * 100)
-    n_add_neg = 100 - n_add_pos
-
-    # result container
-    new_train_indices = np.array([], dtype=np.int64)
-
-    for i in range(0, y_train.shape[0], 100):
-        new_train_indices = np.concatenate([new_train_indices, indices_pos[pos_count: pos_count + n_add_pos]])
-        new_train_indices = np.concatenate([new_train_indices, indices_neg[neg_count: neg_count + n_add_neg]])
-
-        pos_count += n_add_pos
-        neg_count += n_add_neg
-
-    # add leftovers
-    new_train_indices = np.concatenate([new_train_indices, indices_pos[pos_count:]])
-    new_train_indices = np.concatenate([new_train_indices, indices_neg[neg_count:]])
-
-    # make sure the new ordering the is the same shape as the original
-    assert new_train_indices.shape == train_indices.shape
-
-    return new_train_indices
-
-
 def filter_out_non_pred_label_indices(model, X_test, y_train, train_indices):
     """
     Removes train indices that do not match the majority predicted label.
@@ -102,7 +56,7 @@ def filter_out_non_pred_label_indices(model, X_test, y_train, train_indices):
     return train_indices
 
 
-def measure_performance(args, clf, X_train, y_train, X_test, y_test, rng,
+def measure_performance(args, train_indices, clf, X_train, y_train, X_test, y_test,
                         logger=None):
     """
     Measures the change in predictions as training instances are removed.
@@ -111,12 +65,17 @@ def measure_performance(args, clf, X_train, y_train, X_test, y_test, rng,
     # baseline predicted probability
     model = clone(clf).fit(X_train, y_train)
     base_proba = model.predict_proba(X_test)[:, 1]
+
     base_proba_avg = base_proba.mean()
     label_avg = y_test.sum() / y_test.shape[0]
+
+    print(base_proba)
+    print(y_test)
 
     # display status
     if logger:
         logger.info('\nremoving, retraining, and remeasuring predicted probability...')
+        # logger.info('test label: {}, before prob.: {:.5f}'.format(int(y_test[0]), base_proba[0]))
         logger.info('test label (avg.): {:.2f}, before prob.: {:.5f}'.format(label_avg, base_proba_avg))
 
     # result container
@@ -125,35 +84,26 @@ def measure_performance(args, clf, X_train, y_train, X_test, y_test, rng,
     result['remove_pct'] = [0]
     result['proba'] = [base_proba_avg]
 
-    # construct list of removed percentages
-    ckpt_list = np.linspace(0, args.train_frac_to_remove, 10 + 1)[1:]
-    non_ckpt_list = np.linspace(0, 0.1, 10 + 1)[1:]  # take extra measurements at these points
-    frac_remove_list = np.unique(np.concatenate([ckpt_list, non_ckpt_list]))
+    # compute no. samples to remove between each checkpoint
+    # n_checkpoint = int(X_train.shape[0] * args.train_frac_to_remove / args.n_checkpoints)
 
-    # initial sorting of train indices to be removed
-    train_indices = sort_train_instances(args, model, X_train, y_train,
-                                         X_test, y_test, rng, logger=logger)
+    train_frac_to_remove = np.where(y_train == args.desired_pred)[0].shape[0] / y_train.shape[0]
+    n_checkpoint = int(X_train.shape[0] * train_frac_to_remove / args.n_checkpoints)
 
-    # trackers
-    frac_deleted_data = 0
+    print(train_frac_to_remove, n_checkpoint)
 
-    # vairables that can be modified
-    X_train_mod = X_train.copy()
-    y_train_mod = y_train.copy()
-
-    # sort, remove, retrain, remeasure, repeat
-    for frac_remove in frac_remove_list:
+    # remove percentages of training samples and retrain
+    for i in range(args.n_checkpoints):
         start = time.time()
-        pct_remove = frac_remove * 100
 
-        # compute how many samples should be removed in terms of the original train data
-        frac_remove_adjusted = frac_remove - frac_deleted_data
-        n_remove_adjusted = int(X_train.shape[0] * frac_remove_adjusted)
-        remove_indices = train_indices[:n_remove_adjusted]
+        # compute how many samples should be removed
+        n_remove = (i + 1) * n_checkpoint
+        remove_indices = train_indices[:n_remove]
+        pct_remove = n_remove / X_train.shape[0] * 100
 
         # remove most influential training samples
-        new_X_train = np.delete(X_train_mod, remove_indices, axis=0)
-        new_y_train = np.delete(y_train_mod, remove_indices)
+        new_X_train = np.delete(X_train, remove_indices, axis=0)
+        new_y_train = np.delete(y_train, remove_indices)
 
         # only samples from one class remain
         if len(np.unique(new_y_train)) == 1:
@@ -163,11 +113,13 @@ def measure_performance(args, clf, X_train, y_train, X_test, y_test, rng,
         # measure change in test instance probability
         new_model = clone(clf).fit(new_X_train, new_y_train)
         proba = new_model.predict_proba(X_test)[:, 1]
+        # proba_diff = np.abs(base_proba - proba)[0]
 
         proba_avg = proba.mean()
         proba_avg_diff = np.abs(base_proba_avg - proba_avg)
 
         # add to results
+        # result['proba_diff'].append(np.abs(base_proba - proba)[0])
         result['proba_diff'].append(np.abs(base_proba_avg - proba_avg))
         result['proba'].append(proba_avg)
         result['remove_pct'].append(pct_remove)
@@ -175,21 +127,10 @@ def measure_performance(args, clf, X_train, y_train, X_test, y_test, rng,
         # display progress
         if logger:
             s = '[{:.1f}% removed] after prob.: {:.5f}, delta: {:.5f}...{:.3f}s'
-            logger.info(s.format(pct_remove, proba_avg, proba_avg_diff, time.time() - start))
+            # logger.info(s.format(n_remove / X_train.shape[0] * 100, proba[0], proba_diff, time.time() - start))
+            logger.info(s.format(n_remove / X_train.shape[0] * 100, proba_avg, proba_avg_diff, time.time() - start))
 
-        # checkpoint! recompute influence on new dataset and resort train indices
-        if frac_remove in ckpt_list and args.setting == 'dynamic':
-            # logger.info('Checkpoint! Recomputing influence on new training set...')
-
-            # use updated dataset from here on
-            X_train_mod = new_X_train.copy()
-            y_train_mod = new_y_train.copy()
-
-            # sort new train data
-            train_indices = sort_train_instances(args, new_model, X_train_mod, y_train_mod,
-                                                 X_test, y_test, rng, logger=logger)
-
-            frac_deleted_data = frac_remove
+    print(proba)
 
     return result
 
@@ -254,10 +195,10 @@ def trex_method(args, model, X_train, y_train, X_test, logger=None,
                                      metric=args.metric,
                                      seed=args.rs,
                                      params=params,
-                                     logger=None)
+                                     logger=logger)
 
     # display status
-    if not logger:
+    if logger:
         logger.info('\ncomputing influence of each training sample on the test set...')
 
     # sort by similarity
@@ -271,11 +212,11 @@ def trex_method(args, model, X_train, y_train, X_test, logger=None,
         attributions = surrogate.pred_influence(X_test, pred).sum(axis=0)
         train_indices = np.argsort(attributions)[::-1]
 
-    # # restrict removals to the majority predicted label
-    # train_indices = filter_out_non_pred_label_indices(model, X_test, y_train, train_indices)
+    # restrict removals to the majority predicted label
+    train_indices = filter_out_non_pred_label_indices(model, X_test, y_train, train_indices)
 
     # display attributions from the top k train instances
-    if not logger:
+    if logger:
         k = 20
         sim_s = surrogate.similarity(X_test).sum(axis=0)[train_indices]
         alpha_s = surrogate.get_alpha()[train_indices]
@@ -304,7 +245,7 @@ def maple_method(args, model, X_train, y_train, X_test, logger=None,
                             verbose=args.verbose, dstump=False)
 
     # display status
-    if not logger:
+    if logger:
         logger.info('\ncomputing influence of each training sample on the test instance...')
 
     # contributions container
@@ -323,7 +264,7 @@ def maple_method(args, model, X_train, y_train, X_test, logger=None,
     # sort train data based largest similarity (MAPLE) OR largest similarity-influence (MAPLE+) to test set
     train_indices = np.argsort(contributions_sum)[::-1]
 
-    # train_indices = filter_out_non_pred_label_indices(model, X_test, y_train, train_indices)
+    train_indices = filter_out_non_pred_label_indices(model, X_test, y_train, train_indices)
 
     return train_indices
 
@@ -478,9 +419,6 @@ def sort_train_instances(args, model, X_train, y_train, X_test, y_test, rng, log
     else:
         raise ValueError('method {} unknown!'.format(args.method))
 
-    # alternate between removing positive and negative instances based on the train distribution
-    train_indices = sort_by_distribution(train_indices, y_train)
-
     return train_indices
 
 
@@ -510,9 +448,11 @@ def experiment(args, logger, out_dir):
                          random_state=args.rs,
                          cat_indices=cat_indices)
 
-    # train a tree ensemble
-    model = clone(clf).fit(X_train, y_train)
-    util.performance(model, X_train, y_train, logger=logger, name='Train')
+    # use a fraction of the train data
+    if args.train_frac < 1.0 and args.train_frac > 0.0:
+        n_train_samples = int(X_train.shape[0] * args.train_frac)
+        train_indices = rng.choice(X_train.shape[0], size=n_train_samples, replace=False)
+        X_train, y_train = X_train[train_indices], y_train[train_indices]
 
     # select a subset of test instances uniformly at random
     test_indices = rng.choice(X_test.shape[0], size=args.n_test, replace=False)
@@ -523,9 +463,28 @@ def experiment(args, logger, out_dir):
     logger.info('no. test instances: {:,}'.format(X_test_sub.shape[0]))
     logger.info('no. features: {:,}\n'.format(X_train.shape[1]))
 
+    # train a tree ensemble
+    model = clone(clf).fit(X_train, y_train)
+    util.performance(model, X_train, y_train, logger=logger, name='Train')
+
+    # select a subset of test instances FROM THE SAME PREDICTED CLASS uniformly at random
+    model_pred_test = model.predict(X_test)
+    test_indices = np.where(model_pred_test == args.desired_pred)[0]
+    test_indices = rng.choice(test_indices, size=args.n_test, replace=False)
+    X_test_sub, y_test_sub = X_test[test_indices], y_test[test_indices]
+
+    # select a subset of test instances, half from the neg. class and half from the pos. class
+    # model_pred_test = model.predict(X_test)
+    # neg_test_indices = np.where(model_pred_test == 0)[0]
+    # pos_test_indices = np.where(model_pred_test == 1)[0]
+    # neg_test_indices = rng.choice(neg_test_indices, size=int(args.n_test / 2), replace=False)
+    # pos_test_indices = rng.choice(pos_test_indices, size=int(args.n_test / 2), replace=False)
+    # test_indices = np.concatenate([neg_test_indices, pos_test_indices])
+    # X_test_sub, y_test_sub = X_test[test_indices], y_test[test_indices]
+
     # sort train instances, then remove, retrain, and re-evaluate
-    result = measure_performance(args, clf, X_train, y_train,
-                                 X_test_sub, y_test_sub, rng, logger=logger)
+    train_indices = sort_train_instances(args, model, X_train, y_train, X_test_sub, y_test_sub, rng, logger=logger)
+    result = measure_performance(args, train_indices, clf, X_train, y_train, X_test_sub, y_test_sub, logger=logger)
 
     # save results
     result['max_rss'] = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
@@ -545,7 +504,7 @@ def main(args):
                            args.model,
                            args.preprocessing,
                            args.method,
-                           args.setting,
+                           'pred_{}'.format(args.desired_pred),
                            'n_test_{}'.format(args.n_test),
                            'rs_{}'.format(args.rs))
 
@@ -571,25 +530,30 @@ if __name__ == '__main__':
     parser.add_argument('--preprocessing', type=str, default='standard', help='preprocessing directory.')
     parser.add_argument('--out_dir', type=str, default='output/impact/', help='directory to save results.')
 
+    # Data settings
+    parser.add_argument('--train_frac', type=float, default=1.0, help='fraction of train data to evaluate.')
+    parser.add_argument('--tune_frac', type=float, default=0.0, help='amount of data for validation.')
+
     # Tree-ensemble settings
     parser.add_argument('--model', type=str, default='cb', help='model to use.')
     parser.add_argument('--n_estimators', type=int, default=10, help='no. of trees.')
     parser.add_argument('--max_depth', type=int, default=3, help='max. depth in tree ensemble.')
 
-    # Tuning settings
+    # Method settings
+    parser.add_argument('--method', type=str, default='klr', help='method.')
     parser.add_argument('--metric', type=str, default='mse', help='metric for tuning surrogate models.')
-    parser.add_argument('--tune_frac', type=float, default=0.0, help='amount of data for validation.')
+
+    # No tuning settings
     parser.add_argument('--C', type=float, default=1.0, help='penalty parameters for KLR or SVM.')
     parser.add_argument('--n_neighbors', type=int, default=5, help='no. neighbors to use for KNN.')
     parser.add_argument('--tree_kernel', type=str, default='tree_output', help='tree kernel.')
 
     # Experiment settings
-    parser.add_argument('--method', type=str, default='klr', help='method.')
-    parser.add_argument('--setting', type=str, default='static', help='if dynamic, resort at each checkpoint.')
-    parser.add_argument('--n_test', type=int, default=1, help='no. of test instances to evaluate.')
-    parser.add_argument('--train_frac_to_remove', type=float, default=0.5, help='fraction of train data to remove.')
-    parser.add_argument('--n_checkpoints', type=int, default=10, help='no. checkpoints to perform retraining.')
     parser.add_argument('--rs', type=int, default=1, help='random state.')
+    parser.add_argument('--n_test', type=int, default=1, help='no. of test instances to evaluate.')
+    parser.add_argument('--desired_pred', type=int, default=1, help='use test instances predicted to be this label.')
+    # parser.add_argument('--train_frac_to_remove', type=float, default=0.5, help='fraction of train data to remove.')
+    parser.add_argument('--n_checkpoints', type=int, default=10, help='no. checkpoints to perform retraining.')
 
     # Additional settings
     parser.add_argument('--verbose', type=int, default=0, help='verbosity level.')

@@ -10,7 +10,7 @@ preprocessing=$3
 n_estimators=$4
 max_depth=$5
 method=$6
-desired_pred=$7
+setting=$7
 n_test=$8
 klr_C=$9
 knn_tree_kernel=${10}
@@ -26,7 +26,7 @@ python3 scripts/experiments/impact.py \
   --n_estimators $n_estimators \
   --max_depth $max_depth \
   --method $method \
-  --desired_pred $desired_pred \
+  --setting $setting \
   --n_test $n_test \
   --tree_kernel $tree_kernel \
   --C $klr_C \
