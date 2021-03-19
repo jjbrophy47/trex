@@ -260,26 +260,23 @@ def trex_method(args, model, X_train, y_train, X_test, logger=None,
     if not logger:
         logger.info('\ncomputing influence of each training sample on the test set...')
 
-    # random test instances
-    if args.start_pred == -1:
+    # sort by similarity
+    if 'sim' in args.method:
+        attributions = surrogate.similarity(X_test).sum(axis=0)
+        train_indices = np.argsort(attributions)[::-1]
 
-        # sort by similarity
-        if 'sim' in args.method:
-            attributions = surrogate.similarity(X_test).sum(axis=0)
-            train_indices = np.argsort(attributions)[::-1]
-
-        # sort instances with the larget influence on the predicted labels of the test set
-        else:
-            pred = model.predict(X_test)
-            attributions = surrogate.pred_influence(X_test, pred).sum(axis=0)
-            train_indices = np.argsort(attributions)[::-1]
-
-    # drive predictions toward 0 if `args.start_pred` is 1, otherwise 1
+    # sort instances with the larget influence on the predicted labels of the test set
     else:
+        pred = model.predict(X_test)
+        attributions = surrogate.pred_influence(X_test, pred).sum(axis=0)
+        train_indices = np.argsort(attributions)[::-1]
 
-        # sort by most excitatory or inhibitory
-        attributions = surrogate.compute_attributions(X_test).sum(axis=0)
-        train_indices = np.argsort(attributions)[::-1] if args.start_pred == 1 else np.argsort(attributions)
+    # sort by most excitatory
+    attributions = surrogate.compute_attributions(X_test).sum(axis=0)
+    train_indices = np.argsort(attributions)[::-1]
+
+    # # restrict removals to the majority predicted label
+    # train_indices = filter_out_non_pred_label_indices(model, X_test, y_train, train_indices)
 
     # display attributions from the top k train instances
     if not logger:
@@ -306,6 +303,7 @@ def maple_method(args, model, X_train, y_train, X_test, logger=None,
 
     # train a MAPLE explainer model
     train_label = model.predict(X_train)
+    pred_label = model.predict(X_test)
     maple_explainer = MAPLE(X_train, train_label, X_train, train_label,
                             verbose=args.verbose, dstump=False)
 
@@ -322,17 +320,10 @@ def maple_method(args, model, X_train, y_train, X_test, logger=None,
 
         # consider train instances with the same label as the predicted label as excitatory, else inhibitory
         if '+' in args.method:
+            # contributions = np.where(train_label == pred_label[i], contributions, contributions * -1)
 
-            # random test instances
-            if args.start_pred == -1:
-                pred_label = model.predict(X_test)
-                contributions = np.where(train_label == pred_label[i], contributions, contributions * -1)
-
-            # predetermined start prediction
-            else:
-
-                # gives positive weight to excitatory (w.r.t. to the start prediction) instances
-                contributions = np.where(train_label == args.start_pred, contributions, contributions * -1)
+            # gives positive weight to excitatory instances
+            contributions = np.where(train_label == 1, contributions, contributions * -1)
 
         contributions_sum += contributions
 
@@ -531,19 +522,15 @@ def experiment(args, logger, out_dir):
     util.performance(model, X_train, y_train, logger=logger, name='Train')
 
     # select a subset of test instances uniformly at random
-    if args.start_pred == -1:
-        test_indices = rng.choice(X_test.shape[0], size=args.n_test, replace=False)
-        X_test_sub, y_test_sub = X_test[test_indices], y_test[test_indices]
+    test_indices = rng.choice(X_test.shape[0], size=args.n_test, replace=False)
+    X_test_sub, y_test_sub = X_test[test_indices], y_test[test_indices]
 
     # select a subset of test instances of the desired predicted label uniformly at random
-    elif args.start_pred in [0, 1]:
-        model_pred = model.predict(X_test)
-        label_indices = np.where(model_pred == args.start_pred)[0]
-        test_indices = rng.choice(label_indices, size=args.n_test, replace=False)
-        X_test_sub, y_test_sub = X_test[test_indices], y_test[test_indices]
-
-    else:
-        raise ValueError('unknown start_pred: {}'.format(args.start_pred))
+    pred_label = 1
+    model_pred = model.predict(X_test)
+    label_indices = np.where(model_pred == pred_label)[0]
+    test_indices = rng.choice(label_indices, size=args.n_test, replace=False)
+    X_test_sub, y_test_sub = X_test[test_indices], y_test[test_indices]
 
     # display dataset statistics
     logger.info('\nno. train instances: {:,}'.format(X_train.shape[0]))
@@ -573,7 +560,6 @@ def main(args):
                            args.preprocessing,
                            args.method,
                            args.setting,
-                           'start_pred_{}'.format(args.start_pred),
                            'n_test_{}'.format(args.n_test),
                            'rs_{}'.format(args.rs))
 
@@ -615,7 +601,6 @@ if __name__ == '__main__':
     parser.add_argument('--method', type=str, default='klr', help='method.')
     parser.add_argument('--setting', type=str, default='static', help='if dynamic, resort at each checkpoint.')
     parser.add_argument('--n_test', type=int, default=1, help='no. of test instances to evaluate.')
-    parser.add_argument('--start_pred', type=int, default=1, help='0, 1, or -1; if -1, randomly picks test instances.')
     parser.add_argument('--train_frac_to_remove', type=float, default=0.5, help='fraction of train data to remove.')
     parser.add_argument('--n_checkpoints', type=int, default=10, help='no. checkpoints to perform retraining.')
     parser.add_argument('--rs', type=int, default=1, help='random state.')

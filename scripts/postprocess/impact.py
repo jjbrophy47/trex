@@ -85,7 +85,7 @@ def process_results(df):
     Averages utility results over different random states.
     """
 
-    groups = ['dataset', 'model', 'preprocessing', 'method', 'desired_pred', 'n_test']
+    groups = ['dataset', 'model', 'preprocessing', 'method', 'setting', 'n_test']
 
     main_result_list = []
 
@@ -129,20 +129,20 @@ def create_csv(args, out_dir, logger):
                                          args.model,
                                          args.preprocessing,
                                          args.method,
-                                         args.desired_pred,
+                                         args.setting,
                                          args.n_test,
                                          args.rs]))
 
     # organize results
     results = []
-    for dataset, model, preprocessing, method, desired_pred, n_test, rs in tqdm(experiment_settings):
+    for dataset, model, preprocessing, method, setting, n_test, rs in tqdm(experiment_settings):
 
         # create result
         template = {'dataset': dataset,
                     'model': model,
                     'preprocessing': preprocessing,
                     'method': method,
-                    'desired_pred': desired_pred,
+                    'setting': setting,
                     'n_test': n_test,
                     'rs': rs}
 
@@ -152,7 +152,7 @@ def create_csv(args, out_dir, logger):
                                       model,
                                       preprocessing,
                                       method,
-                                      'pred_{}'.format(desired_pred),
+                                      setting,
                                       'n_test_{}'.format(n_test),
                                       'rs_{}'.format(rs))
 
@@ -215,7 +215,7 @@ if __name__ == '__main__':
                                  'klr_leaf_path', 'klr_leaf_path_sim', 'svm', 'maple', 'maple+',
                                  'knn', 'leaf_influence', 'fast_leaf_influence'],
                         help='method for sorting train data.')
-    parser.add_argument('--desired_pred', type=int, nargs='+', default=[0, 1], help='desired prediction.')
+    parser.add_argument('--setting', type=str, nargs='+', default=['static', 'dynamic'], help='setting.')
     parser.add_argument('--n_test', type=int, nargs='+', default=[1, 100], help='no. test.')
     parser.add_argument('--rs', type=int, nargs='+', default=list(range(1, 21)), help='random state.')
 

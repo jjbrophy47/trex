@@ -41,7 +41,7 @@ def main(args):
 
     # filter results
     df = df[df['model'] == args.model]
-    df = df[df['desired_pred'] == args.desired_pred]
+    df = df[df['setting'] == args.setting]
     df = df[df['n_test'] == args.n_test]
 
     # plot settings
@@ -113,8 +113,14 @@ def main(args):
                 metric_sem = np.fromstring(metric_sem[1: -1], dtype=np.float32, sep=' ')
                 removed_pcts = np.fromstring(removed_pcts[1: -1], dtype=np.float32, sep=' ')
 
+                # plot only the first 10 checkpoints
+                if args.view == 'zoom':
+                    metric_mean = metric_mean[:10]
+                    metric_sem = metric_mean[:10]
+                    removed_pcts = removed_pcts[:10]
+
                 # plot
-                line = ax.errorbar(removed_pcts, metric_mean, yerr=metric_sem, marker=marker,
+                line = ax.errorbar(removed_pcts, metric_mean, yerr=None, marker=marker,
                                    linestyle=linestyle, color=color, label=label, zorder=zorder)
 
                 # save for legend
@@ -129,7 +135,7 @@ def main(args):
             ax.set_xlim(left=0, right=None)
 
     # create output directory
-    out_dir = os.path.join(args.out_dir, args.model, args.metric)
+    out_dir = os.path.join(args.out_dir, args.model, args.view, args.setting, args.metric)
     os.makedirs(out_dir, exist_ok=True)
 
     # adjust legend
@@ -144,7 +150,7 @@ def main(args):
         fig.subplots_adjust(bottom=0.265, wspace=0.3)
 
     # save figure
-    fp = os.path.join(out_dir, 'pred_{}_n_test_{}.pdf'.format(args.desired_pred, args.n_test))
+    fp = os.path.join(out_dir, 'n_test_{}.pdf'.format(args.n_test))
     plt.savefig(fp)
     print('saving to {}...'.format(fp))
 
@@ -156,7 +162,8 @@ if __name__ == '__main__':
     parser.add_argument('--out_dir', type=str, default='output/plots/impact/', help='output directory.')
     parser.add_argument('--model', type=str, default='cb', help='tree-ensemble model.')
     parser.add_argument('--metric', type=str, default='proba', help='peformance metric.')
-    parser.add_argument('--desired_pred', type=int, default=1, help='starting label.')
+    parser.add_argument('--setting', type=str, default='dynamic', help='evaluation setting.')
+    parser.add_argument('--view', type=str, default='normal', help='normal or zoom.')
     parser.add_argument('--n_test', type=int, default=1, help='no. test instances.')
 
     args = parser.parse_args()

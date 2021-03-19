@@ -10,12 +10,13 @@ preprocessing=$3
 n_estimators=$4
 max_depth=$5
 method=$6
-setting=$7
-n_test=$8
-klr_C=$9
-knn_tree_kernel=${10}
-knn_n_neighbors=${11}
-rs=${12}
+start_pred=$7
+setting=$8
+n_test=$9
+klr_C=${10}
+knn_tree_kernel=${11}
+knn_n_neighbors=${12}
+rs=${13}
 
 tree_kernel=$knn_tree_kernel
 
@@ -26,6 +27,7 @@ python3 scripts/experiments/impact.py \
   --n_estimators $n_estimators \
   --max_depth $max_depth \
   --method $method \
+  --start_pred $start_pred \
   --setting $setting \
   --n_test $n_test \
   --tree_kernel $tree_kernel \
