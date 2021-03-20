@@ -3,10 +3,10 @@
 # CB: currently random_minority and random_majority
 ./jobs/impact/primer.sh 'churn'          'cb' 'standard' 100 3 2  300  'short'
 ./jobs/impact/primer.sh 'surgical'       'cb' 'standard' 250 5 2  300  'short'
-./jobs/impact/primer.sh 'vaccine'        'cb' 'standard' 250 5 2  300  'short'
+./jobs/impact/primer.sh 'vaccine'        'cb' 'standard' 250 5 15 300  'short'
 ./jobs/impact/primer.sh 'amazon'         'cb' 'standard' 250 7 25 2880 'long'
-./jobs/impact/primer.sh 'bank_marketing' 'cb' 'standard' 250 5 2  300  'short'
-./jobs/impact/primer.sh 'adult'          'cb' 'standard' 250 5 2  300  'short'
+./jobs/impact/primer.sh 'bank_marketing' 'cb' 'standard' 250 5 15 300  'short'
+./jobs/impact/primer.sh 'adult'          'cb' 'standard' 250 5 15 300  'short'
 ./jobs/impact/primer.sh 'census'         'cb' 'standard' 250 5 20 300  'short'
 
 # RF: currently random_minority and random_majority
@@ -21,7 +21,7 @@
 # CB: methods that need more time and / or memory
 ./jobs/impact/primer_single.sh 'churn'          'cb' 'standard' 100 3 'fast_leaf_influence' 2  600  'short'
 ./jobs/impact/primer_single.sh 'surgical'       'cb' 'standard' 250 5 'fast_leaf_influence' 2  600  'short'
-./jobs/impact/primer_single.sh 'vaccine'        'cb' 'standard' 250 5 'fast_leaf_influence' 5  600  'short'
+./jobs/impact/primer_single.sh 'vaccine'        'cb' 'standard' 250 5 'fast_leaf_influence' 15  600  'short'
 ./jobs/impact/primer_single.sh 'amazon'         'cb' 'standard' 250 7 'fast_leaf_influence' 25 1440 'short'
 ./jobs/impact/primer_single.sh 'bank_marketing' 'cb' 'standard' 250 5 'fast_leaf_influence' 15 600  'short'
 ./jobs/impact/primer_single.sh 'adult'          'cb' 'standard' 250 5 'fast_leaf_influence' 15 600  'short'
