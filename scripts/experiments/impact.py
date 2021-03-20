@@ -331,7 +331,7 @@ def maple_method(args, model, X_train, y_train, X_test, logger=None,
     """
 
     # train a MAPLE explainer model
-    train_label = model.predict(X_train)
+    train_label = y_train if 'og' in args.method else model.predict(X_train)
     maple_explainer = MAPLE(X_train, train_label, X_train, train_label,
                             verbose=args.verbose, dstump=False)
 
@@ -439,8 +439,7 @@ def influence_method(args, model, X_train, y_train, X_test, y_test, logger=None,
         contributions_sum += contributions
 
     # sort by instances that cause the biggest decrease in loss
-    if args.start_pred == -1:
-        train_indices = np.argsort(contributions_sum)[::-1]
+    train_indices = np.argsort(contributions_sum)[::-1]
 
     # clean up
     shutil.rmtree(temp_dir)
@@ -463,7 +462,7 @@ def teknn_method(args, model, X_train, y_train, X_test, logger=None):
                                      metric=args.metric,
                                      seed=args.rs,
                                      params=params,
-                                     logger=logger)
+                                     logger=None)
 
     # sort instances based on largest influence w.r.t. the predicted labels of the test set
     if args.start_pred == -1:
