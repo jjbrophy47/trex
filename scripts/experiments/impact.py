@@ -455,7 +455,6 @@ def teknn_method(args, model, X_train, y_train, X_test, logger=None):
 
     # train surrogate model
     params = util.get_selected_params(dataset=args.dataset, model=args.model, surrogate=args.method)
-    print(params)
     surrogate = trex.train_surrogate(model=model,
                                      surrogate=args.method,
                                      X_train=X_train,
