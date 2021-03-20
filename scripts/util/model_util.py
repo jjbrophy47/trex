@@ -230,3 +230,41 @@ def instance_log_loss(y_true, y_proba, labels=[0, 1]):
         results.append(log_loss(y_true[[i]], y_proba[[i]], labels=labels))
 
     return np.array(results)
+
+
+def get_selected_params(dataset, model, surrogate):
+    """
+    Convenience method to return selected hyperparameters for a given
+    dataset / model / surrogate combination
+    """
+
+    # selected hyperparameters using the CatBoost model
+    cb = {}
+    cb['surgical'] = ['tree_output', 1.0, 'leaf_path', 15]
+    cb['vaccine'] = ['tree_output', 1.0, 'tree_output', 61]
+    cb['amazon'] = ['tree_output', 1.0, 'feature_path', 7]
+    cb['bank_marketing'] = ['tree_output', 1.0, 'tree_output', 31]
+    cb['adult'] = ['tree_output', 1.0, 'tree_output', 61]
+    cb['census'] = ['tree_output', 1.0, 'tree_output', 61]
+
+    # selected hyperparameters using the RF model
+    rf = {}
+    rf['surgical'] = ['leaf_path', 0.001, 'feature_output', 61]
+    rf['vaccine'] = ['leaf_output', 0.001, 'feature_output', 61]
+    rf['amazon'] = ['tree_output', 0.01, 'tree_output', 61]
+    rf['bank_marketing'] = ['leaf_output', 0.001, 'leaf_path', 61]
+    rf['adult'] = ['leaf_output', 0.001, 'feature_output', 61]
+    rf['census'] = ['tree_output', 0.001, 'leaf_path', 61]
+
+    # select parameters based on the tree-ensemble
+    d = cb if model == 'cb' else rf
+
+    # extracting hyperparameters
+    tree_kernel = d[dataset][0] if 'klr' in surrogate else d[dataset][2]
+    C = d[dataset][1]
+    n_neighbors = d[dataset][3]
+
+    # assemble params
+    result = {'C': C, 'n_neighbors': n_neighbors, 'tree_kernel': tree_kernel}
+
+    return result

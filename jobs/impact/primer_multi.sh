@@ -7,11 +7,11 @@ mem=$6
 time=$7
 partition=$8
 
-# method_list=('random' 'klr_tree_output' 'klr_leaf_path_sim' 'maple+')
-method_list=('fast_leaf_influence', 'knn')
+# method_list=('random' 'klr_tree_output' 'klr_leaf_path_sim' 'maple' 'maple+')
+method_list=('fast_leaf_influence' 'maple')
 setting_list=('dynamic')
-n_test_list=(1)
-start_pred_list=(0 1)
+n_test_list=(100)
+start_pred_list=(-1)
 
 for setting in ${setting_list[@]}; do
     for n_test in ${n_test_list[@]}; do

@@ -13,12 +13,7 @@ method=$6
 start_pred=$7
 setting=$8
 n_test=$9
-klr_C=${10}
-knn_tree_kernel=${11}
-knn_n_neighbors=${12}
-rs=${13}
-
-tree_kernel=$knn_tree_kernel
+rs=${10}
 
 python3 scripts/experiments/impact.py \
   --dataset $dataset \
@@ -30,7 +25,4 @@ python3 scripts/experiments/impact.py \
   --start_pred $start_pred \
   --setting $setting \
   --n_test $n_test \
-  --tree_kernel $tree_kernel \
-  --C $klr_C \
-  --n_neighbors $knn_n_neighbors \
   --rs $rs

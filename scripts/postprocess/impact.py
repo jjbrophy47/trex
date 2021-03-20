@@ -95,18 +95,32 @@ def process_results(df):
         main_result['max_rss'] = gf['max_rss'].mean()
         main_result['total_time'] = gf['total_time'].mean()
 
-        # compute average
-        proba_diffs = [np.array(x) for x in gf['proba_diff'].values]
-        mean_vals, sem_vals, n_drop = mean_and_sem(proba_diffs)
-        main_result['proba_diff_mean'] = mean_vals
-        main_result['proba_diff_sem'] = sem_vals
-        main_result['num_dropped'] = n_drop
-
-        # get average probas
+        # probas
         proba = [np.array(x) for x in gf['proba'].values]
         mean_vals, sem_vals, n_drop = mean_and_sem(proba)
         main_result['proba_mean'] = mean_vals
         main_result['proba_sem'] = sem_vals
+        main_result['num_dropped'] = n_drop
+
+        # absolute probability differences
+        proba_diff = [np.array(x) for x in gf['proba_diff'].values]
+        mean_vals, sem_vals, n_drop = mean_and_sem(proba_diff)
+        main_result['proba_diff_mean'] = mean_vals
+        main_result['proba_diff_sem'] = sem_vals
+
+        # accuracy
+        acc = [np.array(x) for x in gf['acc'].values]
+        if acc[0].shape != ():
+            mean_vals, sem_vals, n_drop = mean_and_sem(acc)
+            main_result['acc_mean'] = mean_vals
+            main_result['acc_sem'] = sem_vals
+
+        # AUC
+        auc = [np.array(x) for x in gf['auc'].values]
+        if auc[0].shape != ():
+            mean_vals, sem_vals, n_drop = mean_and_sem(auc)
+            main_result['auc_mean'] = mean_vals
+            main_result['auc_sem'] = sem_vals
 
         # get removed percentages
         remove_pcts = [np.array(x) for x in gf['remove_pct'].values]

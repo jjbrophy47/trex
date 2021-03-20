@@ -318,7 +318,7 @@ class KNN(KNeighborsClassifier):
         X_alt = self.transform(X)
         return super().kneighbors(X_alt)
 
-    def compute_attributions(self, X, frac_progress=0.1, logger=None):
+    def compute_attributions(self, X, start_pred=None, frac_progress=0.1, logger=None):
         """
         Return a 2d array of train instance impacts of shape=(X.shape[0], no. train samples).
         """
@@ -332,12 +332,19 @@ class KNN(KNeighborsClassifier):
             x = X[[i]]
 
             # get predicted label and neighbors
-            pred = int(self.predict(x)[0])
             distances, neighbor_ids = self.kneighbors(x)
 
             # add density to neighbor training instances if they have the same label as the predicted label
             for neighbor_id in neighbor_ids[0]:
-                attributions[i][neighbor_id] = 1 if self.y_train_[neighbor_id] == pred else -1
+
+                # gives positive weight to excitatory instances (w.r.t. to the predicted label)
+                if start_pred is None:
+                    pred = int(self.predict(x)[0])
+                    attributions[i][neighbor_id] = 1 if self.y_train_[neighbor_id] == pred else -1
+
+                # gives positive weight to excitatory instances (w.r.t. to the given label)
+                else:
+                    attributions[i][neighbor_id] = 1 if self.y_train_[neighbor_id] == start_pred else -1
 
             # display progress
             if logger and i % int(X.shape[0] * frac_progress) == 0:

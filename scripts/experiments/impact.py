@@ -271,13 +271,8 @@ def trex_method(args, model, X_train, y_train, X_test, logger=None,
        (i.e. excitatory or inhibitory attributions w.r.t. the predicted label).
     """
 
-    # extract tree kernel
-    for tree_kernel in ['feature_path', 'feature_output', 'leaf_path', 'leaf_output', 'tree_output']:
-        if tree_kernel in args.method:
-            break
-
     # train surrogate model
-    params = {'C': args.C, 'n_neighbors': args.n_neighbors, 'tree_kernel': tree_kernel}
+    params = util.get_selected_params(dataset=args.dataset, model=args.model, surrogate=args.method)
     surrogate = trex.train_surrogate(model=model,
                                      surrogate='klr',
                                      X_train=X_train,
@@ -413,6 +408,9 @@ def influence_method(args, model, X_train, y_train, X_test, y_test, logger=None,
     start = time.time()
     contributions_sum = np.zeros(X_train.shape[0])
 
+    # predicted test labels
+    model_pred = model.predict(X_test)
+
     # compute influence on each test instance
     for i in range(X_test.shape[0]):
 
@@ -422,7 +420,14 @@ def influence_method(args, model, X_train, y_train, X_test, y_test, logger=None,
         # compute influence for each training instance
         for j in range(X_train.shape[0]):
             explainer.fit(removed_point_idx=j, destination_model=buf)
-            contributions.append(buf.loss_derivative(X_test[[i]], y_test[[i]])[0])
+
+            # approximate loss on the predicted label
+            if args.start_pred == -1:
+                contributions.append(buf.loss_derivative(X_test[[i]], model_pred[[i]])[0])
+
+            # approximate loss on a predetermined label
+            else:
+                contributions.append(buf.loss_derivative(X_test[[i]], np.array([args.start_pred]))[0])
 
             # display progress
             if logger and j % int(X_train.shape[0] * frac_progress_update) == 0:
@@ -433,8 +438,9 @@ def influence_method(args, model, X_train, y_train, X_test, y_test, logger=None,
         contributions = np.array(contributions)
         contributions_sum += contributions
 
-    # sort by decreasing absolute influence
-    train_indices = np.argsort(np.abs(contributions_sum))[::-1]
+    # sort by instances that cause the biggest decrease in loss
+    if args.start_pred == -1:
+        train_indices = np.argsort(contributions_sum)[::-1]
 
     # clean up
     shutil.rmtree(temp_dir)
@@ -448,7 +454,8 @@ def teknn_method(args, model, X_train, y_train, X_test, logger=None):
     """
 
     # train surrogate model
-    params = {'C': args.C, 'n_neighbors': args.n_neighbors, 'tree_kernel': args.tree_kernel}
+    params = util.get_selected_params(dataset=args.dataset, model=args.model, surrogate=args.method)
+    print(params)
     surrogate = trex.train_surrogate(model=model,
                                      surrogate=args.method,
                                      X_train=X_train,
@@ -459,10 +466,16 @@ def teknn_method(args, model, X_train, y_train, X_test, logger=None):
                                      params=params,
                                      logger=logger)
 
-    # sort instances based on largest influence on predicted test labels
-    attributions = surrogate.compute_attributions(X_test)
-    attributions_sum = np.sum(attributions, axis=0)
-    train_indices = np.argsort(attributions_sum)[::-1]
+    # sort instances based on largest influence w.r.t. the predicted labels of the test set
+    if args.start_pred == -1:
+        attributions = surrogate.compute_attributions(X_test).sum(axis=0)
+
+    # sort instances based on largest influence w.r.t. the given label
+    else:
+        attributions = surrogate.compute_attributions(X_test, start_pred=args.start_pred).sum(axis=0)
+
+    # sort based by largest similarity-influence to the test set
+    train_indices = np.argsort(attributions)[::-1]
 
     return train_indices
 

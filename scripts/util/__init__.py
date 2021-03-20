@@ -4,6 +4,7 @@ from .model_util import train_tree_ensemble
 from .model_util import sigmoid
 from .model_util import performance
 from .model_util import instance_log_loss
+from .model_util import get_selected_params
 from .print_util import get_logger
 from .print_util import remove_logger
 from .print_util import clear_dir
