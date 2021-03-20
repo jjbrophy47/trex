@@ -477,7 +477,7 @@ def teknn_method(args, model, X_train, y_train, X_test, logger=None):
     params = util.get_selected_params(dataset=args.dataset, model=args.model, surrogate=args.method)
     train_label = y_train if 'og' in args.method else model.predict(X_train)
     surrogate = trex.train_surrogate(model=model,
-                                     surrogate=args.method,
+                                     surrogate='knn',
                                      X_train=X_train,
                                      y_train=train_label,
                                      val_frac=args.tune_frac,

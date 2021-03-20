@@ -32,10 +32,10 @@
 # CB: currently random_minority and random_majority
 ./jobs/impact/primer_multi.sh 'churn'          'cb' 'standard' 100 3 2  300  'short'
 ./jobs/impact/primer_multi.sh 'surgical'       'cb' 'standard' 250 5 2  300  'short'
-./jobs/impact/primer_multi.sh 'vaccine'        'cb' 'standard' 250 5 2  300  'short'
-./jobs/impact/primer_multi.sh 'amazon'         'cb' 'standard' 250 7 15 1440 'short'
-./jobs/impact/primer_multi.sh 'bank_marketing' 'cb' 'standard' 250 5 2  300  'short'
-./jobs/impact/primer_multi.sh 'adult'          'cb' 'standard' 250 5 2  300  'short'
+./jobs/impact/primer_multi.sh 'vaccine'        'cb' 'standard' 250 5 15 300  'short'
+./jobs/impact/primer_multi.sh 'amazon'         'cb' 'standard' 250 7 25 1440 'short'
+./jobs/impact/primer_multi.sh 'bank_marketing' 'cb' 'standard' 250 5 15 300  'short'
+./jobs/impact/primer_multi.sh 'adult'          'cb' 'standard' 250 5 15 300  'short'
 ./jobs/impact/primer_multi.sh 'census'         'cb' 'standard' 250 5 20 300  'short'
 
 # RF: currently random_minority and random_majority
