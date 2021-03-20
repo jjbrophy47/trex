@@ -11,6 +11,10 @@ mem=${10}
 time=${11}
 partition=${12}
 
+setting_list=('dynamic')
+n_test_list=(1)
+start_pred_list=(0 1)
+
 for rs in {1..20}; do
     job_name="I_${dataset}_${model}_${method}_${setting}_${start_pred}_${n_test}"
 

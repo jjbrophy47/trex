@@ -273,10 +273,11 @@ def trex_method(args, model, X_train, y_train, X_test, logger=None,
 
     # train surrogate model
     params = util.get_selected_params(dataset=args.dataset, model=args.model, surrogate=args.method)
+    train_label = y_train if 'og' in args.method else model.predict(X_train)
     surrogate = trex.train_surrogate(model=model,
                                      surrogate='klr',
                                      X_train=X_train,
-                                     y_train=y_train,
+                                     y_train=train_label,
                                      val_frac=args.tune_frac,
                                      metric=args.metric,
                                      seed=args.rs,
@@ -289,23 +290,41 @@ def trex_method(args, model, X_train, y_train, X_test, logger=None,
 
     # sort by similarity
     if 'sim' in args.method:
-        attributions = surrogate.similarity(X_test).sum(axis=0)
-        train_indices = np.argsort(attributions)[::-1]
+        attributions = surrogate.similarity(X_test)
 
-    # random test instances
-    elif args.start_pred == -1:
+        # compute influence based on predicted labels
+        if args.start_pred == -1:
+            pred_label = model.predict(X_test)
 
-        # sort instances with the larget influence on the predicted labels of the test set
-        pred = model.predict(X_test)
-        attributions = surrogate.pred_influence(X_test, pred).sum(axis=0)
-        train_indices = np.argsort(attributions)[::-1]
+            # put positive weight if similar instances have the same label as the predicted test label
+            for i in range(X_test.shape[0]):
+                attributions[i] = np.where(train_label == pred_label[i], attributions[i], attributions[i] * -1)
 
-    # drive predictions toward 0 if `args.start_pred` is 1, otherwise 1
+        # put positive weight if similar instances have the same label as the predetermined label
+        else:
+            for i in range(X_test.shape[0]):
+                attributions[i] = np.where(train_label == args.start_pred, attributions[i], attributions[i] * -1)
+
+        # sort indices by largest similarity-influence to the test or predetermined label
+        train_indices = np.argsort(attributions.sum(axis=0))[::-1]
+
+    # sort by excitatory (or inhibitory) instances, or by influence
     else:
 
-        # sort by most excitatory or inhibitory
-        attributions = surrogate.compute_attributions(X_test).sum(axis=0)
-        train_indices = np.argsort(attributions)[::-1] if args.start_pred == 1 else np.argsort(attributions)
+        # compute influence based on predicted labels
+        if args.start_pred == -1:
+
+            # sort instances with the larget influence on the predicted labels of the test set
+            pred = model.predict(X_test)
+            attributions = surrogate.pred_influence(X_test, pred).sum(axis=0)
+            train_indices = np.argsort(attributions)[::-1]
+
+        # compute influence based on a predetermined label
+        else:
+
+            # sort by most excitatory or inhibitory
+            attributions = surrogate.compute_attributions(X_test).sum(axis=0)
+            train_indices = np.argsort(attributions)[::-1] if args.start_pred == 1 else np.argsort(attributions)
 
     # display attributions from the top k train instances
     if not logger:
@@ -342,6 +361,9 @@ def maple_method(args, model, X_train, y_train, X_test, logger=None,
     # contributions container
     contributions_sum = np.zeros(X_train.shape[0])
 
+    # get predicted labels for the test set
+    pred_label = model.predict(X_test)
+
     # compute similarity of each training instance to the set set
     for i in range(X_test.shape[0]):
         contributions = maple_explainer.get_weights(X_test[i])
@@ -351,7 +373,6 @@ def maple_method(args, model, X_train, y_train, X_test, logger=None,
 
             # random test instances
             if args.start_pred == -1:
-                pred_label = model.predict(X_test)
                 contributions = np.where(train_label == pred_label[i], contributions, contributions * -1)
 
             # predetermined start prediction
@@ -454,10 +475,11 @@ def teknn_method(args, model, X_train, y_train, X_test, logger=None):
 
     # train surrogate model
     params = util.get_selected_params(dataset=args.dataset, model=args.model, surrogate=args.method)
+    train_label = y_train if 'og' in args.method else model.predict(X_train)
     surrogate = trex.train_surrogate(model=model,
                                      surrogate=args.method,
                                      X_train=X_train,
-                                     y_train=y_train,
+                                     y_train=train_label,
                                      val_frac=args.tune_frac,
                                      metric=args.metric,
                                      seed=args.rs,

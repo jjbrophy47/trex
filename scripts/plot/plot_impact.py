@@ -32,6 +32,7 @@ def main(args):
     methods['random_pred'] = ['Random', 'green', 'o', '--', 9]
     methods['maple'] = ['MAPLE', 'orange', '>', '--', 7]
     methods['maple+'] = ['MAPLE+', 'orange', '^', ':', 7]
+    methods['maple+_og'] = ['MAPLE+ (OG)', 'orange', '^', '-.', 7]
     methods['leaf_influence'] = ['LeafInfluence', 'black', '.', '-', 1]
     methods['fast_leaf_influence'] = ['FastLeafInfluence', 'black', '.', '--', 1]
     methods['knn'] = ['TEKNN', 'yellow', 'h', '--', 5]

@@ -27,14 +27,6 @@
 ./jobs/impact/primer_single.sh 'adult'          'cb' 'standard' 250 5 'fast_leaf_influence' 15 600  'short'
 ./jobs/impact/primer_single.sh 'census'         'cb' 'standard' 250 5 'fast_leaf_influence' 20 600  'short'
 
-./jobs/impact/primer_single.sh 'churn' 'cb' 'standard' 100 3 'fast_leaf_influence' 2 4320 'long'
-./jobs/impact/primer_single.sh 'surgical' 'cb' 'standard' 250 5 'fast_leaf_influence' 2 4320 'long'
-./jobs/impact/primer_single.sh 'vaccine' 'cb' 'standard' 250 5 'fast_leaf_influence' 2 4320 'long'
-./jobs/impact/primer_single.sh 'amazon' 'cb' 'standard' 250 7 'fast_leaf_influence' 25 1440 'short'
-./jobs/impact/primer_single.sh 'bank_marketing' 'cb' 'standard' 250 5 'fast_leaf_influence' 15 4320 'long'
-./jobs/impact/primer_single.sh 'adult' 'cb' 'standard' 250 5 'fast_leaf_influence' 15 4320 'long'
-./jobs/impact/primer_single.sh 'census' 'cb' 'standard' 250 5 'fast_leaf_influence' 20 4320 'long'
-
 # TESTING MULTIPLE TEST INSTANCES AT THE SAME TIME
 
 # CB: currently random_minority and random_majority

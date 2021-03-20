@@ -7,8 +7,7 @@ mem=$6
 time=$7
 partition=$8
 
-# method_list=('random' 'klr_tree_output' 'klr_leaf_path_sim' 'maple+')
-method_list=('fast_leaf_influence' 'knn' 'klr' 'maple+_og' 'random')
+method_list=('random' 'klr_og_tree_output' 'klr_og_leaf_path_sim' 'maple+' 'maple+_og' 'knn_og')
 setting_list=('dynamic')
 n_test_list=(1)
 start_pred_list=(0 1)

@@ -229,7 +229,7 @@ if __name__ == '__main__':
     parser.add_argument('--method', type=int, nargs='+',
                         default=['random', 'random_minority', 'random_majority', 'random_pred',
                                  'klr', 'klr_tree_output', 'klr_tree_output_sim',
-                                 'klr_leaf_path', 'klr_leaf_path_sim', 'svm', 'maple', 'maple+',
+                                 'klr_leaf_path', 'klr_leaf_path_sim', 'svm', 'maple', 'maple+', 'maple+_og',
                                  'knn', 'leaf_influence', 'fast_leaf_influence'],
                         help='method for sorting train data.')
     parser.add_argument('--setting', type=str, nargs='+', default=['static', 'dynamic'], help='setting.')

@@ -264,6 +264,12 @@ def get_selected_params(dataset, model, surrogate):
     C = d[dataset][1]
     n_neighbors = d[dataset][3]
 
+    # make custom adjustments
+    for kernel in ['feature_path', 'feature_output', 'leaf_path', 'leaf_output', 'tree_output']:
+        if kernel in surrogate:
+            tree_kernel = kernel
+            break
+
     # assemble params
     result = {'C': C, 'n_neighbors': n_neighbors, 'tree_kernel': tree_kernel}
 
