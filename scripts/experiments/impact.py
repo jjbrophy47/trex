@@ -38,6 +38,7 @@ import trex
 import util
 from baselines import CBLeafInfluenceEnsemble
 from baselines import MAPLE
+from baselines import Bacon
 from baselines import DShap
 
 
@@ -391,6 +392,30 @@ def maple_method(args, model, X_train, y_train, X_test, logger=None,
     return train_indices
 
 
+def bacon_method(args, model, X_train, y_train, X_test, logger=None,
+                 frac_progress_update=0.1):
+    """
+    Sort training instances using MAPLE's "local training distribution".
+    """
+
+    # train a MAPLE explainer model
+    bacon_explainer = Bacon(model, X_train, y_train)
+
+    # display status
+    if not logger:
+        logger.info('\ncomputing influence of each training sample on the test instance...')
+
+    # compute similarity of each training instance to the set set
+    contributions = np.zeros(X_train.shape[0])
+    for i in range(X_test.shape[0]):
+        contributions += bacon_explainer.get_weights(X_test[i])
+
+    # most excitatory to most inhibitory
+    train_indices = np.argsort(contributions)[::-1]
+
+    return train_indices
+
+
 def influence_method(args, model, X_train, y_train, X_test, y_test, logger=None,
                      k=-1, update_set='AllPoints', frac_progress_update=0.1):
     """
@@ -538,6 +563,10 @@ def sort_train_instances(args, model, X_train, y_train, X_test, y_test, rng, log
     # TREX method
     elif 'klr' in args.method or 'svm' in args.method:
         train_indices = trex_method(args, model, X_train, y_train, X_test, logger=logger)
+
+    # Bacon
+    elif 'bacon' in args.method:
+        train_indices = bacon_method(args, model, X_train, y_train, X_test, logger=logger)
 
     # MAPLE
     elif 'maple' in args.method:

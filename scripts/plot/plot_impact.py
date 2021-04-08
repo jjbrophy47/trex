@@ -21,21 +21,14 @@ def main(args):
     dataset_list = ['surgical', 'vaccine', 'amazon', 'bank_marketing', 'adult', 'census']
 
     methods = {}
-    methods['klr'] = ['TREX', 'blue', '1', '-', 11]  # label, color, marker, linestyle, zorder
-    methods['klr_tree_output'] = ['TREX (TO)', 'blue', '1', '--', 10]
-    methods['klr_tree_output_sim'] = ['TREX (TO, SIM)', 'cyan', '2', ':', 10]
-    methods['klr_leaf_path'] = ['TREX (LP)', 'purple', '1', '--', 10]
-    methods['klr_leaf_path_sim'] = ['TREX (LP, SIM)', 'magenta', '2', ':', 10]
+    methods['klr_og'] = ['TREX (OG)', 'blue', '1', '--', 11]  # label, color, marker, linestyle, zorder
+    methods['klr_og_leaf_path_sim'] = ['TREX (OG, LP, SIM)', 'cyan', '1', ':', 10]
     methods['random'] = ['Random', 'red', 'o', '-', 9]
-    methods['random_minority'] = ['Random (minority class)', 'cyan', 'o', '--', 9]
-    methods['random_majority'] = ['Random (majoirty class)', 'magenta', 'o', '--', 9]
-    methods['random_pred'] = ['Random', 'green', 'o', '--', 9]
-    methods['maple'] = ['MAPLE', 'orange', '>', '--', 7]
-    methods['maple+'] = ['MAPLE+', 'orange', '^', ':', 7]
-    methods['maple+_og'] = ['MAPLE+ (OG)', 'orange', '^', '-.', 7]
+    methods['maple+'] = ['MAPLE+', 'orange', '^', '--', 7]
+    methods['maple+_og'] = ['MAPLE+ (OG)', 'orange', '^', ':', 7]
     methods['leaf_influence'] = ['LeafInfluence', 'black', '.', '-', 1]
     methods['fast_leaf_influence'] = ['FastLeafInfluence', 'black', '.', '--', 1]
-    methods['knn'] = ['TEKNN', 'yellow', 'h', '--', 5]
+    methods['knn_og'] = ['TEKNN (OG)', 'magenta', 'h', '--', 5]
 
     # get results
     df = pd.read_csv(os.path.join(args.in_dir, 'results.csv'))

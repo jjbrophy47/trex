@@ -58,9 +58,9 @@ def show_instances(args, X_train, alpha, sim, attribution, y_train, indices, k, 
     Display train instance weight, similarity, attribution, label and `age` value
     ordered by `indices`.
     """
-    s = '[{:5}] label: {}, alpha: {:.3f}, sim: {:.3f} attribution: {:.3f}, age: {:.0f}'
-    for ndx in indices[:k]:
-        logger.info(s.format(ndx, y_train[ndx], alpha[ndx], sim[ndx],
+    s = '[{:5,}: {:5}] label: {}, alpha: {:.3f}, sim: {:.3f} attribution: {:.3f}, age: {:.0f}'
+    for i, ndx in enumerate(indices[:k]):
+        logger.info(s.format(i, ndx, y_train[ndx], alpha[ndx], sim[ndx],
                     attribution[ndx], X_train[ndx][args.age_ndx]))
 
 
@@ -180,10 +180,8 @@ def experiment(args, logger, out_dir):
 
         attribution_indices = np.argsort(attributions)[::-1]
 
-    # sort training instances by most influential to the predicted label
     else:
-        attributions = surrogate.pred_influence(x_test, model_pred[[test_ndx]])[0]
-        attribution_indices = np.argsort(attributions)[::-1]
+        exit(0)
 
     # sort training instances by most similar to the test instance
     sim = surrogate.similarity(x_test)[0]
@@ -192,24 +190,15 @@ def experiment(args, logger, out_dir):
     # get instance weights
     alpha = surrogate.get_alpha()
 
-    # 1. show most influential training instances
-    logger.info('\nTop {:,} most influential samples to the predicted label...'.format(args.topk_inf))
+    # 1. show most excitatory training instances
+    logger.info('\nTop {:,} most excitatory instances to the predicted label...'.format(args.topk_inf))
     show_instances(args, X_train, alpha, sim, attributions, y_train, attribution_indices, args.topk_inf, logger)
 
-    # 2a. compute aggregate surrogate contribution of most influential train instances
-    attr_all = np.sum(np.abs(attributions))
-    attr_pos = np.sum(np.where(attributions > 0, attributions, 0))  # sum of pos. attributions only
-    attr_topk_inf = np.sum(np.abs(attributions[attribution_indices][:args.topk_inf]))
-    attr_topk_inf_pct = attr_topk_inf / attr_all * 100
-    attr_topk_inf_pos_pct = attr_topk_inf / attr_pos * 100
+    # 1. show most inhibitory training instances
+    logger.info('\nTop {:,} most inhibitory instances to the predicted label...'.format(args.topk_inf))
+    show_instances(args, X_train, alpha, sim, attributions, y_train, np.argsort(attributions), args.topk_inf, logger)
 
-    # 2b. display aggregate attributions
-    s1 = '\nattribution % of top {:,} infuential instances: {:.2f}%'
-    s2 = 'attribution % of top {:,} infuential instances for pos. attributions: {:.2f}%'
-    logger.info(s1.format(args.topk_inf, attr_topk_inf_pct))
-    logger.info(s2.format(args.topk_inf, attr_topk_inf_pos_pct))
-
-    # 3. compute change in predicted probability after REMOVING the most influential instances
+    # 2. compute change in predicted probability after REMOVING the most influential instances
     s = 'test: {}, actual: {}, proba.: {:.3f}, age: {:.0f}'
     logger.info('\nRemoving top {:,} influential instances..'.format(args.topk_inf))
     new_X_train = np.delete(X_train, attribution_indices[:args.topk_inf], axis=0)
@@ -219,26 +208,36 @@ def experiment(args, logger, out_dir):
     util.performance(model, X_test, y_test, logger=logger, name='Test')
     logger.info(s.format(test_ndx, y_test[test_ndx], new_model.predict_proba(X_test)[:, 1][test_ndx], age_test_val))
 
-    # 4a. compute change in predicted probability after FLIPPING the labels of the most influential instances
+    # 3. compute change in predicted probability after FLIPPING the labels of the most influential instances
     s1 = 'test: {}, actual: {}, proba.: {:.3f}, age: {:.0f}'
-    s2 = '\n{:,} out of the top {:,} most influential instances have age <= 17'
+    s2 = '\n{:,} out of the top {:,} most (excitatory) influential instances have age <= 17'
     logger.info('\nFixing ONLY corrupted labels of the top {:,} influential instances..'.format(args.topk_inf))
     new_X_train = X_train.copy()
     new_y_train = y_train.copy()
 
-    # 4b. fixing a portion of the corrupted training instances
+    # fix a portion of the corrupted training instances
     temp_indices = np.where(X_train[attribution_indices][:args.topk_inf][:, args.age_ndx] <= 17)[0]
     age17_topk_inf_indices = attribution_indices[temp_indices]
     new_y_train[age17_topk_inf_indices] = 0
 
-    # 4c. fit new model and re-evaluate
+    # fit new model and re-evaluate
     new_model = clone(clf).fit(new_X_train, new_y_train)
     util.performance(new_model, new_X_train, new_y_train, logger=logger, name='Train')
     util.performance(new_model, X_test, y_test, logger=logger, name='Test')
     logger.info(s1.format(test_ndx, y_test[test_ndx], new_model.predict_proba(X_test)[:, 1][test_ndx], age_test_val))
     logger.info(s2.format(age17_topk_inf_indices.shape[0], args.topk_inf))
 
-    # 5. show most similar training instances
+    # 6. of the most influential train instances (pos. and neg.), compute how many have age <= 17
+    neg_inf_indices = np.argsort(attributions)
+    neg_inf_num_age17 = np.where(X_train[neg_inf_indices][:args.topk_inf][:, args.age_ndx] <= 17)[0].shape[0]
+    logger.info('\nTop {:,} neg. influence instances with age <= 17: {:,}'.format(args.topk_inf, neg_inf_num_age17))
+
+    # 6. of the most influential train instances (pos. and neg.), compute how many have age <= 17
+    abs_inf_indices = np.argsort(np.abs(attributions))[::-1]
+    abs_inf_num_age17 = np.where(X_train[abs_inf_indices][:args.topk_inf][:, args.age_ndx] <= 17)[0].shape[0]
+    logger.info('\nTop {:,} abs. influence instances with age <= 17: {:,}'.format(args.topk_inf, abs_inf_num_age17))
+
+    # 4. show most similar training instances
     logger.info('\nTop {:,} most similar samples to the predicted label...'.format(args.topk_sim))
     show_instances(args, X_train, alpha, sim, attributions, y_train, sim_indices, args.topk_sim, logger)
 
@@ -312,7 +311,7 @@ if __name__ == '__main__':
     parser.add_argument('--rs', type=int, default=1, help='random state.')
 
     # Explanation settings
-    parser.add_argument('--topk_inf', type=int, default=100, help='no. top influential train instances to show.')
+    parser.add_argument('--topk_inf', type=int, default=5, help='no. top influential train instances to show.')
     parser.add_argument('--topk_sim', type=int, default=400, help='no. most similar train instances to show.')
 
     # Tree-ensemble settings
@@ -322,10 +321,10 @@ if __name__ == '__main__':
 
     # Surrogate settings
     parser.add_argument('--tune_frac', type=float, default=0.0, help='amount of data for validation.')
-    parser.add_argument('--surrogate', type=str, default='klr', help='surrogate model.')
+    parser.add_argument('--surrogate', type=str, default='klr_sim', help='surrogate model.')
     parser.add_argument('--C', type=float, default=1.0, help='penalty parameters for KLR or SVM.')
     parser.add_argument('--n_neighbors', type=int, default=5, help='no. neighbors to use for KNN.')
-    parser.add_argument('--tree_kernel', type=str, default='tree_output', help='tree kernel.')
+    parser.add_argument('--tree_kernel', type=str, default='leaf_path', help='tree kernel.')
     parser.add_argument('--metric', type=str, default='mse', help='fidelity metric.')
 
     # Plot settings
