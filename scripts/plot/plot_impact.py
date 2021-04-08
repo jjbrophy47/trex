@@ -29,6 +29,7 @@ def main(args):
     methods['leaf_influence'] = ['LeafInfluence', 'black', '.', '-', 1]
     methods['fast_leaf_influence'] = ['FastLeafInfluence', 'black', '.', '--', 1]
     methods['knn_og'] = ['TEKNN (OG)', 'magenta', 'h', '--', 5]
+    methods['bacon'] = ['Bacon', 'green', '2', '--', 5]
 
     # get results
     df = pd.read_csv(os.path.join(args.in_dir, 'results.csv'))

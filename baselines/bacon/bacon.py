@@ -11,7 +11,7 @@ class Bacon:
 
         self.train_leaf_ids_ = self.model.apply(X_train)
 
-    def get_weights(self, x):
+    def get_weights(self, x, y=None):
         x = x.reshape(1, -1)
 
         instance_leaf_ids = self.model.apply(x)[0]
@@ -24,6 +24,10 @@ class Bacon:
             same_leaf_train_indices = np.where(self.train_leaf_ids_[:, i] == instance_leaf_ids[i])
             weights[same_leaf_train_indices] += 1.0 / len(same_leaf_train_indices[0])
 
-        pred_label = self.model.predict(x)[0]
-        weights = np.where(self.y_train == pred_label, weights, weights * -1)
+        if y is None:
+            pred_label = self.model.predict(x)[0]
+            weights = np.where(self.y_train == pred_label, weights, weights * -1)
+        else:
+            weights = np.where(self.y_train == y, weights, weights * -1)
+
         return weights

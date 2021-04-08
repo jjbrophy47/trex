@@ -405,10 +405,12 @@ def bacon_method(args, model, X_train, y_train, X_test, logger=None,
     if not logger:
         logger.info('\ncomputing influence of each training sample on the test instance...')
 
+    designated_label = None if args.start_pred == -1 else args.start_pred
+
     # compute similarity of each training instance to the set set
     contributions = np.zeros(X_train.shape[0])
     for i in range(X_test.shape[0]):
-        contributions += bacon_explainer.get_weights(X_test[i])
+        contributions += bacon_explainer.get_weights(X_test[i], y=designated_label)
 
     # most excitatory to most inhibitory
     train_indices = np.argsort(contributions)[::-1]
