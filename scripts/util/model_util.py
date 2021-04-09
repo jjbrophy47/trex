@@ -93,6 +93,7 @@ def get_model(model,
         import lightgbm
         max_depth = -1 if max_depth is None else max_depth
         clf = lightgbm.LGBMClassifier(random_state=random_state,
+                                      num_leaves=32,
                                       n_estimators=n_estimators,
                                       max_depth=max_depth)
     # CatBoost
