@@ -33,7 +33,8 @@ class Bacon:
         weights = np.zeros(self.X_train.shape[0])
         for i in range(self.train_leaf_ids_.shape[1]):
             same_leaf_train_indices = np.where(self.train_leaf_ids_[:, i] == instance_leaf_ids[i])[0]
-            weights[same_leaf_train_indices] += 1.0 / len(same_leaf_train_indices)
+            if len(same_leaf_train_indices) > 0:
+                weights[same_leaf_train_indices] += 1.0 / len(same_leaf_train_indices)
 
         if y is None:
             pred_label = self.model.predict(x)[0]

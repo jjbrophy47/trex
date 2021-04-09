@@ -309,6 +309,10 @@ def trex_method(args, model, X_train, y_train, X_test, logger=None,
         # sort indices by largest similarity-influence to the test or predetermined label
         train_indices = np.argsort(attributions.sum(axis=0))[::-1]
 
+    elif 'alpha' in args.method:
+        alpha = surrogate.get_alpha()
+        train_indices = np.argsort(np.abs(alpha))[::-1]
+
     # sort by excitatory (or inhibitory) instances, or by influence
     else:
 
@@ -718,7 +722,7 @@ if __name__ == '__main__':
 
     # Experiment settings
     parser.add_argument('--method', type=str, default='klr', help='method.')
-    parser.add_argument('--setting', type=str, default='static', help='if dynamic, resort at each checkpoint.')
+    parser.add_argument('--setting', type=str, default='dynamic', help='if dynamic, resort at each checkpoint.')
     parser.add_argument('--n_test', type=int, default=1, help='no. of test instances to evaluate.')
     parser.add_argument('--start_pred', type=int, default=1, help='0, 1, or -1; if -1, randomly picks test instances.')
     parser.add_argument('--train_frac_to_remove', type=float, default=0.5, help='fraction of train data to remove.')
