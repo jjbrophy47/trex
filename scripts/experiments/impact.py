@@ -275,6 +275,7 @@ def trex_method(args, model, X_train, y_train, X_test, logger=None,
     # train surrogate model
     params = util.get_selected_params(dataset=args.dataset, model=args.model, surrogate=args.method)
     train_label = y_train if 'og' in args.method else model.predict(X_train)
+
     surrogate = trex.train_surrogate(model=model,
                                      surrogate='klr',
                                      X_train=X_train,
@@ -289,7 +290,7 @@ def trex_method(args, model, X_train, y_train, X_test, logger=None,
     if not logger:
         logger.info('\ncomputing influence of each training sample on the test set...')
 
-    # sort by similarity
+    # sort by sim
     if 'sim' in args.method:
         attributions = surrogate.similarity(X_test)
 
@@ -309,11 +310,19 @@ def trex_method(args, model, X_train, y_train, X_test, logger=None,
         # sort indices by largest similarity-influence to the test or predetermined label
         train_indices = np.argsort(attributions.sum(axis=0))[::-1]
 
+    # sort by alpha
     elif 'alpha' in args.method:
         alpha = surrogate.get_alpha()
-        train_indices = np.argsort(np.abs(alpha))[::-1]
 
-    # sort by excitatory (or inhibitory) instances, or by influence
+        # sort by largest to smallest magnitude
+        if args.start_pred == -1:
+            train_indices = np.argsort(np.abs(alpha))[::-1]
+
+        # sort by most pos.to most neg. if `start_pred` is 1, and vice versa if 0
+        else:
+            train_indices = np.argsort(alpha) if args.start_pred == 0 else np.argsort(alpha)[::-1]
+
+    # sort by alpha * sim
     else:
 
         # compute influence based on predicted labels
@@ -330,20 +339,6 @@ def trex_method(args, model, X_train, y_train, X_test, logger=None,
             # sort by most excitatory or inhibitory
             attributions = surrogate.compute_attributions(X_test).sum(axis=0)
             train_indices = np.argsort(attributions)[::-1] if args.start_pred == 1 else np.argsort(attributions)
-
-    # display attributions from the top k train instances
-    if not logger:
-        k = 20
-        sim_s = surrogate.similarity(X_test).sum(axis=0)[train_indices]
-        alpha_s = surrogate.get_alpha()[train_indices]
-        attributions_s = attributions[train_indices]
-        y_train_s = y_train[train_indices]
-
-        train_info = list(zip(train_indices, attributions_s, y_train_s, alpha_s, sim_s))
-        s = '[{:5}] label: {}, alpha: {:.3f}, sim: {:.3f} attribution sum: {:.3f}'
-
-        for ndx, atr, lab, alpha, sim in train_info[:k]:
-            logger.info(s.format(ndx, lab, alpha, sim, atr))
 
     return train_indices
 
@@ -632,17 +627,21 @@ def experiment(args, logger, out_dir):
     # select a subset of test instances uniformly at random
     if args.start_pred == -1:
 
-        # select a random stratified subset
-        if args.n_test > 1:
-            _, X_test_sub, _, y_test_sub = train_test_split(X_test, y_test,
-                                                            test_size=args.n_test,
-                                                            random_state=args.rs,
-                                                            stratify=y_test)
-
         # select an instance at random
-        else:
+        if args.n_test == 1:
             test_indices = rng.choice(X_test.shape[0], size=args.n_test, replace=False)
             X_test_sub, y_test_sub = X_test[test_indices], y_test[test_indices]
+
+        # select a random stratified subset
+        elif args.n_test <= 0:
+            X_test_sub, y_test_sub = X_test, y_test
+
+        else:
+            n_test = 1.0 if args.n_test == -1 else args.n_test
+            _, X_test_sub, _, y_test_sub = train_test_split(X_test, y_test,
+                                                            test_size=n_test,
+                                                            random_state=args.rs,
+                                                            stratify=y_test)
 
     # select a subset of test instances of the desired predicted label uniformly at random
     elif args.start_pred in [0, 1]:

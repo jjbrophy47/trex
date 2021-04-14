@@ -53,6 +53,9 @@ class TreeExtractor:
         elif self.tree_kernel == 'leaf_output':
             X_feature = self.leaf_output(X)
 
+        elif self.tree_kernel == 'weighted_leaf_path':
+            X_feature = self.leaf_path(X)
+
         elif self.tree_kernel == 'tree_output':
             X_feature = self.tree_output(X)
 
@@ -250,6 +253,81 @@ class TreeExtractor:
 
         return encoding
 
+    def weighted_leaf_path(self, X):
+        """
+        Transforms each x in X as follows:
+            -A concatenation of one-hot vectors.
+            -For each vector, a 1/L in position i represents x traversed to leaf i
+             in which leaf i contains L training instances.
+
+        Returns 2D array of shape (no. samples, no. leaves in the ensemble).
+        """
+        assert X.ndim == 2, 'X is not 2d!'
+
+        # RF
+        # NOTE: Shape=(no. samples, no. nodes in the ensemble), still valid though, uses 2x redundant features
+        if self.model_type_ == 'RandomForestClassifier':
+            leaf_indices = self.model.apply(X)  # in terms of all nodes in each tree, shape=(no. samples, no. trees)
+
+            # compute per-tree info
+            leaf_weight_list = []
+            node_counts = []
+            for j in range(leaf_indices.shape[1]):  # per tree
+                tree = self.model.estimators_[j].tree_  # extract tree representation
+                leaf_weight_list.append(1.0 / tree.n_node_samples[leaf_indices[:, j]])  # weight, traversed leaves
+                node_counts.append(tree.node_count)  # no. nodes
+
+            leaf_weights = np.hstack(leaf_weight_list)  # shape=(no. samples, no. trees)
+            node_counts = np.array(node_counts)  # shape=(no. trees)
+
+            # construct encoding
+            encoding = np.zeros((X.shape[0], node_counts.sum()))  # shape=(no. samples, total no. nodes)
+
+            # substitute leaves traversed to with 1 / no. instances at that leaf
+            for i in range(encoding.shape[0]):  # per instance
+                n_prev_nodes = 0
+
+                for j in range(leaf_indices.shape[1]):  # per tree
+                    encoding[i][n_prev_nodes + leaf_indices[i][j]] = leaf_weights[i][j]
+                    n_prev_nodes += node_counts[j]
+
+        # CatBoost
+        elif self.model_type_ == 'CatBoostClassifier':
+            exit('{} not currently supported!'.format(str(self.model)))
+
+            # extract leaf indices traversed to and no. leaves per tree
+            X_pool = catboost.Pool(self.model.numpy_to_cat(X), cat_features=self.model.get_cat_indices())
+            leaf_indices = self.model.calc_leaf_indexes(X_pool)  # in terms of only leaf nodes in each tree
+            leaf_counts = self.model.get_tree_leaf_counts()
+
+            # construct encoding
+            encoding = np.zeros((X.shape[0], leaf_counts.sum()))
+
+            # replace leaves traversed to with a 1
+            for i in range(encoding.shape[0]):  # per instance
+                n_prev_leaves = 0
+
+                for j in range(leaf_indices.shape[1]):  # per tree
+                    encoding[i][n_prev_leaves + leaf_indices[i][j]] = 1
+                    n_prev_leaves += leaf_counts[j]
+
+        # GBM
+        elif self.model_type_ == 'GradientBoostingClassifier':
+            exit('{} not currently supported!'.format(str(self.model)))
+
+        # LightGBM
+        elif self.model_type_ == 'LGBMClassifier':
+            exit('{} not currently supported!'.format(str(self.model)))
+
+        # XGBoost
+        elif self.model_type_ == 'XGBClassifier':
+            exit('{} not currently supported!'.format(str(self.model)))
+
+        # convert to np.float32
+        encoding = encoding.astype(np.float32)
+
+        return encoding
+
     def leaf_output(self, X, timeit=False):
         """
         Transforms each x in X as follows:
@@ -395,7 +473,8 @@ class TreeExtractor:
         """
 
         # check tree kernel
-        tree_kernels = ['feature_path', 'feature_output', 'leaf_path', 'leaf_output', 'tree_output']
+        tree_kernels = ['feature_path', 'feature_output', 'weighted_leaf_path',
+                        'leaf_path', 'leaf_output', 'tree_output']
         assert self.tree_kernel in tree_kernels, '{} not supported!'.format(self.tree_kernel)
 
         # check model

@@ -1,13 +1,13 @@
 # TESTING ONE TEST INSTANCE AT A TIME
 
 # CB
-./jobs/impact/primer.sh 'churn'          'lgb' 'standard' 100 3 2  300  'short'
-./jobs/impact/primer.sh 'surgical'       'lgb' 'standard' 250 5 2  300  'short'
-./jobs/impact/primer.sh 'vaccine'        'lgb' 'standard' 250 5 15 300  'short'
-./jobs/impact/primer.sh 'amazon'         'lgb' 'standard' 250 7 25 2880 'long'
-./jobs/impact/primer.sh 'bank_marketing' 'lgb' 'standard' 250 5 15 300  'short'
-./jobs/impact/primer.sh 'adult'          'lgb' 'standard' 250 5 15 300  'short'
-./jobs/impact/primer.sh 'census'         'lgb' 'standard' 250 5 20 300  'short'
+./jobs/impact/primer.sh 'churn'          'cb' 'standard' 100 3 2  300  'short'
+./jobs/impact/primer.sh 'surgical'       'cb' 'standard' 250 5 2  300  'short'
+./jobs/impact/primer.sh 'vaccine'        'cb' 'standard' 250 5 15 300  'short'
+./jobs/impact/primer.sh 'amazon'         'cb' 'standard' 250 7 25 2880 'long'
+./jobs/impact/primer.sh 'bank_marketing' 'cb' 'standard' 250 5 15 300  'short'
+./jobs/impact/primer.sh 'adult'          'cb' 'standard' 250 5 15 300  'short'
+./jobs/impact/primer.sh 'census'         'cb' 'standard' 250 5 20 300  'short'
 
 # RF
 ./jobs/impact/primer.sh 'churn'          'rf' 'standard'    100 3 2  300 'short'

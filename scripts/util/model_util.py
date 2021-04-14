@@ -266,7 +266,7 @@ def get_selected_params(dataset, model, surrogate):
     n_neighbors = d[dataset][3]
 
     # make custom adjustments
-    for kernel in ['feature_path', 'feature_output', 'leaf_path', 'leaf_output', 'tree_output']:
+    for kernel in ['feature_path', 'feature_output', 'weighted_leaf_path', 'leaf_path', 'leaf_output', 'tree_output']:
         if kernel in surrogate:
             tree_kernel = kernel
             break
