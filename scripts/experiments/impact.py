@@ -25,8 +25,6 @@ from copy import deepcopy
 from datetime import datetime
 
 import numpy as np
-import matplotlib
-matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 from matplotlib.colors import ListedColormap
 from sklearn.base import clone
@@ -313,9 +311,9 @@ def trex_method(args, model, X_train, y_train, X_test, out_dir, frac_remove, log
                                      logger=None)
 
     # save alpha
-    frac_remove = round(frac_remove, 2)
-    plot_alpha(surrogate.get_alpha(), y_train, os.path.join(out_dir, 'alpha_{}.pdf'.format(frac_remove)))
-    np.save(os.path.join(out_dir, 'arr_alpha_{}.npy'.format(frac_remove)), surrogate.get_alpha())
+    if frac_remove == 0.0:
+        alpha_dict = {'alpha': surrogate.get_alpha(), 'y_train': y_train}
+        np.save(os.path.join(out_dir, 'alpha.npy'.format(frac_remove)), alpha_dict)
 
     # display status
     if not logger:
