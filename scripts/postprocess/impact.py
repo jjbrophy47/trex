@@ -227,8 +227,19 @@ if __name__ == '__main__':
     parser.add_argument('--preprocessing', type=int, nargs='+', default=['categorical', 'standard'],
                         help='preprocessing directory.')
     parser.add_argument('--method', type=int, nargs='+',
-                        default=['random', 'klr_og', 'klr_og_leaf_path_sim', 'maple+', 'maple+_og',
-                                 'knn_og', 'leaf_influence', 'fast_leaf_influence', 'bacon'],
+                        default=['random',
+                                 'klr_og_leaf_path_alpha',
+                                 'klr_og_leaf_path_sim',
+                                 'klr_og_leaf_path',
+                                 'klr_og_weighted_leaf_path_alpha',
+                                 'klr_og_weighted_leaf_path_sim',
+                                 'klr_og_weighted_leaf_path',
+                                 'maple+',
+                                 'maple+_og',
+                                 'knn_og',
+                                 'leaf_influence',
+                                 'fast_leaf_influence',
+                                 'bacon'],
                         help='method for sorting train data.')
     parser.add_argument('--setting', type=str, nargs='+', default=['static', 'dynamic'], help='setting.')
     parser.add_argument('--start_pred', type=int, nargs='+', default=[0, 1, -1], help='start prediction.')

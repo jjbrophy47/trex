@@ -54,7 +54,7 @@ class TreeExtractor:
             X_feature = self.leaf_output(X)
 
         elif self.tree_kernel == 'weighted_leaf_path':
-            X_feature = self.leaf_path(X)
+            X_feature = self.weighted_leaf_path(X)
 
         elif self.tree_kernel == 'tree_output':
             X_feature = self.tree_output(X)
@@ -274,7 +274,7 @@ class TreeExtractor:
             node_counts = []
             for j in range(leaf_indices.shape[1]):  # per tree
                 tree = self.model.estimators_[j].tree_  # extract tree representation
-                leaf_weight_list.append(1.0 / tree.n_node_samples[leaf_indices[:, j]])  # weight, traversed leaves
+                leaf_weight_list.append(tree.n_node_samples[leaf_indices[:, j]].reshape(-1, 1))  # weight of leaves
                 node_counts.append(tree.node_count)  # no. nodes
 
             leaf_weights = np.hstack(leaf_weight_list)  # shape=(no. samples, no. trees)
@@ -288,7 +288,7 @@ class TreeExtractor:
                 n_prev_nodes = 0
 
                 for j in range(leaf_indices.shape[1]):  # per tree
-                    encoding[i][n_prev_nodes + leaf_indices[i][j]] = leaf_weights[i][j]
+                    encoding[i][n_prev_nodes + leaf_indices[i][j]] = 1.0 / leaf_weights[i][j]
                     n_prev_nodes += node_counts[j]
 
         # CatBoost

@@ -20,12 +20,17 @@ def main(args):
     # settings
     dataset_list = ['surgical', 'vaccine', 'amazon', 'bank_marketing', 'adult', 'census']
 
+    # label, color, marker, linestyle, zorder
     methods = {}
-    methods['klr_og'] = ['TREX (OG)', 'blue', '1', '--', 11]  # label, color, marker, linestyle, zorder
-    methods['klr_og_leaf_path_sim'] = ['TREX (OG, LP, SIM)', 'cyan', '1', ':', 10]
+    methods['klr_og_leaf_path_alpha'] = ['TREX (OG-LP-Alpha)', 'blue', '1', '-', 11]
+    methods['klr_og_leaf_path_sim'] = ['TREX (OG-LP-Sim)', 'blue', '1', '--', 10]
+    methods['klr_og_leaf_path'] = ['TREX (OG-LP-AlphaSim)', 'blue', '1', ':', 11]
+    methods['klr_og_weighted_leaf_path_alpha'] = ['TREX (OG-WLP-Alpha)', 'cyan', '2', '-', 11]
+    methods['klr_og_weighted_leaf_path_sim'] = ['TREX (OG-WLP-Sim)', 'cyan', '2', '--', 11]
+    methods['klr_og_weighted_leaf_path'] = ['TREX (OG-WLP-AlphaSim)', 'cyan', '2', ':', 11]
     methods['random'] = ['Random', 'red', 'o', '-', 9]
-    methods['maple+'] = ['MAPLE+', 'orange', '^', '--', 7]
-    methods['maple+_og'] = ['MAPLE+ (OG)', 'orange', '^', ':', 7]
+    # methods['maple+'] = ['MAPLE', 'orange', '^', '--', 7]
+    methods['maple+_og'] = ['MAPLE (OG)', 'orange', '^', ':', 7]
     methods['leaf_influence'] = ['LeafInfluence', 'black', '.', '-', 1]
     methods['fast_leaf_influence'] = ['FastLeafInfluence', 'black', '.', '--', 1]
     methods['knn_og'] = ['TEKNN (OG)', 'magenta', 'h', '--', 5]
@@ -50,7 +55,7 @@ def main(args):
     if args.model == 'cb':
         fig, axs = plt.subplots(2, 3, figsize=(width * 1.85, height * 2.95))
     else:
-        fig, axs = plt.subplots(2, 3, figsize=(width * 1.75, height * 2.35))
+        fig, axs = plt.subplots(2, 3, figsize=(width * 1.95, height * 3.5))
 
     # legend containers
     lines = []
