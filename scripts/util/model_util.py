@@ -265,11 +265,16 @@ def get_selected_params(dataset, model, surrogate):
     C = d[dataset][1]
     n_neighbors = d[dataset][3]
 
-    # make custom adjustments
+    # make custom adjustment
     for kernel in ['feature_path', 'feature_output', 'weighted_leaf_path', 'leaf_path', 'leaf_output', 'tree_output']:
         if kernel in surrogate:
             tree_kernel = kernel
             break
+
+    # make custom adjustment
+    c_str = surrogate.split('_')[-1]
+    if 'C' in c_str:
+        C = float(c_str.split('-')[-1])
 
     # assemble params
     result = {'C': C, 'n_neighbors': n_neighbors, 'tree_kernel': tree_kernel}

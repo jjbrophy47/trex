@@ -7,10 +7,13 @@ mem=$6
 time=$7
 partition=$8
 
-method_list=('klr_og_weighted_leaf_path_alpha' 'klr_og_weighted_leaf_path_sim' 'klr_og_weighted_leaf_path'
-             'klr_og_leaf_path_alpha' 'klr_og_leaf_path_sim' 'klr_og_leaf_path' 'random' 'bacon')
+method_list=('klr_og_weighted_leaf_path_alpha_C-1.0' 'klr_og_weighted_leaf_path_sim_C-1.0'
+             'klr_og_weighted_leaf_path_C-1.0'
+             'klr_og_leaf_path_alpha_C-1.0' 'klr_og_leaf_path_sim_C-1.0' 'klr_og_leaf_path_C-1.0'
+             'klr_og_tree_output_alpha' 'klr_og_tree_output_sim' 'klr_og_tree_output'
+             'klr_og_tree_output_alpha_C-1.0' 'klr_og_tree_output_sim_C-1.0' 'klr_og_tree_output_C-1.0')
 setting_list=('dynamic')
-n_test_list=(1000)
+n_test_list=(100)
 start_pred_list=(-1)
 
 for setting in ${setting_list[@]}; do

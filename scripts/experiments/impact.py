@@ -276,6 +276,8 @@ def trex_method(args, model, X_train, y_train, X_test, logger=None,
     params = util.get_selected_params(dataset=args.dataset, model=args.model, surrogate=args.method)
     train_label = y_train if 'og' in args.method else model.predict(X_train)
 
+    print(params)
+
     surrogate = trex.train_surrogate(model=model,
                                      surrogate='klr',
                                      X_train=X_train,
@@ -321,6 +323,12 @@ def trex_method(args, model, X_train, y_train, X_test, logger=None,
         # sort by most pos.to most neg. if `start_pred` is 1, and vice versa if 0
         else:
             train_indices = np.argsort(alpha) if args.start_pred == 0 else np.argsort(alpha)[::-1]
+
+        # import matplotlib.pyplot as plt
+        # print(alpha[train_indices])
+        # fig, ax = plt.subplots()
+        # ax.scatter(np.arange(len(train_indices)), alpha[train_indices])
+        # plt.show()
 
     # sort by alpha * sim
     else:
