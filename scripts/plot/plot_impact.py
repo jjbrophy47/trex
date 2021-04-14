@@ -22,29 +22,30 @@ def main(args):
 
     # label, color, marker, linestyle, zorder
     methods = {}
-    methods['klr_og_leaf_path_alpha'] = ['TREX (OG-LP-Alpha-C_0.001)', 'blue', '1', '-', 11]
-    methods['klr_og_leaf_path_sim'] = ['TREX (OG-LP-Sim-C_0.001)', 'blue', '1', '--', 10]
-    methods['klr_og_leaf_path'] = ['TREX (OG-LP-AlphaSim-C_0.001)', 'blue', '1', ':', 11]
+
+    methods['klr_og_tree_output_alpha_C-0.001'] = ['TREX (OG-TO-Alpha-C_0.001)', 'yellowgreen', '2', '-', 11]
+    methods['klr_og_tree_output_sim_C-0.001'] = ['TREX (OG-TO-Sim-C_0.001)', 'yellowgreen', '2', '--', 11]
+    methods['klr_og_tree_output_C-0.001'] = ['TREX (OG-TO-AlphaSim-C_0.001)', 'yellowgreen', '2', ':', 11]
+
+    methods['klr_og_tree_output_alpha_C-1.0'] = ['TREX (OG-TO-Alpha-C_1.0)', 'seagreen', '2', '-', 11]
+    methods['klr_og_tree_output_sim_C-1.0'] = ['TREX (OG-TO-Sim-C_1.0)', 'seagreen', '2', '--', 11]
+    methods['klr_og_tree_output_C-1.0'] = ['TREX (OG-TO-AlphaSim-C_1.0)', 'seagreen', '2', ':', 11]
+
+    methods['klr_og_leaf_path_alpha_C-0.001'] = ['TREX (OG-LP-Alpha-C_0.001)', 'blue', '1', '-', 11]
+    methods['klr_og_leaf_path_sim_C-0.001'] = ['TREX (OG-LP-Sim-C_0.001)', 'blue', '1', '--', 10]
+    methods['klr_og_leaf_path_C-0.001'] = ['TREX (OG-LP-AlphaSim-C_0.001)', 'blue', '1', ':', 11]
 
     methods['klr_og_leaf_path_alpha_C-1.0'] = ['TREX (OG-LP-Alpha-C_1.0)', 'purple', '1', '-', 11]
     methods['klr_og_leaf_path_sim_C-1.0'] = ['TREX (OG-LP-Sim-C_1.0)', 'purple', '1', '--', 10]
     methods['klr_og_leaf_path_C-1.0'] = ['TREX (OG-LP-AlphaSim-C_1.0)', 'purple', '1', ':', 11]
 
-    methods['klr_og_weighted_leaf_path_alpha'] = ['TREX (OG-WLP-Alpha-C_0.001)', 'cyan', '2', '-', 11]
-    methods['klr_og_weighted_leaf_path_sim'] = ['TREX (OG-WLP-Sim-C_0.001)', 'cyan', '2', '--', 11]
-    methods['klr_og_weighted_leaf_path'] = ['TREX (OG-WLP-AlphaSim-C_0.001)', 'cyan', '2', ':', 11]
+    methods['klr_og_weighted_leaf_path_alpha_C-0.001'] = ['TREX (OG-WLP-Alpha-C_0.001)', 'cyan', '2', '-', 11]
+    methods['klr_og_weighted_leaf_path_sim_C-0.001'] = ['TREX (OG-WLP-Sim-C_0.001)', 'cyan', '2', '--', 11]
+    methods['klr_og_weighted_leaf_path_C-0.001'] = ['TREX (OG-WLP-AlphaSim-C_0.001)', 'cyan', '2', ':', 11]
 
     methods['klr_og_weighted_leaf_path_alpha_C-1.0'] = ['TREX (OG-WLP-Alpha-C_1.0)', 'magenta', '2', '-', 11]
     methods['klr_og_weighted_leaf_path_sim_C-1.0'] = ['TREX (OG-WLP-Sim-C_1.0)', 'magenta', '2', '--', 11]
     methods['klr_og_weighted_leaf_path_C-1.0'] = ['TREX (OG-WLP-AlphaSim-C_1.0)', 'magenta', '2', ':', 11]
-
-    methods['klr_og_tree_output_alpha'] = ['TREX (OG-TO-Alpha-C_0.001)', 'yellowgreen', '2', '-', 11]
-    methods['klr_og_tree_output_sim'] = ['TREX (OG-TO-Sim-C_0.001)', 'yellowgreen', '2', '--', 11]
-    methods['klr_og_tree_output'] = ['TREX (OG-TO-AlphaSim-C_0.001)', 'yellowgreen', '2', ':', 11]
-
-    methods['klr_og_tree_output_alpha_C-1.0'] = ['TREX (OG-TO-Alpha-C_1.0)', 'seagreen', '2', '-', 11]
-    methods['klr_og_tree_output_sim_C-1.0'] = ['TREX (OG-TO-Sim-C_1.0)', 'seagreen', '2', '--', 11]
-    methods['klr_og_tree_output_C-1.0'] = ['TREX (OG-TO-AlphaSim-C_1.0)', 'seagreen', '2', ':', 11]
 
     methods['random'] = ['Random', 'red', 'o', '-', 9]
     # methods['maple+'] = ['MAPLE', 'orange', '^', '--', 7]
