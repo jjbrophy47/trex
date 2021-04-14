@@ -642,9 +642,6 @@ def experiment(args, logger, out_dir):
                          preprocessing=args.preprocessing)
     X_train, X_test, y_train, y_test, feature, cat_indices = data
 
-    X_train = X_train[:1000].copy()
-    y_train = y_train[:1000].copy()
-
     # get tree-ensemble
     clf = util.get_model(args.model,
                          n_estimators=args.n_estimators,

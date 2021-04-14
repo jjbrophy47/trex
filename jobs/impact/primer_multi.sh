@@ -29,7 +29,7 @@ method_list=('klr_og_tree_output_alpha_C-0.001'
              'maple+_og'
              'bacon')
 setting_list=('dynamic')
-n_test_list=(100)
+n_test_list=(1000)
 start_pred_list=(-1)
 
 for setting in ${setting_list[@]}; do

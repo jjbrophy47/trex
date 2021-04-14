@@ -23,29 +23,50 @@ def main(args):
     # label, color, marker, linestyle, zorder
     methods = {}
 
-    methods['klr_og_tree_output_alpha_C-0.001'] = ['TREX (OG-TO-Alpha-C_0.001)', 'yellowgreen', '2', '-', 11]
-    methods['klr_og_tree_output_sim_C-0.001'] = ['TREX (OG-TO-Sim-C_0.001)', 'yellowgreen', '2', '--', 11]
-    methods['klr_og_tree_output_C-0.001'] = ['TREX (OG-TO-AlphaSim-C_0.001)', 'yellowgreen', '2', ':', 11]
+    # slice 'n dice TREX results
+    if args.C is None or args.C == 0.001:
+        if args.kernel is None or args.kernel == 'to':
+            if args.trex_type is None or args.trex_type == 'alpha':
+                methods['klr_og_tree_output_alpha_C-0.001'] = ['TREX (OG-TO-Alpha-C_0.001)', 'seagreen', '2', '-', 11]
+            if args.trex_type is None or args.trex_type == 'sim':
+                methods['klr_og_tree_output_sim_C-0.001'] = ['TREX (OG-TO-Sim-C_0.001)', 'seagreen', '2', '--', 11]
+            methods['klr_og_tree_output_C-0.001'] = ['TREX (OG-TO-AlphaSim-C_0.001)', 'seagreen', '2', ':', 11]
 
-    methods['klr_og_tree_output_alpha_C-1.0'] = ['TREX (OG-TO-Alpha-C_1.0)', 'seagreen', '2', '-', 11]
-    methods['klr_og_tree_output_sim_C-1.0'] = ['TREX (OG-TO-Sim-C_1.0)', 'seagreen', '2', '--', 11]
-    methods['klr_og_tree_output_C-1.0'] = ['TREX (OG-TO-AlphaSim-C_1.0)', 'seagreen', '2', ':', 11]
+        if args.kernel is None or args.kernel == 'lp':
+            if args.trex_type is None or args.trex_type == 'alpha':
+                methods['klr_og_leaf_path_alpha_C-0.001'] = ['TREX (OG-LP-Alpha-C_0.001)', 'blue', '1', '-', 11]
+            if args.trex_type is None or args.trex_type == 'sim':
+                methods['klr_og_leaf_path_sim_C-0.001'] = ['TREX (OG-LP-Sim-C_0.001)', 'blue', '1', '--', 10]
+            methods['klr_og_leaf_path_C-0.001'] = ['TREX (OG-LP-AlphaSim-C_0.001)', 'blue', '1', ':', 11]
 
-    methods['klr_og_leaf_path_alpha_C-0.001'] = ['TREX (OG-LP-Alpha-C_0.001)', 'blue', '1', '-', 11]
-    methods['klr_og_leaf_path_sim_C-0.001'] = ['TREX (OG-LP-Sim-C_0.001)', 'blue', '1', '--', 10]
-    methods['klr_og_leaf_path_C-0.001'] = ['TREX (OG-LP-AlphaSim-C_0.001)', 'blue', '1', ':', 11]
+        if args.kernel is None or args.kernel == 'wlp':
+            if args.trex_type is None or args.trex_type == 'alpha':
+                methods['klr_og_weighted_leaf_path_alpha_C-0.001'] = ['TREX (OG-WLP-Alpha-C_0.001)', 'purple', '2', '-', 11]
+            if args.trex_type is None or args.trex_type == 'sim':
+                methods['klr_og_weighted_leaf_path_sim_C-0.001'] = ['TREX (OG-WLP-Sim-C_0.001)', 'purple', '2', '--', 11]
+            methods['klr_og_weighted_leaf_path_C-0.001'] = ['TREX (OG-WLP-AlphaSim-C_0.001)', 'purple', '2', ':', 11]
 
-    methods['klr_og_leaf_path_alpha_C-1.0'] = ['TREX (OG-LP-Alpha-C_1.0)', 'purple', '1', '-', 11]
-    methods['klr_og_leaf_path_sim_C-1.0'] = ['TREX (OG-LP-Sim-C_1.0)', 'purple', '1', '--', 10]
-    methods['klr_og_leaf_path_C-1.0'] = ['TREX (OG-LP-AlphaSim-C_1.0)', 'purple', '1', ':', 11]
+    if args.C is None or args.C == 1.0:
+        if args.kernel is None or args.kernel == 'to':
+            if args.trex_type is None or args.trex_type == 'alpha':
+                methods['klr_og_tree_output_alpha_C-1.0'] = ['TREX (OG-TO-Alpha-C_1.0)', 'yellowgreen', '2', '-', 11]
+            if args.trex_type is None or args.trex_type == 'sim':
+                methods['klr_og_tree_output_sim_C-1.0'] = ['TREX (OG-TO-Sim-C_1.0)', 'yellowgreen', '2', '--', 11]
+            methods['klr_og_tree_output_C-1.0'] = ['TREX (OG-TO-AlphaSim-C_1.0)', 'yellowgreen', '2', ':', 11]
 
-    methods['klr_og_weighted_leaf_path_alpha_C-0.001'] = ['TREX (OG-WLP-Alpha-C_0.001)', 'cyan', '2', '-', 11]
-    methods['klr_og_weighted_leaf_path_sim_C-0.001'] = ['TREX (OG-WLP-Sim-C_0.001)', 'cyan', '2', '--', 11]
-    methods['klr_og_weighted_leaf_path_C-0.001'] = ['TREX (OG-WLP-AlphaSim-C_0.001)', 'cyan', '2', ':', 11]
+        if args.kernel is None or args.kernel == 'lp':
+            if args.trex_type is None or args.trex_type == 'alpha':
+                methods['klr_og_leaf_path_alpha_C-1.0'] = ['TREX (OG-LP-Alpha-C_1.0)', 'cyan', '1', '-', 11]
+            if args.trex_type is None or args.trex_type == 'sim':
+                methods['klr_og_leaf_path_sim_C-1.0'] = ['TREX (OG-LP-Sim-C_1.0)', 'cyan', '1', '--', 10]
+            methods['klr_og_leaf_path_C-1.0'] = ['TREX (OG-LP-AlphaSim-C_1.0)', 'cyan', '1', ':', 11]
 
-    methods['klr_og_weighted_leaf_path_alpha_C-1.0'] = ['TREX (OG-WLP-Alpha-C_1.0)', 'magenta', '2', '-', 11]
-    methods['klr_og_weighted_leaf_path_sim_C-1.0'] = ['TREX (OG-WLP-Sim-C_1.0)', 'magenta', '2', '--', 11]
-    methods['klr_og_weighted_leaf_path_C-1.0'] = ['TREX (OG-WLP-AlphaSim-C_1.0)', 'magenta', '2', ':', 11]
+        if args.kernel is None or args.kernel == 'wlp':
+            if args.trex_type is None or args.trex_type == 'alpha':
+                methods['klr_og_weighted_leaf_path_alpha_C-1.0'] = ['TREX (OG-WLP-Alpha-C_1.0)', 'magenta', '2', '-', 11]
+            if args.trex_type is None or args.trex_type == 'sim':
+                methods['klr_og_weighted_leaf_path_sim_C-1.0'] = ['TREX (OG-WLP-Sim-C_1.0)', 'magenta', '2', '--', 11]
+            methods['klr_og_weighted_leaf_path_C-1.0'] = ['TREX (OG-WLP-AlphaSim-C_1.0)', 'magenta', '2', ':', 11]
 
     methods['random'] = ['Random', 'red', 'o', '-', 9]
     # methods['maple+'] = ['MAPLE', 'orange', '^', '--', 7]
@@ -71,10 +92,7 @@ def main(args):
     width = 4.8  # Machine Learning journal
     height = util.get_height(width=width, subplots=(2, 3))
 
-    if args.model == 'cb':
-        fig, axs = plt.subplots(2, 3, figsize=(width * 1.85, height * 2.95))
-    else:
-        fig, axs = plt.subplots(2, 3, figsize=(width * 1.95, height * 3.5))
+    fig, axs = plt.subplots(2, 3, figsize=(width * 3, height * 5))
 
     # legend containers
     lines = []
@@ -141,6 +159,9 @@ def main(args):
 
                 # plot
                 yerr = metric_sem if args.view == 'normal' else None
+
+                # TEMP
+                yerr = None
                 line = ax.errorbar(removed_pcts, metric_mean, yerr=yerr, marker=marker,
                                    linestyle=linestyle, color=color, label=label, zorder=zorder)
 
@@ -164,18 +185,16 @@ def main(args):
     os.makedirs(out_dir, exist_ok=True)
 
     # adjust legend
-    if len(lines) <= 4:
-        fig.legend(tuple(lines), tuple(labels), loc='center', ncol=6, bbox_to_anchor=(0.5, 0.04))
-        plt.tight_layout()
-        fig.subplots_adjust(bottom=0.225, wspace=0.3)
-
-    else:
-        fig.legend(tuple(lines), tuple(labels), loc='center', ncol=3, bbox_to_anchor=(0.5, 0.075))
-        plt.tight_layout()
-        fig.subplots_adjust(bottom=0.265, wspace=0.3)
+    fig.legend(tuple(lines), tuple(labels), loc='center', ncol=3, fontsize=12, bbox_to_anchor=(0.5, 0.1))
+    plt.tight_layout()
+    fig.subplots_adjust(bottom=0.265, wspace=0.3)
 
     # save figure
-    fp = os.path.join(out_dir, 'n_test_{}_{}.pdf'.format(args.n_test, args.view))
+    fn = 'n_test_{}_{}'.format(args.n_test, args.view)
+    fn += '_{}'.format(args.kernel) if args.kernel is not None else ''
+    fn += '_{}'.format(args.trex_type) if args.trex_type is not None else ''
+    fn += '_C{}'.format(args.C) if args.C is not None else ''
+    fp = os.path.join(out_dir, '{}.pdf'.format(fn))
     plt.savefig(fp)
     print('saving to {}...'.format(fp))
 
@@ -191,6 +210,11 @@ if __name__ == '__main__':
     parser.add_argument('--start_pred', type=int, default=1, help='starting prediction.')
     parser.add_argument('--view', type=str, default='normal', help='normal or zoom.')
     parser.add_argument('--n_test', type=int, default=1, help='no. test instances.')
+
+    # filter settings
+    parser.add_argument('--C', type=float, default=None, help='specific C.')
+    parser.add_argument('--trex_type', type=str, default=None, help='None, alpha, or sim.')
+    parser.add_argument('--kernel', type=str, default=None, help='None, to, lp, or wlp.')
 
     args = parser.parse_args()
     main(args)
