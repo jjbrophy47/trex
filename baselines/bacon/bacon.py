@@ -31,7 +31,7 @@ class Bacon:
         instance_leaf_ids = self._get_leaf_indices(x)[0]
 
         weights = np.zeros(self.X_train.shape[0])
-        for i in range(self.train_leaf_ids_.shape[1]):
+        for i in range(self.train_leaf_ids_.shape[1]):  # per tree
             same_leaf_train_indices = np.where(self.train_leaf_ids_[:, i] == instance_leaf_ids[i])[0]
             if len(same_leaf_train_indices) > 0:
                 weights[same_leaf_train_indices] += 1.0 / len(same_leaf_train_indices)

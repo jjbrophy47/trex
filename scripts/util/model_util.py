@@ -245,6 +245,7 @@ def get_selected_params(dataset, model, surrogate):
     cb['vaccine'] = ['tree_output', 1.0, 'tree_output', 61]
     cb['amazon'] = ['tree_output', 1.0, 'feature_path', 7]
     cb['bank_marketing'] = ['tree_output', 1.0, 'tree_output', 31]
+    cb['bank_marketing2'] = ['tree_output', 1.0, 'tree_output', 31]
     cb['adult'] = ['tree_output', 1.0, 'tree_output', 61]
     cb['census'] = ['tree_output', 1.0, 'tree_output', 61]
 
@@ -254,6 +255,7 @@ def get_selected_params(dataset, model, surrogate):
     rf['vaccine'] = ['leaf_output', 0.001, 'feature_output', 61]
     rf['amazon'] = ['tree_output', 0.01, 'tree_output', 61]
     rf['bank_marketing'] = ['leaf_output', 0.001, 'leaf_path', 61]
+    rf['bank_marketing2'] = ['leaf_output', 0.001, 'leaf_path', 61]
     rf['adult'] = ['leaf_output', 0.001, 'feature_output', 61]
     rf['census'] = ['tree_output', 0.001, 'leaf_path', 61]
 

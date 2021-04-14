@@ -25,6 +25,8 @@ from copy import deepcopy
 from datetime import datetime
 
 import numpy as np
+import matplotlib.pyplot as plt
+from matplotlib.colors import ListedColormap
 from sklearn.base import clone
 from sklearn.metrics import roc_auc_score
 from sklearn.metrics import accuracy_score
@@ -40,6 +42,27 @@ from baselines import CBLeafInfluenceEnsemble
 from baselines import MAPLE
 from baselines import Bacon
 from baselines import DShap
+
+
+def plot_alpha(alpha, y_train, fp):
+    """
+    Plots alpha values, sorting from most pos. to most negative.
+    """
+    s = np.argsort(alpha)[::-1]
+
+    # define legend
+    colormap = ListedColormap(['blue', 'red'])
+    classes = [r'$y=-1$', r'$y=+1$']
+
+    fig, ax = plt.subplots()
+    scatter = ax.scatter(np.arange(len(s)), alpha[s], s=1, c=y_train[s], cmap=colormap)
+    ax.axhline(0, linestyle='--', color='gray', linewidth=0.25)
+    ax.set_title('Alphas (sorted)')
+    ax.set_xlabel('No. instances')
+    ax.set_ylabel('Alpha')
+    ax.legend(handles=scatter.legend_elements()[0], labels=classes, markerscale=0.2)
+    plt.savefig(fp, bbox_inches='tight')
+    plt.close()
 
 
 def score(model, X_test, y_test):
@@ -125,7 +148,7 @@ def filter_out_non_pred_label_indices(model, X_test, y_train, train_indices):
 
 
 def measure_performance(args, clf, X_train, y_train, X_test, y_test, rng,
-                        logger=None):
+                        out_dir, logger=None):
     """
     Measures the change in predictions as training instances are removed.
     """
@@ -157,7 +180,7 @@ def measure_performance(args, clf, X_train, y_train, X_test, y_test, rng,
 
     # initial sorting of train indices to be removed
     train_indices = sort_train_instances(args, model, X_train, y_train,
-                                         X_test, y_test, rng, logger=logger)
+                                         X_test, y_test, rng, out_dir, 0.0, logger=logger)
 
     # trackers
     frac_deleted_data = 0
@@ -213,7 +236,7 @@ def measure_performance(args, clf, X_train, y_train, X_test, y_test, rng,
 
             # sort new train data
             train_indices = sort_train_instances(args, new_model, X_train_mod, y_train_mod,
-                                                 X_test, y_test, rng, logger=logger)
+                                                 X_test, y_test, rng, out_dir, frac_remove, logger=logger)
 
             frac_deleted_data = frac_remove
 
@@ -261,8 +284,7 @@ def random_method(args, model, X_train, y_train, X_test, rng):
     return result
 
 
-def trex_method(args, model, X_train, y_train, X_test, logger=None,
-                frac_progress_update=0.1):
+def trex_method(args, model, X_train, y_train, X_test, out_dir, frac_remove, logger=None):
     """
     Sort training instances by largest 'excitatory' influnce on the test set.
 
@@ -276,7 +298,7 @@ def trex_method(args, model, X_train, y_train, X_test, logger=None,
     params = util.get_selected_params(dataset=args.dataset, model=args.model, surrogate=args.method)
     train_label = y_train if 'og' in args.method else model.predict(X_train)
 
-    print(params)
+    logger.info('\nparams: {}'.format(params))
 
     surrogate = trex.train_surrogate(model=model,
                                      surrogate='klr',
@@ -287,6 +309,11 @@ def trex_method(args, model, X_train, y_train, X_test, logger=None,
                                      seed=args.rs,
                                      params=params,
                                      logger=None)
+
+    # save alpha
+    frac_remove = round(frac_remove, 2)
+    plot_alpha(surrogate.get_alpha(), y_train, os.path.join(out_dir, 'alpha_{}.pdf'.format(frac_remove)))
+    np.save(os.path.join(out_dir, 'arr_alpha_{}.npy'.format(frac_remove)), surrogate.get_alpha())
 
     # display status
     if not logger:
@@ -323,12 +350,6 @@ def trex_method(args, model, X_train, y_train, X_test, logger=None,
         # sort by most pos.to most neg. if `start_pred` is 1, and vice versa if 0
         else:
             train_indices = np.argsort(alpha) if args.start_pred == 0 else np.argsort(alpha)[::-1]
-
-        # import matplotlib.pyplot as plt
-        # print(alpha[train_indices])
-        # fig, ax = plt.subplots()
-        # ax.scatter(np.arange(len(train_indices)), alpha[train_indices])
-        # plt.show()
 
     # sort by alpha * sim
     else:
@@ -560,7 +581,7 @@ def dshap_method(args, model, X_train, y_train, X_test, logger=None):
     return train_indices
 
 
-def sort_train_instances(args, model, X_train, y_train, X_test, y_test, rng, logger=None):
+def sort_train_instances(args, model, X_train, y_train, X_test, y_test, rng, out_dir, frac_remove, logger=None):
     """
     Sorts training instance to be removed using one of several methods.
     """
@@ -571,7 +592,7 @@ def sort_train_instances(args, model, X_train, y_train, X_test, y_test, rng, log
 
     # TREX method
     elif 'klr' in args.method or 'svm' in args.method:
-        train_indices = trex_method(args, model, X_train, y_train, X_test, logger=logger)
+        train_indices = trex_method(args, model, X_train, y_train, X_test, out_dir, frac_remove, logger=logger)
 
     # Bacon
     elif 'bacon' in args.method:
@@ -621,6 +642,9 @@ def experiment(args, logger, out_dir):
                          preprocessing=args.preprocessing)
     X_train, X_test, y_train, y_test, feature, cat_indices = data
 
+    X_train = X_train[:1000].copy()
+    y_train = y_train[:1000].copy()
+
     # get tree-ensemble
     clf = util.get_model(args.model,
                          n_estimators=args.n_estimators,
@@ -668,7 +692,7 @@ def experiment(args, logger, out_dir):
 
     # sort train instances, then remove, retrain, and re-evaluate
     result = measure_performance(args, clf, X_train, y_train,
-                                 X_test_sub, y_test_sub, rng, logger=logger)
+                                 X_test_sub, y_test_sub, rng, out_dir, logger=logger)
 
     # save results
     result['max_rss'] = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss

@@ -293,12 +293,12 @@ class TreeExtractor:
 
         # CatBoost
         elif self.model_type_ == 'CatBoostClassifier':
-            exit('{} not currently supported!'.format(str(self.model)))
 
             # extract leaf indices traversed to and no. leaves per tree
             X_pool = catboost.Pool(self.model.numpy_to_cat(X), cat_features=self.model.get_cat_indices())
-            leaf_indices = self.model.calc_leaf_indexes(X_pool)  # in terms of only leaf nodes in each tree
-            leaf_counts = self.model.get_tree_leaf_counts()
+            leaf_indices = self.model.calc_leaf_indexes(X_pool)  # w.r.t. leaves, shape=(no. samples, no. trees)
+            leaf_counts = self.model.get_tree_leaf_counts()  # no. leaves per tree, shape=(no. trees,)
+            leaf_weights = self.model.get_leaf_weights()  # no. instances per leaf, shape=(total no. leaves,)
 
             # construct encoding
             encoding = np.zeros((X.shape[0], leaf_counts.sum()))
@@ -308,7 +308,11 @@ class TreeExtractor:
                 n_prev_leaves = 0
 
                 for j in range(leaf_indices.shape[1]):  # per tree
-                    encoding[i][n_prev_leaves + leaf_indices[i][j]] = 1
+                    leaf_ndx = leaf_indices[i][j]
+                    if leaf_weights[n_prev_leaves + leaf_ndx] == 0:
+                        encoding[i][n_prev_leaves + leaf_ndx] = 0
+                    else:
+                        encoding[i][n_prev_leaves + leaf_ndx] = 1.0 / leaf_weights[n_prev_leaves + leaf_ndx]
                     n_prev_leaves += leaf_counts[j]
 
         # GBM
