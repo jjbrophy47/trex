@@ -25,6 +25,8 @@ from copy import deepcopy
 from datetime import datetime
 
 import numpy as np
+import matplotlib
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 from matplotlib.colors import ListedColormap
 from sklearn.base import clone
