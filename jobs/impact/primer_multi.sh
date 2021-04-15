@@ -27,8 +27,9 @@ method_list=('klr_og_tree_output_alpha_C-0.001'
              'klr_og_weighted_leaf_path_C-1.0'
              'random'
              'maple+_og'
-             'bacon')
-setting_list=('dynamic')
+             'bacon'
+             'fast_leaf_influence')
+setting_list=('static')
 n_test_list=(1000)
 start_pred_list=(-1)
 

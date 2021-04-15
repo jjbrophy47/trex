@@ -241,6 +241,7 @@ def get_selected_params(dataset, model, surrogate):
 
     # selected hyperparameters using the CatBoost model
     cb = {}
+    cb['churn'] = ['tree_output', 1.0, 'leaf_path', 15]
     cb['surgical'] = ['tree_output', 1.0, 'leaf_path', 15]
     cb['vaccine'] = ['tree_output', 1.0, 'tree_output', 61]
     cb['amazon'] = ['tree_output', 1.0, 'feature_path', 7]
@@ -251,6 +252,7 @@ def get_selected_params(dataset, model, surrogate):
 
     # selected hyperparameters using the RF model
     rf = {}
+    rf['churn'] = ['leaf_path', 0.001, 'feature_output', 61]
     rf['surgical'] = ['leaf_path', 0.001, 'feature_output', 61]
     rf['vaccine'] = ['leaf_output', 0.001, 'feature_output', 61]
     rf['amazon'] = ['tree_output', 0.01, 'tree_output', 61]

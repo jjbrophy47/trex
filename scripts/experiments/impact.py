@@ -451,6 +451,10 @@ def influence_method(args, model, X_train, y_train, X_test, y_test, logger=None,
     """
     Sort training instances based on their Leaf Influence on the test set.
 
+    Inf.(x_i) := L(y, F(x_t)) - L(y, F w/o x_i (x_t))
+    A neg. number means removing x_i increases the loss (i.e. adding x_i decreases loss).
+    A pos. number means removing x_i decreases the loss (i.e. adding x_i increases loss).
+
     Reference:
     https://github.com/kohpangwei/influence-release/blob/master/influence/experiments.py
     """
@@ -478,44 +482,41 @@ def influence_method(args, model, X_train, y_train, X_test, y_test, logger=None,
 
     # display status
     if logger:
-        logger.info('\ncomputing influence of each training sample on the test instance...')
+        logger.info('\ncomputing influence of each training sample on the test set...')
 
     # contributions container
     start = time.time()
-    contributions_sum = np.zeros(X_train.shape[0])
 
     # predicted test labels
     model_pred = model.predict(X_test)
 
-    # compute influence on each test instance
-    for i in range(X_test.shape[0]):
+    inf_list = []
+    buf = deepcopy(explainer)
 
-        contributions = []
-        buf = deepcopy(explainer)
+    # compute influence for each training instance
+    for j in range(X_train.shape[0]):
+        explainer.fit(removed_point_idx=j, destination_model=buf)
 
-        # compute influence for each training instance
-        for j in range(X_train.shape[0]):
-            explainer.fit(removed_point_idx=j, destination_model=buf)
+        # approximate loss on the predicted label
+        if args.start_pred == -1:
+            inf_list.append(buf.loss_derivative(X_test, model_pred))
 
-            # approximate loss on the predicted label
-            if args.start_pred == -1:
-                contributions.append(buf.loss_derivative(X_test[[i]], model_pred[[i]])[0])
+        # approximate loss on a predetermined label
+        else:
+            inf_list.append(buf.loss_derivative(X_test, np.array([args.start_pred])))
 
-            # approximate loss on a predetermined label
-            else:
-                contributions.append(buf.loss_derivative(X_test[[i]], np.array([args.start_pred]))[0])
+        # display progress
+        if logger and j % int(X_train.shape[0] * frac_progress_update) == 0:
+            elapsed = time.time() - start
+            train_frac_complete = j / X_train.shape[0] * 100
+            logger.info('train {:.1f}%...{:.3f}s'.format(train_frac_complete, elapsed))
 
-            # display progress
-            if logger and j % int(X_train.shape[0] * frac_progress_update) == 0:
-                elapsed = time.time() - start
-                train_frac_complete = j / X_train.shape[0] * 100
-                logger.info('train {:.1f}%...{:.3f}s'.format(train_frac_complete, elapsed))
+    # compute avg. influence of each train instance on the test set loss
+    influence = np.vstack(inf_list)  # shape=(no. train, no. test)
+    influence = influence.mean(axis=1)  # shape=(no. train)
 
-        contributions = np.array(contributions)
-        contributions_sum += contributions
-
-    # sort by instances that cause the biggest decrease in loss
-    train_indices = np.argsort(contributions_sum)[::-1]
+    # sort by most neg. to most pos.
+    train_indices = np.argsort(influence)
 
     # clean up
     shutil.rmtree(temp_dir)
