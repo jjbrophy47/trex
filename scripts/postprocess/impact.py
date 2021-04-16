@@ -246,6 +246,7 @@ if __name__ == '__main__':
                                  'klr_og_weighted_leaf_path_alpha_C-1.0',
                                  'klr_og_weighted_leaf_path_sim_C-1.0',
                                  'klr_og_weighted_leaf_path_C-1.0',
+                                 'klr_og_weighted_feature_path_sim_C-1.0',
                                  'maple+',
                                  'maple+_og',
                                  'knn_og',

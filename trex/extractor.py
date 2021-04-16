@@ -124,10 +124,14 @@ class TreeExtractor:
 
         # RF
         if self.model_type_ == 'RandomForestClassifier':
-            dp = np.array(self.model.decision_path(X)[0].todense())  # 1 if x in X traversed to that node
 
+            # 1 if x in X traversed to that node
+            dp = np.array(self.model.decision_path(X)[0].todense())  # shape=(no. samples, total no. nodes)
+
+            # node weights, 1 / no. instances at that node
             if self.model.w is None:
-                w = 1.0 / dp.sum(axis=0)  # node weights, 1 / no. instances at that node
+                w = 1.0 / dp.sum(axis=0)  # shape=(total no. nodes,)
+                w[0] = 0  # set root node weight to 0
                 self.model.w = w
 
             encoding = dp * self.model.w

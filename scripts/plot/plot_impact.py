@@ -18,7 +18,7 @@ def main(args):
     print(args)
 
     # settings
-    dataset_list = ['surgical', 'vaccine', 'amazon', 'bank_marketing', 'adult', 'census']
+    dataset_list = ['surgical', 'vaccine', 'churn', 'bank_marketing', 'adult', 'census']
 
     # label, color, marker, linestyle, zorder
     methods = {}
@@ -73,6 +73,8 @@ def main(args):
                 methods['klr_og_weighted_leaf_path_sim_C-1.0'] = ['TREX (OG-WLP-Sim-C_1.0)', 'magenta', '2', '--', 11]
             if args.trex_type is None or args.trex_type == 'alphasim':
                 methods['klr_og_weighted_leaf_path_C-1.0'] = ['TREX (OG-WLP-AlphaSim-C_1.0)', 'magenta', '2', ':', 11]
+
+    methods['klr_og_weighted_feature_path_sim_C-1.0'] = ['TREX (OG-WFP-AlphaSim-C_1.0)', 'gold', '2', '--', 11]
 
     methods['random'] = ['Random', 'red', 'o', '-', 9]
     # methods['maple+'] = ['MAPLE', 'orange', '^', '--', 7]
