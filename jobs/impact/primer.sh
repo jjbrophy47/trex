@@ -30,7 +30,7 @@ method_list=('klr_og_tree_output_alpha_C-0.001'
              'bacon'
              'fast_leaf_influence')
 setting_list=('static')
-n_test_list=(1)
+n_test_list=(-1)
 start_pred_list=(0 1)
 
 for setting in ${setting_list[@]}; do

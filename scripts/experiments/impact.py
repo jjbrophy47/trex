@@ -1,16 +1,16 @@
 """
 Experiment:
-    1) Select test instance(s) uniformly at random.
-    2) Sort training instances by most influential to the test set.
-    3) Remove training samples keeping the removals the same as the train data distribution.
+    1) Select test instance(s) at random, possibly for a specified class.
+    2) Sort training instances by most influential to this test set.
+    3) Remove training samples, keep removals the same as train distribution if not removing a specified class.
     4) Train a new tree-ensemble on the reduced training dataset.
-    4a) Measure absolute change in predicted probability.
-    5) Repeat steps 2-4a for equal increments up to 50% of the train data.
+    4a) Compute evaluation metric: prob. delta, acc., AUC, etc.
+    5) Repeat steps 2-4a for equal increments up to X% of the train data.
 
 Perform steps 3-4a X times (equally spaced) between 0 and 10%.
 
-The best methods choose samples to be removed that have the highest change
-in absolute predicted probabiltiy on the test sample.
+The best methods choose samples to be removed that have the largest change
+or metric evaluation degradation on the test set.
 """
 import os
 import sys
@@ -173,8 +173,13 @@ def measure_performance(args, clf, X_train, y_train, X_test, y_test, rng,
     result['acc'] = [acc]
     result['auc'] = [auc]
 
+    # only relevant if removing instances from a given class
+    max_frac_to_remove = args.train_frac_to_remove
+    if args.n_test <= 0 and args.start_pred in [0, 1]:
+        max_frac_to_remove = len(np.where(y_train == args.start_pred)[0]) / len(y_train)
+
     # construct list of removed percentages
-    ckpt_list = np.linspace(0, args.train_frac_to_remove, 10 + 1)[1:]
+    ckpt_list = np.linspace(0, max_frac_to_remove, 10 + 1)[1:]
     non_ckpt_list = np.linspace(0, 0.1, 10 + 1)[1:]  # take extra measurements at these points
     frac_remove_list = np.unique(np.concatenate([ckpt_list, non_ckpt_list]))
 
@@ -257,7 +262,15 @@ def random_method(args, model, X_train, y_train, X_test, rng):
 
     # remove training instances at random
     if args.method == 'random':
-        result = rng.choice(np.arange(X_train.shape[0]), size=X_train.shape[0], replace=False)
+
+        # remove training instances from a given class
+        if args.n_test <= 0 and args.start_pred in [0, 1]:
+            indices = np.where(y_train == args.start_pred)[0]
+            result = rng.choice(indices, size=indices.shape[0], replace=False)
+
+        # select instances randomly
+        else:
+            result = rng.choice(np.arange(X_train.shape[0]), size=X_train.shape[0], replace=False)
 
     # remove ONLY minority class training instances
     elif args.method == 'random_minority':
@@ -619,7 +632,8 @@ def sort_train_instances(args, model, X_train, y_train, X_test, y_test, rng, out
         raise ValueError('method {} unknown!'.format(args.method))
 
     # alternate between removing positive and negative instances based on the train distribution
-    train_indices = sort_by_distribution(train_indices, y_train)
+    if args.n_test == 1 or (args.n_test > 1 and args.start_pred == -1):
+        train_indices = sort_by_distribution(train_indices, y_train)
 
     return train_indices
 
@@ -662,10 +676,11 @@ def experiment(args, logger, out_dir):
             test_indices = rng.choice(X_test.shape[0], size=args.n_test, replace=False)
             X_test_sub, y_test_sub = X_test[test_indices], y_test[test_indices]
 
-        # select a random stratified subset
+        # use the entire test set
         elif args.n_test <= 0:
             X_test_sub, y_test_sub = X_test, y_test
 
+        # use a stratified sample of the test set
         else:
             n_test = 1.0 if args.n_test == -1 else args.n_test
             _, X_test_sub, _, y_test_sub = train_test_split(X_test, y_test,
@@ -675,10 +690,17 @@ def experiment(args, logger, out_dir):
 
     # select a subset of test instances of the desired predicted label uniformly at random
     elif args.start_pred in [0, 1]:
-        model_pred = model.predict(X_test)
-        label_indices = np.where(model_pred == args.start_pred)[0]
-        test_indices = rng.choice(label_indices, size=args.n_test, replace=False)
-        X_test_sub, y_test_sub = X_test[test_indices], y_test[test_indices]
+
+        # use the entire test set
+        if args.n_test <= 0:
+            X_test_sub, y_test_sub = X_test, y_test
+
+        # select a specified no. instances from the specified class
+        else:
+            model_pred = model.predict(X_test)
+            label_indices = np.where(model_pred == args.start_pred)[0]
+            test_indices = rng.choice(label_indices, size=args.n_test, replace=False)
+            X_test_sub, y_test_sub = X_test[test_indices], y_test[test_indices]
 
     else:
         raise ValueError('unknown start_pred: {}'.format(args.start_pred))
