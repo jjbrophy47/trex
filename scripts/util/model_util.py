@@ -76,6 +76,17 @@ class CatBoostClassifierWrapper(CatBoostClassifier):
         return X
 
 
+class RandomForestClassifierWrapper(RandomForestClassifier):
+    """
+    Wrapper to add extra attributes to.
+    """
+
+    # override
+    def fit(self, X, y):
+        self.w = None
+        return super().fit(X, y)
+
+
 # public
 def get_model(model,
               n_estimators=20,
@@ -109,10 +120,10 @@ def get_model(model,
 
     # Random Forest
     elif model == 'rf':
-        clf = RandomForestClassifier(random_state=random_state,
-                                     n_estimators=n_estimators,
-                                     max_depth=max_depth,
-                                     class_weight=class_weight)
+        clf = RandomForestClassifierWrapper(random_state=random_state,
+                                            n_estimators=n_estimators,
+                                            max_depth=max_depth,
+                                            class_weight=class_weight)
     # GBM
     elif model == 'gbm':
         max_depth = 3 if max_depth is None else max_depth  # gbm default

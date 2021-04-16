@@ -30,21 +30,24 @@ def main(args):
                 methods['klr_og_tree_output_alpha_C-0.001'] = ['TREX (OG-TO-Alpha-C_0.001)', 'seagreen', '2', '-', 11]
             if args.trex_type is None or args.trex_type == 'sim':
                 methods['klr_og_tree_output_sim_C-0.001'] = ['TREX (OG-TO-Sim-C_0.001)', 'seagreen', '2', '--', 11]
-            methods['klr_og_tree_output_C-0.001'] = ['TREX (OG-TO-AlphaSim-C_0.001)', 'seagreen', '2', ':', 11]
+            if args.trex_type is None or args.trex_type == 'alphasim':
+                methods['klr_og_tree_output_C-0.001'] = ['TREX (OG-TO-AlphaSim-C_0.001)', 'seagreen', '2', ':', 11]
 
         if args.kernel is None or args.kernel == 'lp':
             if args.trex_type is None or args.trex_type == 'alpha':
                 methods['klr_og_leaf_path_alpha_C-0.001'] = ['TREX (OG-LP-Alpha-C_0.001)', 'blue', '1', '-', 11]
             if args.trex_type is None or args.trex_type == 'sim':
                 methods['klr_og_leaf_path_sim_C-0.001'] = ['TREX (OG-LP-Sim-C_0.001)', 'blue', '1', '--', 10]
-            methods['klr_og_leaf_path_C-0.001'] = ['TREX (OG-LP-AlphaSim-C_0.001)', 'blue', '1', ':', 11]
+            if args.trex_type is None or args.trex_type == 'alphasim':
+                methods['klr_og_leaf_path_C-0.001'] = ['TREX (OG-LP-AlphaSim-C_0.001)', 'blue', '1', ':', 11]
 
         if args.kernel is None or args.kernel == 'wlp':
             if args.trex_type is None or args.trex_type == 'alpha':
                 methods['klr_og_weighted_leaf_path_alpha_C-0.001'] = ['TREX (OG-WLP-Alpha-C_0.001)', 'purple', '2', '-', 11]
             if args.trex_type is None or args.trex_type == 'sim':
                 methods['klr_og_weighted_leaf_path_sim_C-0.001'] = ['TREX (OG-WLP-Sim-C_0.001)', 'purple', '2', '--', 11]
-            methods['klr_og_weighted_leaf_path_C-0.001'] = ['TREX (OG-WLP-AlphaSim-C_0.001)', 'purple', '2', ':', 11]
+            if args.trex_type is None or args.trex_type == 'alphasim':
+                methods['klr_og_weighted_leaf_path_C-0.001'] = ['TREX (OG-WLP-AlphaSim-C_0.001)', 'purple', '2', ':', 11]
 
     if args.C is None or args.C == 1.0:
         if args.kernel is None or args.kernel == 'to':
@@ -52,21 +55,24 @@ def main(args):
                 methods['klr_og_tree_output_alpha_C-1.0'] = ['TREX (OG-TO-Alpha-C_1.0)', 'yellowgreen', '2', '-', 11]
             if args.trex_type is None or args.trex_type == 'sim':
                 methods['klr_og_tree_output_sim_C-1.0'] = ['TREX (OG-TO-Sim-C_1.0)', 'yellowgreen', '2', '--', 11]
-            methods['klr_og_tree_output_C-1.0'] = ['TREX (OG-TO-AlphaSim-C_1.0)', 'yellowgreen', '2', ':', 11]
+            if args.trex_type is None or args.trex_type == 'alphasim':
+                methods['klr_og_tree_output_C-1.0'] = ['TREX (OG-TO-AlphaSim-C_1.0)', 'yellowgreen', '2', ':', 11]
 
         if args.kernel is None or args.kernel == 'lp':
             if args.trex_type is None or args.trex_type == 'alpha':
                 methods['klr_og_leaf_path_alpha_C-1.0'] = ['TREX (OG-LP-Alpha-C_1.0)', 'cyan', '1', '-', 11]
             if args.trex_type is None or args.trex_type == 'sim':
                 methods['klr_og_leaf_path_sim_C-1.0'] = ['TREX (OG-LP-Sim-C_1.0)', 'cyan', '1', '--', 10]
-            methods['klr_og_leaf_path_C-1.0'] = ['TREX (OG-LP-AlphaSim-C_1.0)', 'cyan', '1', ':', 11]
+            if args.trex_type is None or args.trex_type == 'alphasim':
+                methods['klr_og_leaf_path_C-1.0'] = ['TREX (OG-LP-AlphaSim-C_1.0)', 'cyan', '1', ':', 11]
 
         if args.kernel is None or args.kernel == 'wlp':
             if args.trex_type is None or args.trex_type == 'alpha':
                 methods['klr_og_weighted_leaf_path_alpha_C-1.0'] = ['TREX (OG-WLP-Alpha-C_1.0)', 'magenta', '2', '-', 11]
             if args.trex_type is None or args.trex_type == 'sim':
                 methods['klr_og_weighted_leaf_path_sim_C-1.0'] = ['TREX (OG-WLP-Sim-C_1.0)', 'magenta', '2', '--', 11]
-            methods['klr_og_weighted_leaf_path_C-1.0'] = ['TREX (OG-WLP-AlphaSim-C_1.0)', 'magenta', '2', ':', 11]
+            if args.trex_type is None or args.trex_type == 'alphasim':
+                methods['klr_og_weighted_leaf_path_C-1.0'] = ['TREX (OG-WLP-AlphaSim-C_1.0)', 'magenta', '2', ':', 11]
 
     methods['random'] = ['Random', 'red', 'o', '-', 9]
     # methods['maple+'] = ['MAPLE', 'orange', '^', '--', 7]

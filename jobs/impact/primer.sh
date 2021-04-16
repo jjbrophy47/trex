@@ -7,30 +7,33 @@ mem=$6
 time=$7
 partition=$8
 
-method_list=('klr_og_tree_output_alpha_C-0.001'
-             'klr_og_tree_output_sim_C-0.001'
-             'klr_og_tree_output_C-0.001'
-             'klr_og_tree_output_alpha_C-1.0'
-             'klr_og_tree_output_sim_C-1.0'
-             'klr_og_tree_output_C-1.0'
-             'klr_og_leaf_path_alpha_C-0.001'
-             'klr_og_leaf_path_sim_C-0.001'
-             'klr_og_leaf_path_C-0.001'
-             'klr_og_leaf_path_alpha_C-1.0'
-             'klr_og_leaf_path_sim_C-1.0'
-             'klr_og_leaf_path_C-1.0'
-             'klr_og_weighted_leaf_path_alpha_C-0.001'
-             'klr_og_weighted_leaf_path_sim_C-0.001'
-             'klr_og_weighted_leaf_path_C-0.001'
-             'klr_og_weighted_leaf_path_alpha_C-1.0'
-             'klr_og_weighted_leaf_path_sim_C-1.0'
-             'klr_og_weighted_leaf_path_C-1.0'
-             'random'
-             'maple+_og'
-             'bacon'
-             'fast_leaf_influence')
-setting_list=('static')
-n_test_list=(-1)
+method_list=(
+             # 'klr_og_tree_output_alpha_C-0.001'
+             # 'klr_og_tree_output_sim_C-0.001'
+             # 'klr_og_tree_output_C-0.001'
+             # 'klr_og_tree_output_alpha_C-1.0'
+             # 'klr_og_tree_output_sim_C-1.0'
+             # 'klr_og_tree_output_C-1.0'
+             # 'klr_og_leaf_path_alpha_C-0.001'
+             # 'klr_og_leaf_path_sim_C-0.001'
+             # 'klr_og_leaf_path_C-0.001'
+             # 'klr_og_leaf_path_alpha_C-1.0'
+             # 'klr_og_leaf_path_sim_C-1.0'
+             # 'klr_og_leaf_path_C-1.0'
+             # 'klr_og_weighted_leaf_path_alpha_C-0.001'
+             # 'klr_og_weighted_leaf_path_sim_C-0.001'
+             # 'klr_og_weighted_leaf_path_C-0.001'
+             # 'klr_og_weighted_leaf_path_alpha_C-1.0'
+             # 'klr_og_weighted_leaf_path_sim_C-1.0'
+             # 'klr_og_weighted_leaf_path_C-1.0'
+             'klr_og_weighted_feature_path_C-1.0'
+             # 'random'
+             # 'maple+_og'
+             # 'bacon'
+             # 'fast_leaf_influence'
+)
+setting_list=('static' 'dynamic')
+n_test_list=(1)
 start_pred_list=(0 1)
 
 for setting in ${setting_list[@]}; do

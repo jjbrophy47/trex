@@ -44,17 +44,20 @@ class TreeExtractor:
         if self.tree_kernel == 'feature_path':
             X_feature = self.feature_path(X)
 
+        elif self.tree_kernel == 'weighted_feature_path':
+            X_feature = self.weighted_feature_path(X)
+
         elif self.tree_kernel == 'feature_output':
             X_feature = self.feature_output(X)
 
         elif self.tree_kernel == 'leaf_path':
             X_feature = self.leaf_path(X)
 
-        elif self.tree_kernel == 'leaf_output':
-            X_feature = self.leaf_output(X)
-
         elif self.tree_kernel == 'weighted_leaf_path':
             X_feature = self.weighted_leaf_path(X)
+
+        elif self.tree_kernel == 'leaf_output':
+            X_feature = self.leaf_output(X)
 
         elif self.tree_kernel == 'tree_output':
             X_feature = self.tree_output(X)
@@ -86,6 +89,57 @@ class TreeExtractor:
         #          thus, the raw JSON representation cannot be used with cat.
         #          features since it assumes transformed cat. features.
         elif self.model_type_ == 'CatBoostClassifier':
+            cb_model, temp_dir = self.get_cb_model(self.model)
+            encoding, _, _ = cb_model.decision_path(X)
+            self.cleanup_cb_model(temp_dir)
+
+        # GBM
+        elif self.model_type_ == 'GradientBoostingClassifier':
+            exit('{} not currently supported!'.format(str(self.model)))
+
+        # LightGBM
+        elif self.model_type_ == 'LGBMClassifier':
+            exit('{} not currently supported!'.format(str(self.model)))
+
+        # XGBoost
+        elif self.model_type_ == 'XGBClassifier':
+            exit('{} not currently supported!'.format(str(self.model)))
+
+        # convert to np.float32
+        encoding = encoding.astype(np.float32)
+
+        return encoding
+
+    # private
+    def weighted_feature_path(self, X):
+        """
+        Transforms each x in X as follows:
+            -A concatenation of weighted one-hot vectors.
+            -For each vector, a 1/L in position i represents x traversed to node i
+             in which node i contains L training instances.
+
+        Returns a 2D array of shape (no. samples, no. nodes in ensemble).
+        """
+        assert X.ndim == 2, 'X is not 2d!'
+
+        # RF
+        if self.model_type_ == 'RandomForestClassifier':
+            dp = np.array(self.model.decision_path(X)[0].todense())  # 1 if x in X traversed to that node
+
+            if self.model.w is None:
+                w = 1.0 / dp.sum(axis=0)  # node weights, 1 / no. instances at that node
+                self.model.w = w
+
+            encoding = dp * self.model.w
+
+        # CatBoost
+        # WARNING: Should only be used if NOT using cat. features.
+        #          CatBoost transforms categorical features to numeric internally,
+        #          but does not provide any APIs that do this transformation;
+        #          thus, the raw JSON representation cannot be used with cat.
+        #          features since it assumes transformed cat. features.
+        elif self.model_type_ == 'CatBoostClassifier':
+            exit('{} not currently supported!'.format(str(self.model)))
             cb_model, temp_dir = self.get_cb_model(self.model)
             encoding, _, _ = cb_model.decision_path(X)
             self.cleanup_cb_model(temp_dir)
@@ -477,8 +531,8 @@ class TreeExtractor:
         """
 
         # check tree kernel
-        tree_kernels = ['feature_path', 'feature_output', 'weighted_leaf_path',
-                        'leaf_path', 'leaf_output', 'tree_output']
+        tree_kernels = ['feature_path', 'weighted_feature_path' 'feature_output',
+                        'weighted_leaf_path', 'leaf_path', 'leaf_output', 'tree_output']
         assert self.tree_kernel in tree_kernels, '{} not supported!'.format(self.tree_kernel)
 
         # check model

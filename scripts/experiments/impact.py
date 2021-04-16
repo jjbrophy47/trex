@@ -190,9 +190,14 @@ def measure_performance(args, clf, X_train, y_train, X_test, y_test, rng,
     # trackers
     frac_deleted_data = 0
 
-    # vairables that can be modified
-    X_train_mod = X_train.copy()
-    y_train_mod = y_train.copy()
+    # variables that can be modified
+    if args.evaluation == 'remove':
+        X_train_mod = X_train.copy()
+        y_train_mod = y_train.copy()
+
+    else:
+        X_train_mod = np.zeros((0,) + tuple(X_train.shape[1:]))
+        y_train_mod = np.zeros(0, int)
 
     # sort, remove, retrain, remeasure, repeat
     for frac_remove in frac_remove_list:
@@ -206,8 +211,14 @@ def measure_performance(args, clf, X_train, y_train, X_test, y_test, rng,
         remove_indices = train_indices[:n_remove_adjusted]
 
         # remove most influential training samples
-        new_X_train = np.delete(X_train_mod, remove_indices, axis=0)
-        new_y_train = np.delete(y_train_mod, remove_indices)
+        if args.evaluation == 'remove':
+            new_X_train = np.delete(X_train_mod, remove_indices, axis=0)
+            new_y_train = np.delete(y_train_mod, remove_indices)
+
+        # add most influential training samples
+        else:
+            new_X_train = np.vstack([X_train_mod, X_train[remove_indices]])
+            new_y_train = np.concatenate([y_train_mod, y_train[remove_indices]])
 
         # only samples from one class remain
         if len(np.unique(new_y_train)) == 1:
@@ -359,6 +370,8 @@ def trex_method(args, model, X_train, y_train, X_test, out_dir, frac_remove, log
         # sort by largest to smallest magnitude
         if args.start_pred == -1:
             train_indices = np.argsort(np.abs(alpha))[::-1]
+
+            print(alpha[train_indices])
 
         # sort by most pos.to most neg. if `start_pred` is 1, and vice versa if 0
         else:
@@ -667,6 +680,7 @@ def experiment(args, logger, out_dir):
     # train a tree ensemble
     model = clone(clf).fit(X_train, y_train)
     util.performance(model, X_train, y_train, logger=logger, name='Train')
+    util.performance(model, X_test, y_test, logger=logger, name='Test')
 
     # select a subset of test instances uniformly at random
     if args.start_pred == -1:
@@ -774,6 +788,7 @@ if __name__ == '__main__':
     # Experiment settings
     parser.add_argument('--method', type=str, default='klr', help='method.')
     parser.add_argument('--setting', type=str, default='dynamic', help='if dynamic, resort at each checkpoint.')
+    parser.add_argument('--evaluation', type=str, default='remove', help='remove or add instances for evaluation.')
     parser.add_argument('--n_test', type=int, default=1, help='no. of test instances to evaluate.')
     parser.add_argument('--start_pred', type=int, default=1, help='0, 1, or -1; if -1, randomly picks test instances.')
     parser.add_argument('--train_frac_to_remove', type=float, default=0.5, help='fraction of train data to remove.')
