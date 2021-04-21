@@ -18,7 +18,7 @@ def main(args):
     print(args)
 
     # settings
-    dataset_list = ['surgical', 'vaccine', 'churn', 'bank_marketing', 'adult', 'census']
+    dataset_list = ['churn', 'surgical', 'vaccine', 'bank_marketing', 'adult']
 
     # label, color, marker, linestyle, zorder
     methods = {}
@@ -113,6 +113,9 @@ def main(args):
     for i in range(axs.shape[0]):
         for j in range(axs.shape[1]):
 
+            if k == 5:
+                break
+
             # extract dataset results
             ax = axs[i][j]
             dataset = dataset_list[k]
@@ -174,7 +177,7 @@ def main(args):
                 yerr = metric_sem if args.view == 'normal' else None
 
                 # TEMP
-                yerr = None
+                # yerr = None
                 ax_label = 'n={:,}'.format(n_runs)
                 line = ax.errorbar(removed_pcts, metric_mean, yerr=yerr, marker=marker,
                                    linestyle=linestyle, color=color, zorder=zorder, label=ax_label)
