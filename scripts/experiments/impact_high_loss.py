@@ -25,7 +25,7 @@ from copy import deepcopy
 from datetime import datetime
 
 import numpy as np
-import seaborn as sns
+# import seaborn as sns
 import matplotlib.pyplot as plt
 from matplotlib.colors import ListedColormap
 from sklearn.base import clone
@@ -812,7 +812,7 @@ def experiment(args, logger, out_dir):
     losses = np.abs([proba[i][1] - y_test[i] for i in range(proba.shape[0])])
 
     # plot highest losses and their corresponding labels
-    sns.displot(losses)
+    # sns.displot(losses)
     plt.show()
 
     # select instances with an L1 loss >= 0.9
