@@ -33,7 +33,7 @@ method_list=(
              # 'fast_leaf_influence'
 )
 setting_list=('static')
-n_test_list=(1)
+n_test_list=(1 1000)
 start_pred_list=(-1)
 
 for setting in ${setting_list[@]}; do

@@ -770,8 +770,8 @@ def sort_train_instances(args, model, X_train, y_train, X_test, y_test, rng, out
         raise ValueError('method {} unknown!'.format(args.method))
 
     # alternate between removing positive and negative instances based on the train distribution
-    if args.n_test == 1 or (args.n_test > 1 and args.start_pred == -1):
-        train_indices = sort_by_distribution(train_indices, y_train)
+    # if args.n_test == 1 or (args.n_test > 1 and args.start_pred == -1):
+    #     train_indices = sort_by_distribution(train_indices, y_train)
 
     return train_indices
 
@@ -813,7 +813,7 @@ def experiment(args, logger, out_dir):
 
     # plot highest losses and their corresponding labels
     # sns.displot(losses)
-    plt.show()
+    # plt.show()
 
     # select instances with an L1 loss >= 0.9
     test_indices = np.where(losses >= 0.9)[0]
@@ -821,12 +821,42 @@ def experiment(args, logger, out_dir):
 
     logger.info('\nNo. test instances w/ L1 loss >= 0.9: {:,}, no. pos.: {:,}'.format(len(test_indices), n_pos))
 
-    for i, ndx in enumerate(test_indices):
-        logger.info('\nTest {}, loss: {:.3f}'.format(ndx, losses[ndx]))
+    if args.n_test == 1:
 
-        X_test_sub = X_test[[ndx]]
-        y_test_sub = y_test[[ndx]]
-        instance_dir = os.path.join(out_dir, 'test_{}'.format(i))
+        for i, ndx in enumerate(test_indices):
+            logger.info('\nTest {}, loss: {:.3f}'.format(ndx, losses[ndx]))
+
+            X_test_sub = X_test[[ndx]]
+            y_test_sub = y_test[[ndx]]
+            instance_dir = os.path.join(out_dir, 'test_{}'.format(i))
+
+            os.makedirs(instance_dir, exist_ok=True)
+
+            # display dataset statistics
+            logger.info('\nno. train instances: {:,}'.format(X_train.shape[0]))
+            logger.info('no. test instances: {:,}'.format(X_test_sub.shape[0]))
+            logger.info('no. features: {:,}\n'.format(X_train.shape[1]))
+
+            # sort train instances, then remove, retrain, and re-evaluate
+            result = measure_performance(args, clf, X_train, y_train,
+                                         X_test_sub, y_test_sub, rng, instance_dir, logger=logger)
+
+            # save results
+            result['max_rss'] = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+            result['total_time'] = time.time() - begin
+            np.save(os.path.join(instance_dir, 'results.npy'), result)
+
+            # display results
+            logger.info('\nResults:\n{}'.format(result))
+            logger.info('\nsaving results to {}...'.format(os.path.join(instance_dir, 'results.npy')))
+
+    # multiple test instances
+    else:
+        test_indices = test_indices[:args.n_test]
+
+        X_test_sub = X_test[test_indices]
+        y_test_sub = y_test[test_indices]
+        instance_dir = os.path.join(out_dir, 'test_{}'.format(len(test_indices)))
 
         os.makedirs(instance_dir, exist_ok=True)
 
