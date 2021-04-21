@@ -48,7 +48,7 @@ for setting in ${setting_list[@]}; do
                        --job-name=$job_name \
                        --output=jobs/logs/impact_high_loss/$job_name \
                        --error=jobs/errors/impact_high_loss/$job_name \
-                       jobs/impact/runner.sh $dataset $model $preprocessing \
+                       jobs/impact_high_loss/runner.sh $dataset $model $preprocessing \
                        $n_estimators $max_depth $method $start_pred $setting $n_test
             done
         done
