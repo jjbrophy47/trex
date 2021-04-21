@@ -13,7 +13,6 @@ method=$6
 start_pred=$7
 setting=$8
 n_test=$9
-rs=${10}
 
 python3 scripts/experiments/impact_high_loss.py \
   --dataset $dataset \
@@ -24,5 +23,4 @@ python3 scripts/experiments/impact_high_loss.py \
   --method $method \
   --start_pred $start_pred \
   --setting $setting \
-  --n_test $n_test \
-  --rs $rs
+  --n_test $n_test
