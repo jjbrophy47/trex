@@ -13,13 +13,13 @@ method_list=(
              # 'klr_og_tree_output_C-0.001'
              # 'klr_og_tree_output_alpha_C-1.0'
              # 'klr_og_tree_output_sim_C-1.0'
-             'klr_og_tree_output_C-1.0'
+             # 'klr_og_tree_output_C-1.0'
              # 'klr_og_leaf_path_alpha_C-0.001'
              # 'klr_og_leaf_path_sim_C-0.001'
              # 'klr_og_leaf_path_C-0.001'
              # 'klr_og_leaf_path_alpha_C-1.0'
              # 'klr_og_leaf_path_sim_C-1.0'
-             'klr_og_leaf_path_C-1.0'
+             # 'klr_og_leaf_path_C-1.0'
              # 'klr_og_weighted_leaf_path_alpha_C-0.001'
              # 'klr_og_weighted_leaf_path_sim_C-0.001'
              # 'klr_og_weighted_leaf_path_C-0.001'
@@ -30,7 +30,7 @@ method_list=(
              # 'random'
              # 'maple+_og'
              # 'bacon'
-             # 'fast_leaf_influence'
+             'fast_leaf_influence'
 )
 setting_list=('static')
 n_test_list=(1 1000)
