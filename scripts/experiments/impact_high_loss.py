@@ -667,7 +667,7 @@ def influence_method(args, model, X_train, y_train, X_test, y_test, logger=None,
     influence = influence.mean(axis=1)  # shape=(no. train)
 
     # sort by most neg. to most pos.
-    train_indices = np.argsort(influence)[::-1]
+    train_indices = np.argsort(influence)
 
     # clean up
     shutil.rmtree(temp_dir)
