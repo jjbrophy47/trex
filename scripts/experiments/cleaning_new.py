@@ -107,17 +107,26 @@ def fix_noisy_instances(train_indices, noisy_indices, n_check, n_checkpoint,
     fixed for each checkpoint.
     """
 
+    # get baseline values
+    y_train_noisy, _ = flip_labels(y_train, indices=noisy_indices)
+    model_noisy = clone(clf).fit(X_train, y_train_noisy)
+    train_acc_noisy, train_auc_noisy = score(model_noisy, X_train, y_train_noisy)
+    test_acc_noisy, test_auc_noisy = score(model_noisy, X_test, y_test)
+
     # initialize results
     result = {}
-    result['accs'] = [acc_noisy]
-    result['aucs'] = [auc_noisy]
+    result['train_accs'] = [train_acc_noisy]
+    result['train_aucs'] = [train_auc_noisy]
+    result['test_accs'] = [test_acc_noisy]
+    result['test_aucs'] = [test_auc_noisy]
     result['checked_pcts'] = [0]
     result['fixed_pcts'] = [0]
 
     # result containers
     indices_to_fix = []
     start = time.time()
-    s = '[Checkpoint] checked: {:.1f}%, fixed: {:.1f}%, Acc.: {:.3f}, AUC: {:.3f}, cum. time: {:.3f}s'
+    s = '[Checkpoint] checked: {:.1f}%, fixed: {:.1f}%, Train Acc.: {:.3f}, Train AUC: {:.3f}'
+    s += ', Test Acc.: {:.3f}, Test AUC: {:.3f}...{:.3f}s'
 
     # display status
     if logger:
@@ -145,18 +154,23 @@ def fix_noisy_instances(train_indices, noisy_indices, n_check, n_checkpoint,
 
             # train and evaluate the tree-ensemble model on this less noisy dataset
             model_semi_noisy = clone(clf).fit(X_train, y_train_semi_noisy)
-            acc_semi_noisy, auc_semi_noisy = score(model_semi_noisy, X_test, y_test)
+            train_acc_semi_noisy, train_auc_semi_noisy = score(model_semi_noisy, X_train, y_train_semi_noisy)
+            test_acc_semi_noisy, test_auc_semi_noisy = score(model_semi_noisy, X_test, y_test)
 
             # add to list of results
-            result['accs'].append(acc_semi_noisy)
-            result['aucs'].append(auc_semi_noisy)
+            result['train_accs'].append(train_acc_semi_noisy)
+            result['train_aucs'].append(train_auc_semi_noisy)
+            result['test_accs'].append(test_acc_semi_noisy)
+            result['test_aucs'].append(test_auc_semi_noisy)
             result['checked_pcts'].append(float(n_checked / y_train.shape[0]) * 100)
             result['fixed_pcts'].append(float(len(indices_to_fix) / noisy_indices.shape[0]) * 100)
 
             # display progress
             if logger:
                 logger.info(s.format(result['checked_pcts'][-1], result['fixed_pcts'][-1],
-                                     result['accs'][-1], result['aucs'][-1], time.time() - start))
+                                     train_acc_semi_noisy, train_auc_semi_noisy,
+                                     test_acc_semi_noisy, test_auc_semi_noisy,
+                                     time.time() - start))
 
     return result
 
@@ -214,8 +228,9 @@ def trex_method(args, model_noisy, y_train_noisy,
 
             # compute attributions of training samples on each input chunk
             similarity_density = np.zeros(0,)
-            for i in range(0, X_train.shape[0], 1000):
-                X_sub_sim = surrogate.similarity(X_train[i: i + 1000])
+            n_chunk = int(X_train.shape[0] * 0.1)
+            for i in range(0, X_train.shape[0], n_chunk):
+                X_sub_sim = surrogate.similarity(X_train[i: i + n_chunk])
 
                 y_sub_mask = np.ones(X_sub_sim.shape)
                 for j in range(y_sub_mask.shape[0]):

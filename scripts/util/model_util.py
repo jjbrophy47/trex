@@ -260,6 +260,7 @@ def get_selected_params(dataset, model, surrogate):
     cb['bank_marketing2'] = ['tree_output', 1.0, 'tree_output', 31]
     cb['adult'] = ['tree_output', 1.0, 'tree_output', 61]
     cb['census'] = ['tree_output', 1.0, 'tree_output', 61]
+    cb['synthetic'] = ['tree_output', 1.0, 'tree_output', 61]
 
     # selected hyperparameters using the RF model
     rf = {}
@@ -271,6 +272,7 @@ def get_selected_params(dataset, model, surrogate):
     rf['bank_marketing2'] = ['leaf_output', 0.001, 'leaf_path', 61]
     rf['adult'] = ['leaf_output', 0.001, 'feature_output', 61]
     rf['census'] = ['tree_output', 0.001, 'leaf_path', 61]
+    rf['synthetic'] = ['tree_output', 0.001, 'leaf_path', 61]
 
     # select parameters based on the tree-ensemble
     d = cb if model == 'cb' else rf
