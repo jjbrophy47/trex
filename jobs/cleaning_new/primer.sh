@@ -22,7 +22,7 @@ method_list=(
 flip_frac_list=(0.1 0.2 0.3 0.4)
 
 for method in ${method_list[@]}; do
-    for flip_frac_list in ${method_list[@]}; do
+    for flip_frac_list in ${flip_frac_list[@]}; do
         job_name="C_${dataset}_${model}_${method}_${flip_frac}"
         sbatch --mem=${mem}G \
                --time=$time \
