@@ -16,14 +16,11 @@ method_list=(
              'klr_og_weighted_leaf_path_alpha'
              'klr_og_weighted_leaf_path_sim'
              'klr_og_weighted_leaf_path'
-             'klr_og_weighted_feature_path_alpha'
-             'klr_og_weighted_feature_path_sim'
-             'klr_og_weighted_feature_path'
              'random'
              'fast_leaf_influence'
 )
 setting_list=('static')
-frac_remove_list=(0.1 0.5)
+frac_remove_list=(0.1 0.25 0.5)
 
 for setting in ${setting_list[@]}; do
     for method in ${method_list[@]}; do

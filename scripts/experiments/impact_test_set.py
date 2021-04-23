@@ -444,14 +444,7 @@ def influence_method(args, model, X_train, y_train, X_test, y_test, logger=None,
     # compute influence for each training instance
     for j in range(X_train.shape[0]):
         explainer.fit(removed_point_idx=j, destination_model=buf)
-
-        # approximate loss on the predicted label
-        if args.start_pred == -1:
-            inf_list.append(buf.loss_derivative(X_test, model_pred))
-
-        # approximate loss on a predetermined label
-        else:
-            inf_list.append(buf.loss_derivative(X_test, np.array([args.start_pred])))
+        inf_list.append(buf.loss_derivative(X_test, model_pred))
 
         # display progress
         if logger and j % int(X_train.shape[0] * frac_progress_update) == 0:
@@ -567,8 +560,8 @@ def sort_train_instances(args, model, X_train, y_train, X_test, y_test, rng, out
         raise ValueError('method {} unknown!'.format(args.method))
 
     # alternate between removing positive and negative instances based on the train distribution
-    if args.train_frac_to_remove > 0.1:
-        train_indices = sort_by_distribution(train_indices, y_train)
+    # if args.train_frac_to_remove > 0.1:
+    #     train_indices = sort_by_distribution(train_indices, y_train)
 
     return train_indices
 
