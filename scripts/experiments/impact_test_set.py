@@ -25,6 +25,8 @@ from copy import deepcopy
 from datetime import datetime
 
 import numpy as np
+import matplotlib
+matplotlib.use('agg')
 import matplotlib.pyplot as plt
 from sklearn.base import clone
 from sklearn.metrics import roc_auc_score
