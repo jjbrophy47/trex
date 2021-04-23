@@ -645,6 +645,8 @@ def main(args):
         # run experiment
         experiment(args, logger, out_dir)
 
+        util.remove_logger(logger)
+
         args.rs += 1
 
 

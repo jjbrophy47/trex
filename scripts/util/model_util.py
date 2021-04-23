@@ -280,6 +280,9 @@ def get_selected_params(dataset, model, surrogate):
     C = d[dataset][1]
     n_neighbors = d[dataset][3]
 
+    # set C to 1 for all methods
+    C = 1.0
+
     # make custom adjustment
     for kernel in ['feature_path', 'feature_output', 'weighted_leaf_path', 'leaf_path', 'leaf_output', 'tree_output']:
         if kernel in surrogate:
