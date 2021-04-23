@@ -7,14 +7,18 @@ time=$6
 partition=$7
 
 method_list=(
+             'klr_tree_output_alpha'
              # 'klr_og_tree_output_alpha'
-             'klr_og_tree_output_sim'
+             # 'klr_og_tree_output_sim'
+             'klr_leaf_path_alpha'
              # 'klr_og_leaf_path_alpha'
-             'klr_og_leaf_path_sim'
+             # 'klr_og_leaf_path_sim'
+             'klr_weighted_leaf_path_alpha'
              # 'klr_og_weighted_leaf_path_alpha'
-             'klr_og_weighted_leaf_path_sim'
+             # 'klr_og_weighted_leaf_path_sim'
+             'klr_weighted_feature_path_alpha'
              # 'klr_og_weighted_feature_path_alpha'
-             'klr_og_weighted_feature_path_sim'
+             # 'klr_og_weighted_feature_path_sim'
              # 'random'
              # 'fast_leaf_influence'
              # 'tree_loss'
