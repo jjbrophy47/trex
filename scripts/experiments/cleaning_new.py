@@ -20,6 +20,9 @@ from copy import deepcopy
 from datetime import datetime
 
 import numpy as np
+import matplotlib
+matplotlib.use('agg')
+import matplotlib.pyplot as plt
 from sklearn.base import clone
 from sklearn.metrics.pairwise import rbf_kernel
 from sklearn.neighbors import KNeighborsClassifier
@@ -175,7 +178,7 @@ def random_method(args, noisy_indices, n_check, n_checkpoint,
 def trex_method(args, model_noisy, y_train_noisy,
                 noisy_indices, n_check, n_checkpoint,
                 clf, X_train, y_train, X_test, y_test,
-                acc_noisy, auc_noisy, logger=None):
+                acc_noisy, auc_noisy, logger=None, out_dir=None):
     """
     Order by largest absolute values of the instance coefficients
     from the KLR or SVM surrogate model.
@@ -208,19 +211,43 @@ def trex_method(args, model_noisy, y_train_noisy,
         # sort train instances prioritizing largest negative similarity density
         if 'sim' in args.method:
             start = time.time()
-            similarity_density = np.zeros(X_train.shape[0])
 
-            for i in range(X_train.shape[0]):
-                x_sim = surrogate.similarity(X_train[[i]])[0]
-                x_sim = np.where(y_train == y_train[i], x_sim, x_sim * -1)
+            # compute attributions of training samples on each input chunk
+            similarity_density = np.zeros(0,)
+            for i in range(0, X_train.shape[0], 1000):
+                X_sub_sim = surrogate.similarity(X_train[i: i + 1000])
 
-                similarity_density[i] = np.sum(x_sim)
+                y_sub_mask = np.ones(X_sub_sim.shape)
+                for j in range(y_sub_mask.shape[0]):
+                    y_sub_mask[j][np.where(y_train_noisy[j + i] != y_train_noisy)] = -1
+                X_sub_sim = X_sub_sim * y_sub_mask
 
-                if (i + 1) % int(X_train.shape[0] * 0.1) == 0:
-                    elapsed = time.time() - start
-                    logger.info('{:.1f}%...{:.3f}s'.format(i / X_train.shape[0] * 100, elapsed))
+                similarity_density_sub = np.sum(X_sub_sim, axis=1)
+                similarity_density = np.concatenate([similarity_density, similarity_density_sub])
 
-            train_indices = np.argsort(similarity_density)[::-1]
+                elapsed = time.time() - start
+
+                logger.info('{:.1f}%...{:.3f}s'.format(i / X_train.shape[0] * 100, elapsed))
+
+            train_indices = np.argsort(similarity_density)
+
+            # plot |alpha| vs. similarity density
+            if out_dir is not None:
+
+                alpha = surrogate.get_alpha()
+                alpha = np.abs(alpha)
+
+                non_noisy_indices = np.setdiff1d(np.arange(y_train.shape[0]), noisy_indices)
+
+                fig, ax = plt.subplots()
+                ax.scatter(alpha[non_noisy_indices], similarity_density[non_noisy_indices],
+                           alpha=0.1, label='non-noisy', color='green')
+                ax.scatter(alpha[noisy_indices], similarity_density[noisy_indices],
+                           alpha=0.1, label='noisy', color='red')
+                ax.set_xlabel('alpha')
+                ax.set_ylabel('similarity_density')
+                ax.legend()
+                plt.savefig(os.path.join(out_dir, 'alpha_sim.png'))
 
         elif 'alpha' in args.method:
             alpha = surrogate.get_alpha()
@@ -602,7 +629,7 @@ def experiment(args, logger, out_dir):
         result = trex_method(args, model_noisy, y_train_noisy,
                              noisy_indices, n_check, n_checkpoint,
                              clf, X_train, y_train, X_test, y_test,
-                             acc_noisy, auc_noisy, logger=logger)
+                             acc_noisy, auc_noisy, logger=logger, out_dir=out_dir)
 
     # tree-esemble loss
     elif args.method == 'tree_loss':
