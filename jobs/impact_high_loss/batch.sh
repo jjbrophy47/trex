@@ -1,16 +1,12 @@
-# TESTING ONE TEST INSTANCE AT A TIME
+./jobs/impact_high_loss/primer.sh 'churn'          'cb' 100 5 5  1440  'short'
+./jobs/impact_high_loss/primer.sh 'surgical'       'cb' 250 7 15 1440  'short'
+./jobs/impact_high_loss/primer.sh 'vaccine'        'cb' 250 7 15 1440  'short'
+./jobs/impact_high_loss/primer.sh 'bank_marketing' 'cb' 250 7 15 1440  'short'
+./jobs/impact_high_loss/primer.sh 'adult'          'cb' 250 7 15 1440  'short'
+./jobs/impact_high_loss/primer.sh 'synthetic'      'cb' 250 7 15 1440  'short'
 
-# CB
-./jobs/impact_high_loss/primer.sh 'churn'          'cb' 'standard' 100 5 2  600  'short'
-./jobs/impact_high_loss/primer.sh 'surgical'       'cb' 'standard' 250 7 2  600  'short'
-./jobs/impact_high_loss/primer.sh 'vaccine'        'cb' 'standard' 250 7 15 600  'short'
-./jobs/impact_high_loss/primer.sh 'bank_marketing' 'cb' 'standard' 250 7 15 600  'short'
-./jobs/impact_high_loss/primer.sh 'adult'          'cb' 'standard' 250 7 15 600  'short'
-./jobs/impact_high_loss/primer.sh 'synthetic'      'cb' 'standard' 250 7 15 600  'short'
-
-# RF
-./jobs/impact_high_loss/primer.sh 'churn'          'rf' 'standard'    100 3 5  300 'short'
-./jobs/impact_high_loss/primer.sh 'surgical'       'rf' 'standard'    250 7 20 300 'short'
-./jobs/impact_high_loss/primer.sh 'vaccine'        'rf' 'standard'    250 7 20 300 'short'
-./jobs/impact_high_loss/primer.sh 'bank_marketing' 'rf' 'standard'    250 7 20 300 'short'
-./jobs/impact_high_loss/primer.sh 'adult'          'rf' 'standard'    250 7 30 300 'short'
+./jobs/impact_high_loss/primer.sh 'churn'          'rf' 100 3 5  300 'short'
+./jobs/impact_high_loss/primer.sh 'surgical'       'rf' 250 7 20 300 'short'
+./jobs/impact_high_loss/primer.sh 'vaccine'        'rf' 250 7 20 300 'short'
+./jobs/impact_high_loss/primer.sh 'bank_marketing' 'rf' 250 7 20 300 'short'
+./jobs/impact_high_loss/primer.sh 'adult'          'rf' 250 7 30 300 'short'
