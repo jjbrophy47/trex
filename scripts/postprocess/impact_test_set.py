@@ -108,11 +108,11 @@ def process_results(df):
         main_result['proba_diff_mean'] = mean_vals
         main_result['proba_diff_sem'] = sem_vals
 
-        # # absolute probability differences
-        # avg_loss = [np.array(x) for x in gf['avg_loss'].values]
-        # mean_vals, sem_vals, n_drop = mean_and_sem(avg_loss)
-        # main_result['avg_loss_mean'] = mean_vals
-        # main_result['avg_loss_sem'] = sem_vals
+        # absolute probability differences
+        logloss = [np.array(x) for x in gf['logloss'].values]
+        mean_vals, sem_vals, n_drop = mean_and_sem(logloss)
+        main_result['logloss_mean'] = mean_vals
+        main_result['logloss_sem'] = sem_vals
 
         # # absolute probability differences
         # med_loss = [np.array(x) for x in gf['med_loss'].values]
@@ -236,12 +236,19 @@ if __name__ == '__main__':
                         default=['random',
                                  'klr_og_tree_output_alpha',
                                  'klr_og_tree_output_sim',
+                                 'klr_og_tree_output_sim_inf',
                                  'klr_og_tree_output',
                                  'klr_og_leaf_path_alpha',
                                  'klr_og_leaf_path_sim',
+                                 'klr_og_leaf_path_sim_inf',
                                  'klr_og_leaf_path',
+                                 'klr_og_leaf_output_alpha',
+                                 'klr_og_leaf_output_sim',
+                                 'klr_og_leaf_output_sim_inf',
+                                 'klr_og_leaf_output',
                                  'klr_og_weighted_leaf_path_alpha',
                                  'klr_og_weighted_leaf_path_sim',
+                                 'klr_og_weighted_leaf_path_sim_inf',
                                  'klr_og_weighted_leaf_path',
                                  'fast_leaf_influence',
                                  ])

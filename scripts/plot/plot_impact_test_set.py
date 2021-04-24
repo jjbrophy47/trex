@@ -24,31 +24,47 @@ def main(args):
     methods = {}
 
     # slice 'n dice TREX results
-    if args.kernel is None or args.kernel == 'to':
-        if args.trex_type is None or args.trex_type == 'alpha':
+    if 'to' in args.kernel:
+        if 'alpha' in args.trex:
             methods['klr_og_tree_output_alpha'] = ['TREX (OG-TO-Alpha)', 'yellowgreen', '2', '-', 11]
-        if args.trex_type is None or args.trex_type == 'sim':
+        if 'sim' in args.trex:
             methods['klr_og_tree_output_sim'] = ['TREX (OG-TO-Sim)', 'yellowgreen', '2', '--', 11]
-        if args.trex_type is None or args.trex_type == 'alphasim':
+        if 'sim_inf' in args.trex:
+            methods['klr_og_tree_output_sim_inf'] = ['TREX (OG-TO-SimInf)', 'yellowgreen', '2', '-.', 11]
+        if 'alphasim' in args.trex:
             methods['klr_og_tree_output'] = ['TREX (OG-TO-AlphaSim)', 'yellowgreen', '2', ':', 11]
 
-    if args.kernel is None or args.kernel == 'lp':
-        if args.trex_type is None or args.trex_type == 'alpha':
+    if 'lp' in args.kernel:
+        if 'alpha' in args.trex:
             methods['klr_og_leaf_path_alpha'] = ['TREX (OG-LP-Alpha)', 'cyan', '1', '-', 11]
-        if args.trex_type is None or args.trex_type == 'sim':
+        if 'sim' in args.trex:
             methods['klr_og_leaf_path_sim'] = ['TREX (OG-LP-Sim)', 'cyan', '1', '--', 10]
-        if args.trex_type is None or args.trex_type == 'alphasim':
+        if 'sim_inf' in args.trex:
+            methods['klr_og_leaf_path_sim_inf'] = ['TREX (OG-LP-SimInf)', 'cyan', '1', '-.', 10]
+        if 'alphasim' in args.trex:
             methods['klr_og_leaf_path'] = ['TREX (OG-LP-AlphaSim)', 'cyan', '1', ':', 11]
 
-    if args.kernel is None or args.kernel == 'wlp':
-        if args.trex_type is None or args.trex_type == 'alpha':
+    if 'lo' in args.kernel:
+        if 'alpha' in args.trex:
+            methods['klr_og_leaf_output_alpha'] = ['TREX (OG-LO-Alpha)', 'green', '1', '-', 11]
+        if 'sim' in args.trex:
+            methods['klr_og_leaf_output_sim'] = ['TREX (OG-LO-Sim)', 'green', '1', '--', 10]
+        if 'sim_inf' in args.trex:
+            methods['klr_og_leaf_output_sim_inf'] = ['TREX (OG-LO-SimInf)', 'green', '1', '-.', 10]
+        if 'alphasim' in args.trex:
+            methods['klr_og_leaf_output'] = ['TREX (OG-LO-AlphaSim)', 'green', '1', ':', 11]
+
+    if 'wlp' in args.kernel:
+        if 'alpha' in args.trex:
             methods['klr_og_weighted_leaf_path_alpha'] = ['TREX (OG-WLP-Alpha)', 'magenta', '2', '-', 11]
-        if args.trex_type is None or args.trex_type == 'sim':
+        if 'sim' in args.trex:
             methods['klr_og_weighted_leaf_path_sim'] = ['TREX (OG-WLP-Sim)', 'magenta', '2', '--', 11]
-        if args.trex_type is None or args.trex_type == 'alphasim':
+        if 'sim_inf' in args.trex:
+            methods['klr_og_weighted_leaf_path_sim_inf'] = ['TREX (OG-WLP-SimInf)', 'magenta', '2', '-.', 11]
+        if 'alphasim' in args.trex:
             methods['klr_og_weighted_leaf_path'] = ['TREX (OG-WLP-AlphaSim)', 'magenta', '2', ':', 11]
 
-    methods['klr_og_weighted_feature_path_sim_C-1.0'] = ['TREX (OG-WFP-AlphaSim)', 'gold', '2', '--', 11]
+    # methods['klr_og_weighted_feature_path_sim_C-1.0'] = ['TREX (OG-WFP-AlphaSim)', 'gold', '2', '--', 11]
 
     methods['random'] = ['Random', 'red', 'o', '-', 9]
     # methods['maple+'] = ['MAPLE', 'orange', '^', '--', 7]
@@ -93,15 +109,7 @@ def main(args):
 
                 # add y-axis
                 if j == 0:
-
-                    if args.metric == 'proba_diff':
-                        ax.set_ylabel(r'|Test prob. $\Delta$|')
-
-                    elif args.metric == 'proba':
-                        ax.set_ylabel(r'Test prob.')
-
-                    elif args.metric == 'avg_loss':
-                        ax.set_ylabel(r'L1 loss')
+                    ax.set_ylabel(args.metric)
 
                 # add x-axis
                 if i == 1:
@@ -176,15 +184,14 @@ if __name__ == '__main__':
     parser.add_argument('--in_dir', type=str, default='output/impact_test_set/csv/', help='input directory.')
     parser.add_argument('--out_dir', type=str, default='output/plots/impact_test_set/', help='output directory.')
     parser.add_argument('--model', type=str, default='cb', help='tree-ensemble model.')
-    parser.add_argument('--metric', type=str, default='acc', help='peformance metric.')
+    parser.add_argument('--metric', type=str, default='acc', help='acc, auc, or logloss.')
     parser.add_argument('--setting', type=str, default='static', help='evaluation setting.')
 
     parser.add_argument('--train_frac_to_remove', type=float, nargs='+', default=[0.1, 0.25, 0.5], help='fracion.')
 
     # filter settings
-    parser.add_argument('--C', type=float, default=None, help='specific C.')
-    parser.add_argument('--trex_type', type=str, default=None, help='None, alpha, or sim.')
-    parser.add_argument('--kernel', type=str, default=None, help='None, to, lp, or wlp.')
+    parser.add_argument('--trex', type=str, nargs='+', default=['alpha', 'sim', 'sim_inf' 'alphasim'], help='TREX.')
+    parser.add_argument('--kernel', type=str, nargs='+', default=['to', 'lp', 'lo', 'wlp'], help='tree kernels.')
 
     args = parser.parse_args()
     main(args)
