@@ -619,8 +619,9 @@ def experiment(args, logger, out_dir):
     util.performance(model_noisy, X_test, y_test, logger=logger, name='After, Test')
 
     # check predictive performance before and after noise
-    acc_clean, auc_clean = score(model, X_test, y_test)
-    acc_noisy, auc_noisy = score(model_noisy, X_test, y_test)
+    train_acc_clean, train_auc_clean = score(model, X_train, y_train)
+    test_acc_clean, test_auc_clean = score(model, X_test, y_test)
+    test_acc_noisy, test_auc_noisy = score(model_noisy, X_test, y_test)
 
     # find how many corrupted / non-corrupted labels were incorrectly predicted
     predicted_labels = model_noisy.predict(X_train).flatten()
@@ -637,56 +638,56 @@ def experiment(args, logger, out_dir):
     if args.method == 'random':
         result = random_method(args, noisy_indices, n_check, n_checkpoint,
                                clf, X_train, y_train, X_test, y_test,
-                               acc_noisy, auc_noisy, logger=logger)
+                               test_acc_noisy, test_auc_noisy, logger=logger)
 
     # TREX
     elif 'klr' in args.method or 'svm' in args.method:
         result = trex_method(args, model_noisy, y_train_noisy,
                              noisy_indices, n_check, n_checkpoint,
                              clf, X_train, y_train, X_test, y_test,
-                             acc_noisy, auc_noisy, logger=logger, out_dir=out_dir)
+                             test_acc_noisy, test_auc_noisy, logger=logger, out_dir=out_dir)
 
     # tree-esemble loss
     elif args.method == 'tree_loss':
         result = tree_loss_method(args, model_noisy, y_train_noisy,
                                   noisy_indices, n_check, n_checkpoint,
                                   clf, X_train, y_train, X_test, y_test,
-                                  acc_noisy, auc_noisy, logger=logger)
+                                  test_acc_noisy, test_auc_noisy, logger=logger)
 
     # Leaf Influence
     elif 'leaf_influence' in args.method and args.model == 'cb':
         result = leaf_influence_method(args, model_noisy, y_train_noisy,
                                        noisy_indices, n_check, n_checkpoint,
                                        clf, X_train, y_train, X_test, y_test,
-                                       acc_noisy, auc_noisy, logger=logger)
+                                       test_acc_noisy, test_auc_noisy, logger=logger)
 
     # MAPLE
     elif args.method == 'maple':
         result = maple_method(args, model_noisy,
                               noisy_indices, n_check, n_checkpoint,
                               clf, X_train, y_train, X_test, y_test,
-                              acc_noisy, auc_noisy, logger=logger)
+                              test_acc_noisy, test_auc_noisy, logger=logger)
 
     # TEKNN
     elif 'knn' in args.method:
         result = teknn_method(args, model_noisy, y_train_noisy,
                               noisy_indices, n_check, n_checkpoint,
                               clf, X_train, y_train, X_test, y_test,
-                              acc_noisy, auc_noisy, logger=logger)
+                              test_acc_noisy, test_auc_noisy, logger=logger)
 
     # Tree Prototype
     elif args.method == 'tree_prototype':
         result = tree_prototype_method(args, model_noisy, y_train_noisy,
                                        noisy_indices, n_check, n_checkpoint,
                                        clf, X_train, y_train, X_test, y_test,
-                                       acc_noisy, auc_noisy, logger=logger)
+                                       test_acc_noisy, test_auc_noisy, logger=logger)
 
     # MMD Prototype
     elif args.method == 'mmd_prototype':
         result = mmd_prototype_method(args, model_noisy, y_train_noisy,
                                       noisy_indices, n_check, n_checkpoint,
                                       clf, X_train, y_train, X_test, y_test,
-                                      acc_noisy, auc_noisy, logger=logger)
+                                      test_acc_noisy, test_auc_noisy, logger=logger)
 
     else:
         raise ValueError('unknown method {}'.format(args.method))
@@ -694,8 +695,10 @@ def experiment(args, logger, out_dir):
     # save results
     result['max_rss'] = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
     result['total_time'] = time.time() - begin
-    result['acc_clean'] = acc_clean
-    result['auc_clean'] = auc_clean
+    result['train_acc_clean'] = train_acc_clean
+    result['train_auc_clean'] = train_auc_clean
+    result['test_acc_clean'] = test_acc_clean
+    result['test_auc_clean'] = test_auc_clean
     np.save(os.path.join(out_dir, 'results.npy'), result)
 
     # display results

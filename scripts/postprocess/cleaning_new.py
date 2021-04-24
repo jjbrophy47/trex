@@ -57,14 +57,24 @@ def process_results(df):
         main_result['auc_clean'] = gf['auc_clean'].mean()
 
         # compute average accuracy
-        accs = [np.array(x) for x in gf['accs'].values]
-        main_result['accs_mean'] = np.mean(accs, axis=0)
-        main_result['accs_sem'] = sem(accs, axis=0)
+        accs = [np.array(x) for x in gf['train_accs'].values]
+        main_result['train_accs_mean'] = np.mean(accs, axis=0)
+        main_result['train_accs_sem'] = sem(accs, axis=0)
+
+        # compute average accuracy
+        accs = [np.array(x) for x in gf['test_accs'].values]
+        main_result['test_accs_mean'] = np.mean(accs, axis=0)
+        main_result['test_accs_sem'] = sem(accs, axis=0)
 
         # compute average AUC
-        aucs = [np.array(x) for x in gf['aucs'].values]
-        main_result['aucs_mean'] = np.mean(aucs, axis=0)
-        main_result['aucs_sem'] = sem(aucs, axis=0)
+        aucs = [np.array(x) for x in gf['train_aucs'].values]
+        main_result['train_aucs_mean'] = np.mean(aucs, axis=0)
+        main_result['train_aucs_sem'] = sem(aucs, axis=0)
+
+        # compute average AUC
+        aucs = [np.array(x) for x in gf['test_aucs'].values]
+        main_result['test_aucs_mean'] = np.mean(aucs, axis=0)
+        main_result['test_aucs_sem'] = sem(aucs, axis=0)
 
         # compute average fixed percentages
         fixed_pcts = [np.array(x) for x in gf['fixed_pcts'].values]

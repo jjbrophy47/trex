@@ -29,23 +29,26 @@ def main(args):
     print(args)
 
     # settings
-    dataset_list = ['churn', 'surgical', 'vaccine', 'bank_marketing', 'adult']
+    dataset_list = ['churn', 'surgical', 'vaccine', 'bank_marketing', 'adult', 'synthetic']
 
     methods = {}
 
     if args.kernel is None or args.kernel == 'to':
+        methods['klr_tree_output_alpha'] = ['TREX (TO-Alpha)', 'yellowgreen', '2', ':', 11]
         if args.trex_type is None or args.trex_type == 'alpha':
             methods['klr_og_tree_output_alpha'] = ['TREX (OG-TO-Alpha)', 'yellowgreen', '2', '-', 11]
         if args.trex_type is None or args.trex_type == 'sim':
             methods['klr_og_tree_output_sim'] = ['TREX (OG-TO-Sim)', 'yellowgreen', '2', '--', 11]
 
     if args.kernel is None or args.kernel == 'lp':
+        methods['klr_leaf_path_alpha'] = ['TREX (LP-Alpha)', 'cyan', '1', ':', 11]
         if args.trex_type is None or args.trex_type == 'alpha':
             methods['klr_og_leaf_path_alpha'] = ['TREX (OG-LP-Alpha)', 'cyan', '1', '-', 11]
         if args.trex_type is None or args.trex_type == 'sim':
             methods['klr_og_leaf_path_sim'] = ['TREX (OG-LP-Sim)', 'cyan', '1', '--', 10]
 
     if args.kernel is None or args.kernel == 'wlp':
+        methods['klr_weighted_leaf_path_alpha'] = ['TREX (WLP-Alpha)', 'magenta', '2', ':', 11]
         if args.trex_type is None or args.trex_type == 'alpha':
             methods['klr_og_weighted_leaf_path_alpha'] = ['TREX (OG-WLP-Alpha)', 'magenta', '2', '-', 11]
         if args.trex_type is None or args.trex_type == 'sim':
@@ -93,9 +96,6 @@ def main(args):
         for i in range(axs.shape[0]):
             for j in range(axs.shape[1]):
 
-                if k == 5:
-                    break
-
                 # extract dataset results
                 ax = axs[i][j]
                 dataset = dataset_list[k]
@@ -103,18 +103,18 @@ def main(args):
 
                 # # obtain clean results
                 line_clean = None
-                if args.metric in ['acc', 'auc']:
-                    metric_clean = temp_df1['{}_clean'.format(args.metric)].mean()
+                if args.metric == 'test_acc' or args.metric == 'test_auc':
+                    metric = 'acc' if args.metric == 'test_acc' else 'auc'
+                    metric_clean = temp_df1['{}_clean'.format(metric)].mean()
                     line_clean = ax.axhline(metric_clean, color='k', linestyle='--')
 
                 # add y-axis
                 if j == 0:
-                    if args.metric in ['acc', 'auc']:
-                        label = 'accuracy' if args.metric == 'acc' else 'AUC'
-                        ax.set_ylabel('Test {}'.format(label))
-
-                    elif args.metric == 'fixed_pct':
+                    if args.metric == 'fixed_pct':
                         ax.set_ylabel('Corrupted labels fixed (%)')
+
+                    else:
+                        ax.set_ylabel(args.metric)
 
                 # add x-axis
                 if i == 1:
@@ -190,7 +190,8 @@ if __name__ == '__main__':
 
     parser.add_argument('--model', type=str, default='cb', help='tree-ensemble.')
     parser.add_argument('--flip_frac', type=float, nargs='+', default=[0.1, 0.2, 0.3, 0.4], help='flips.')
-    parser.add_argument('--metric', type=str, default='acc', help='acc, auc, or fixed_pcts.')
+    parser.add_argument('--metric', type=str, default='test_acc',
+                        help='train_acc, train_auc, test_acc, test_auc, or fixed_pct.')
 
     parser.add_argument('--trex_type', type=str, default=None, help='None, alpha, or sim.')
     parser.add_argument('--kernel', type=str, default=None, help='None, to, lp, or wlp.')

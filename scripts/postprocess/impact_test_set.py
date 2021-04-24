@@ -231,7 +231,7 @@ if __name__ == '__main__':
                         default=['churn', 'surgical', 'vaccine', 'bank_marketing', 'adult', 'synthetic'])
     parser.add_argument('--model', type=int, nargs='+', default=['cb', 'rf', 'lgb'], help='model.')
     parser.add_argument('--setting', type=str, nargs='+', default=['static', 'dynamic'], help='setting.')
-    parser.add_argument('--train_frac_to_remove', type=float, nargs='+', default=[0.1, 0.5], help='remove fraction.')
+    parser.add_argument('--train_frac_to_remove', type=float, nargs='+', default=[0.1, 0.25, 0.5], help='fraction.')
     parser.add_argument('--method', type=int, nargs='+', help='method for sorting train data.',
                         default=['random',
                                  'klr_og_tree_output_alpha',

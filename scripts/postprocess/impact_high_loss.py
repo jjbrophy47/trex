@@ -234,37 +234,24 @@ if __name__ == '__main__':
 
     # experiment settings
     parser.add_argument('--dataset', type=str, nargs='+', help='dataset.',
-                        default=['churn', 'surgical', 'vaccine', 'amazon', 'bank_marketing', 'adult', 'census'])
+                        default=['churn', 'surgical', 'vaccine', 'bank_marketing', 'adult', 'synthetic'])
     parser.add_argument('--model', type=int, nargs='+', default=['cb', 'rf', 'lgb'], help='model.')
-    parser.add_argument('--preprocessing', type=int, nargs='+', default=['categorical', 'standard'],
+    parser.add_argument('--preprocessing', type=int, nargs='+', default=['standard'],
                         help='preprocessing directory.')
     parser.add_argument('--method', type=int, nargs='+',
                         default=['random',
-                                 'klr_og_tree_output_alpha_C-0.001',
-                                 'klr_og_tree_output_sim_C-0.001',
-                                 'klr_og_tree_output_C-0.001',
-                                 'klr_og_tree_output_alpha_C-1.0',
-                                 'klr_og_tree_output_sim_C-1.0',
-                                 'klr_og_tree_output_C-1.0',
-                                 'klr_og_leaf_path_alpha_C-0.001',
-                                 'klr_og_leaf_path_sim_C-0.001',
-                                 'klr_og_leaf_path_C-0.001',
-                                 'klr_og_leaf_path_alpha_C-1.0',
-                                 'klr_og_leaf_path_sim_C-1.0',
-                                 'klr_og_leaf_path_C-1.0',
-                                 'klr_og_weighted_leaf_path_alpha_C-0.001',
-                                 'klr_og_weighted_leaf_path_sim_C-0.001',
-                                 'klr_og_weighted_leaf_path_C-0.001',
-                                 'klr_og_weighted_leaf_path_alpha_C-1.0',
-                                 'klr_og_weighted_leaf_path_sim_C-1.0',
-                                 'klr_og_weighted_leaf_path_C-1.0',
-                                 'klr_og_weighted_feature_path_sim_C-1.0',
-                                 'maple+',
-                                 'maple+_og',
-                                 'knn_og',
-                                 'leaf_influence',
+                                 'klr_og_tree_output_alpha',
+                                 'klr_og_tree_output_sim',
+                                 'klr_og_tree_output',
+                                 'klr_og_leaf_path_alpha',
+                                 'klr_og_leaf_path_sim',
+                                 'klr_og_leaf_path',
+                                 'klr_og_weighted_leaf_path_alpha',
+                                 'klr_og_weighted_leaf_path_sim',
+                                 'klr_og_weighted_leaf_path',
+                                 'klr_og_weighted_feature_path_sim',
                                  'fast_leaf_influence',
-                                 'bacon'],
+                                 ],
                         help='method for sorting train data.')
     parser.add_argument('--setting', type=str, nargs='+', default=['static', 'dynamic'], help='setting.')
     parser.add_argument('--start_pred', type=int, nargs='+', default=[0, 1, -1], help='start prediction.')

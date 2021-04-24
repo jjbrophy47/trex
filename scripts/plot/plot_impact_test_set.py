@@ -179,7 +179,7 @@ if __name__ == '__main__':
     parser.add_argument('--metric', type=str, default='acc', help='peformance metric.')
     parser.add_argument('--setting', type=str, default='static', help='evaluation setting.')
 
-    parser.add_argument('--train_frac_to_remove', type=float, nargs='+', default=[0.1, 0.5], help='remove fracion.')
+    parser.add_argument('--train_frac_to_remove', type=float, nargs='+', default=[0.1, 0.25, 0.5], help='fracion.')
 
     # filter settings
     parser.add_argument('--C', type=float, default=None, help='specific C.')

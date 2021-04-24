@@ -31,6 +31,7 @@ import matplotlib.pyplot as plt
 from sklearn.base import clone
 from sklearn.metrics import roc_auc_score
 from sklearn.metrics import accuracy_score
+from sklearn.metrics import log_loss
 from scipy.stats import mode
 from scipy.stats import spearmanr
 
@@ -78,9 +79,11 @@ def score(model, X_test, y_test):
     Evaluates the model the on test set and returns metric scores.
     """
     assert X_test.shape[1] > 1
+    proba = model.predict_proba(X_test)
     acc = accuracy_score(y_test, model.predict(X_test))
-    auc = roc_auc_score(y_test, model.predict_proba(X_test)[:, 1])
-    return (acc, auc)
+    auc = roc_auc_score(y_test, proba[:, 1])
+    logloss = log_loss(y_test, proba[:, 1])
+    return (acc, auc, logloss)
 
 
 def sort_by_distribution(train_indices, y_train):
@@ -157,7 +160,7 @@ def measure_performance(args, clf, X_train, y_train, X_test, y_test, rng,
     model = clone(clf).fit(X_train, y_train)
     base_proba = model.predict_proba(X_test)[:, 1]
     base_proba_avg = base_proba.mean()
-    acc, auc = score(model, X_test, y_test)
+    acc, auc, logloss = score(model, X_test, y_test)
 
     # display status
     if logger:
@@ -172,6 +175,7 @@ def measure_performance(args, clf, X_train, y_train, X_test, y_test, rng,
     result['proba'] = [base_proba_avg]
     result['acc'] = [acc]
     result['auc'] = [auc]
+    result['logloss'] = [logloss]
 
     # construct list of removed percentages
     frac_remove_list = np.linspace(0, args.train_frac_to_remove, 10 + 1)[1:]
@@ -223,12 +227,12 @@ def measure_performance(args, clf, X_train, y_train, X_test, y_test, rng,
         # compute metrics
         proba = new_model.predict_proba(X_test)[:, 1]
         proba_avg = proba.mean()
-        proba_avg_diff = np.abs(base_proba_avg - proba_avg)
-        acc, auc = score(new_model, X_test, y_test)
+        acc, auc, logloss = score(new_model, X_test, y_test)
 
         # add to results
         result['acc'].append(acc)
         result['auc'].append(auc)
+        result['logloss'].append(logloss)
         result['proba_diff'].append(np.abs(base_proba_avg - proba_avg))
         result['proba'].append(proba_avg)
         result['remove_pct'].append(pct_remove)
@@ -250,10 +254,10 @@ def measure_performance(args, clf, X_train, y_train, X_test, y_test, rng,
 
         # display progress
         if logger:
-            s = '[{:.1f}% removed] after prob.: {:.5f}, delta: {:.5f}, acc: {:.3f}, auc: {:.3f}...{:.3f}s'
+            s = '[{:.1f}% removed] after prob.: {:.5f}, acc: {:.3f}, auc: {:.3f}, logloss: {:.3f}...{:.3f}s'
             if ckpt:
                 s += ', ckpt!'
-            logger.info(s.format(pct_remove, proba_avg, proba_avg_diff, acc, auc, time.time() - start))
+            logger.info(s.format(pct_remove, proba_avg, acc, auc, logloss, time.time() - start))
 
     return result
 
@@ -294,7 +298,7 @@ def trex_method(args, model, X_train, y_train, X_test, out_dir, logger=None):
     # save alpha and sim
     alpha = surrogate.get_alpha()
     sim = surrogate.similarity(X_test)
-    plot_trex(alpha, sim, y_train, out_dir)
+    # plot_trex(alpha, sim, y_train, out_dir)
 
     # display status
     if not logger:
@@ -302,20 +306,31 @@ def trex_method(args, model, X_train, y_train, X_test, out_dir, logger=None):
 
     # sort by largest avg. similarity to the test set
     if 'sim' in args.method:
-        avg_sim = np.mean(sim, axis=0)
-        train_indices = np.argsort(avg_sim)[::-1]
+
+        # sort by largest avg. pos. similarity to the test set
+        if 'inf' in args.method:
+            model_pred = model.predict(X_test)
+            for i in range(X_test.shape[0]):
+                sim[i] = np.where(train_label == model_pred[i], sim[i], sim[i] * -1)
+            agg_sim = np.mean(sim, axis=0)
+            train_indices = np.argsort(agg_sim)[::-1]
+
+        # sort by largest avg. similarity to the test set
+        else:
+            agg_sim = np.mean(sim, axis=0)
+            train_indices = np.argsort(agg_sim)[::-1]
 
     # sort by largest magnitude of alpha
     elif 'alpha' in args.method:
         magnitude = np.abs(alpha)
         train_indices = np.argsort(magnitude)[::-1]
 
-    # sort by largest avg. magnitude of alpha * similarity
+    # sort by largest avg. influence on test set
     else:
-        alpha_sim = surrogate.compute_attributions(X_test)
-        avg_alpha_sim = np.mean(alpha_sim, axis=0)
-        magnitude = np.abs(avg_alpha_sim)
-        train_indices = np.argsort(magnitude)[::-1]
+        model_pred = model.predict(X_test)
+        influence = surrogate.pred_influence(X_test, model_pred)
+        influence = np.mean(influence, axis=0)
+        train_indices = np.argsort(influence)[::-1]
 
     return train_indices
 
@@ -672,7 +687,7 @@ if __name__ == '__main__':
     parser.add_argument('--evaluation', type=str, default='remove', help='remove or add instances for evaluation.')
     parser.add_argument('--train_frac_to_remove', type=float, default=0.1, help='fraction of train data to remove.')
     parser.add_argument('--n_checkpoints', type=int, default=10, help='no. checkpoints to perform retraining.')
-    parser.add_argument('--n_repeats', type=int, default=50, help='no. repeats.')
+    parser.add_argument('--n_repeats', type=int, default=10, help='no. repeats.')
     parser.add_argument('--rs', type=int, default=1, help='random state.')
 
     # Additional settings
