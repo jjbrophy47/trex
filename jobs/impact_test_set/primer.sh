@@ -7,24 +7,24 @@ time=$6
 partition=$7
 
 method_list=(
-             # 'klr_og_tree_output_alpha'
-             # 'klr_og_tree_output_sim'
-             # 'klr_og_tree_output_sim_inf'
-             # 'klr_og_tree_output'
-             # 'klr_og_leaf_path_alpha'
-             # 'klr_og_leaf_path_sim'
-             # 'klr_og_leaf_path_sim_inf'
-             # 'klr_og_leaf_path'
+             'klr_og_tree_output_alpha'
+             'klr_og_tree_output_sim'
+             'klr_og_tree_output_sim_inf'
+             'klr_og_tree_output'
+             'klr_og_leaf_path_alpha'
+             'klr_og_leaf_path_sim'
+             'klr_og_leaf_path_sim_inf'
+             'klr_og_leaf_path'
              'klr_og_leaf_output_alpha'
              'klr_og_leaf_output_sim'
              'klr_og_leaf_output_sim_inf'
              'klr_og_leaf_output'
-             # 'klr_og_weighted_leaf_path_alpha'
-             # 'klr_og_weighted_leaf_path_sim'
-             # 'klr_og_weighted_leaf_path_sim_inf'
-             # 'klr_og_weighted_leaf_path'
-             # 'random'
-             # 'fast_leaf_influence'
+             'klr_og_weighted_leaf_path_alpha'
+             'klr_og_weighted_leaf_path_sim'
+             'klr_og_weighted_leaf_path_sim_inf'
+             'klr_og_weighted_leaf_path'
+             'random'
+             'fast_leaf_influence'
 )
 setting_list=('static')
 frac_remove_list=(0.1 0.25 0.5)

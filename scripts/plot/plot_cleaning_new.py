@@ -146,8 +146,11 @@ def main(args):
                     checked_pcts = np.fromstring(checked_pcts[1: -1], dtype=np.float32, sep=' ')
 
                     # plot
+                    n_runs = temp_df2['num_runs']
                     line = ax.errorbar(checked_pcts, metric_mean, yerr=metric_sem, marker=marker,
-                                       linestyle=linestyle, color=color, zorder=zorder)
+                                       linestyle=linestyle, color=color, zorder=zorder,
+                                       label='n={:,}'.format(n_runs))
+                    ax.legend(fontsize=6)
 
                     # save for legend
                     if i == 0 and j == 0:

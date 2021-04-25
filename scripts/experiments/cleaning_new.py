@@ -218,33 +218,50 @@ def trex_method(args, model_noisy, y_train_noisy,
         y_train_noisy_loss = util.instance_log_loss(y_train_noisy, y_train_proba)  # negative log-likelihood
         train_indices = np.argsort(y_train_noisy_loss)[::-1]  # descending, largest log loss first
 
-    # sort by absolute value of instance weights
+    # sort by sim. or alpha
     else:
         logger.info('\nsorting train instances...')
 
-        # sort train instances prioritizing largest negative similarity density
+        # sort by similarity
         if 'sim' in args.method:
             start = time.time()
 
-            # compute attributions of training samples on each input chunk
-            similarity_density = np.zeros(0,)
-            n_chunk = int(X_train.shape[0] * 0.1)
-            for i in range(0, X_train.shape[0], n_chunk):
-                X_sub_sim = surrogate.similarity(X_train[i: i + n_chunk])
+            # prioritize largest absolute similarity density
+            if 'abs' in args.method:
+                similarity_density = np.zeros(0,)
+                n_chunk = int(X_train.shape[0] * 0.1)
+                for i in range(0, X_train.shape[0], n_chunk):
+                    X_sub_sim = surrogate.similarity(X_train[i: i + n_chunk])
+                    similarity_density_sub = np.sum(X_sub_sim, axis=1)
+                    similarity_density = np.concatenate([similarity_density, similarity_density_sub])
 
-                y_sub_mask = np.ones(X_sub_sim.shape)
-                for j in range(y_sub_mask.shape[0]):
-                    y_sub_mask[j][np.where(y_train_noisy[j + i] != y_train_noisy)] = -1
-                X_sub_sim = X_sub_sim * y_sub_mask
+                    elapsed = time.time() - start
 
-                similarity_density_sub = np.sum(X_sub_sim, axis=1)
-                similarity_density = np.concatenate([similarity_density, similarity_density_sub])
+                    logger.info('{:.1f}%...{:.3f}s'.format(i / X_train.shape[0] * 100, elapsed))
 
-                elapsed = time.time() - start
+                similarity_density = np.abs(similarity_density)
+                train_indices = np.argsort(similarity_density)[::-1]
 
-                logger.info('{:.1f}%...{:.3f}s'.format(i / X_train.shape[0] * 100, elapsed))
+            # sort train instances prioritizing largest negative similarity density
+            else:
+                similarity_density = np.zeros(0,)
+                n_chunk = int(X_train.shape[0] * 0.1)
+                for i in range(0, X_train.shape[0], n_chunk):
+                    X_sub_sim = surrogate.similarity(X_train[i: i + n_chunk])
 
-            train_indices = np.argsort(similarity_density)
+                    y_sub_mask = np.ones(X_sub_sim.shape)
+                    for j in range(y_sub_mask.shape[0]):
+                        y_sub_mask[j][np.where(y_train_noisy[j + i] != y_train_noisy)] = -1
+                    X_sub_sim = X_sub_sim * y_sub_mask
+
+                    similarity_density_sub = np.sum(X_sub_sim, axis=1)
+                    similarity_density = np.concatenate([similarity_density, similarity_density_sub])
+
+                    elapsed = time.time() - start
+
+                    logger.info('{:.1f}%...{:.3f}s'.format(i / X_train.shape[0] * 100, elapsed))
+
+                train_indices = np.argsort(similarity_density)
 
             # plot |alpha| vs. similarity density
             if out_dir is not None:
@@ -763,7 +780,7 @@ if __name__ == '__main__':
 
     # Experiment settings
     parser.add_argument('--rs', type=int, default=1, help='random state.')
-    parser.add_argument('--n_repeats', type=int, default=10, help='no. repeats.')
+    parser.add_argument('--n_repeats', type=int, default=50, help='no. repeats.')
     parser.add_argument('--flip_frac', type=float, default=0.4, help='fraction of train labels to flip.')
     parser.add_argument('--check_pct', type=float, default=0.3, help='max percentage of train instances to check.')
     parser.add_argument('--n_checkpoints', type=int, default=10, help='number of points to plot.')
